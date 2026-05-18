@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using NinjaTrader.Custom.Strategies.FTA.AlgoPO3;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 {
@@ -12,7 +11,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         public RangeBias RangeBias { get; private set; }
 
         private DealingRange currentRange;
-        private DealingRange previousRange;
+        private DealingRange previous;
 
         private DealingRangePosition rangePosition;
 
@@ -20,7 +19,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private bool filteredByPriceAtHighOfDay;
         private bool filteredByPriceAtLowOfDay;
 
-        private bool strongBreakIntoRange;
+        private bool strongBreaksIntoRange;
         private double atr;
 
         public double MinCovered { get; }
@@ -29,8 +28,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private readonly List<(int hour, int minute)> noTradeTimes = [];
 
         private readonly AlgoPO3Base owner;
-
-        private const double DAILY_RANGE_FILTER_PERCENTAGE = 0.05;
 
         public TradeSessionState(AlgoPO3Base owner)
         {
@@ -42,9 +39,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             noTradeTimes.Add((12, 45));
         }
 
-        public void Update(double close, double atr)
+        public void Update(DealingRange current, DealingRange previous, double open, double close, double high, double low, DateTime priceTime, double atr)
         {
-            this.atr = atr;
+            this.currentRange = current;
+            this.previous = previous;
 
             if (close > HighOfDay || HighOfDay == 0)
             {
@@ -55,34 +53,29 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 LowOfDay = close;
             }
-        }
 
-        public void ClearRangeBias()
-        {
-            RangeBias = RangeBias.Neutral;
-        }
-
-        public void DetermineRangeBias(DealingRange previousRange, DealingRange currentRange)
-        {
-            this.currentRange = currentRange;
-            this.previousRange = previousRange;
-
-            if (previousRange == null)
+            if (previous == null)
                 return;
 
-            if (owner.InvalidRange != null && owner.InvalidRange.IsInPlay(owner.Close[0]))
-                return;
+            DetermineRangeBias();
 
-            if (currentRange.Low == previousRange.High)
+            this.rangePosition = this.currentRange.GetPositionInRange(RangeBias, close);
+
+            this.atr = atr;
+        }
+
+        private void DetermineRangeBias()
+        {
+            if (currentRange.Low == previous.High)
             {
                 RangeBias = RangeBias.Bullish;
-                owner.PrintDebug($"Range break detected, range set to {currentRange}");
+                //owner.PrintDebug($"Range bias bull {rangeBias}");
             }
 
-            if (currentRange.High == previousRange.Low)
+            if (currentRange.High == previous.Low)
             {
                 RangeBias = RangeBias.Bearish;
-                owner.PrintDebug($"Range break detected, range set to {currentRange}");
+                //owner.PrintDebug($"Range bias bear {rangeBias}");
             }
         }
 
@@ -98,18 +91,21 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (filteredByTimeOfDay)
                 filteredBy = "filteredByTimeOfDay";
 
-            return $"RangePosition: {rangePosition}, Strong Move: {strongBreakIntoRange} LOD: {LowOfDay}, HOD: {HighOfDay}, Filtered {filteredBy}";
+            return $"RangePosition: {rangePosition}, Strong Move: {strongBreaksIntoRange} LOD: {LowOfDay}, HOD: {HighOfDay}, Filtered {filteredBy}";
         }
 
-        public TradeBias CalculateTradeBias(DateTime priceTime, double open, double close)
+        public TradeBias CalculateTradeBias(DateTime priceTime, double open, double close, double high, double low)
         {
             var bias = TradeBias.Neutral;
 
-            if (previousRange == null)
+            if (previous == null)
                 return bias;
 
+            strongBreaksIntoRange = StrongBreak(open, close, currentRange, atr, owner);
+
             // Don't take trades after these times as we are too close to consolidation.
-            if (owner.BlockEndHoursParsed.Contains(priceTime.Hour) && priceTime.Minute >= 45)
+            if ((priceTime.Hour == 9 && priceTime.Minute >= 45) ||
+                (priceTime.Hour == 12 && priceTime.Minute >= 45))
             {
                 owner.PrintDebug($"Not taking trades as we are past {priceTime.Hour}:{priceTime.Minute}.");
                 filteredByTimeOfDay = true;
@@ -120,25 +116,23 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 filteredByTimeOfDay = false;
             }
 
-            if (owner.SkipHoursParsed.Contains(priceTime.Hour))
+            if (owner.SkipHours.Split(',').Contains(priceTime.Hour.ToString()))
             {
                 owner.PrintDebug($"Not taking trades as we are in hour {priceTime.Hour}:{priceTime.Minute}.");
                 return bias;
             }
 
-            strongBreakIntoRange = StrongBreak(open, close, currentRange, atr, owner);
-
             if (RangeBias == RangeBias.Bullish)
             {
                 if (rangePosition == DealingRangePosition.Discount)
                 {
-                    if (strongBreakIntoRange && owner.BullishBOSDetected)
+                    if (strongBreaksIntoRange && owner.BullishBOSDetected)
                     {
                         bias = TradeBias.Long;
                         owner.PrintDebug($"Set trade to {bias}, range bias {RangeBias}, range position is {rangePosition}.");
                     }
                     else
-                        owner.PrintDebug($"Strong break into range failed, bullish BOS {owner.BullishBOSDetected}, range bias {RangeBias}, range position is {rangePosition}.");
+                        owner.PrintDebug($"No strong move detected {bias}, range bias {RangeBias}, range position is {rangePosition}.");
                 }
             }
 
@@ -146,13 +140,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 if (rangePosition == DealingRangePosition.Discount)
                 {
-                    if (strongBreakIntoRange && owner.BearishBOSDetected)
+                    if (strongBreaksIntoRange && owner.BearishBOSDetected)
                     {
                         bias = TradeBias.Short;
                         owner.PrintDebug($"Set trade to {bias}, range bias {RangeBias}, range position is {rangePosition}.");
                     }
                     else
-                        owner.PrintDebug($"Strong break into range failed, bearish BOS {owner.BearishBOSDetected}, range bias {RangeBias}, range position is {rangePosition}.");
+                        owner.PrintDebug($"No strong move detected {bias}, range bias {RangeBias}, range position is {rangePosition}.");
                 }
             }
 
@@ -178,93 +172,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             return bias;
-        }
-
-        public (TradeBias Bias, bool IsTradeInThisRange) CalculateTradeBiasUniDirectional(DateTime priceTime, double open, double close)
-        {
-            var tradeBias = TradeBias.Neutral;
-            var isTradeInThisRange = true;
-
-            if (previousRange == null)
-                return (tradeBias, false);
-
-            rangePosition = this.currentRange.GetPositionInRange(RangeBias, close);
-
-            if (previousRange == null)
-                return (tradeBias, false);
-
-            // Don't take trades after these times as we are too close to consolidation.
-            if (owner.BlockEndHoursParsed.Contains(priceTime.Hour) && priceTime.Minute >= 45)
-            {
-                owner.PrintDebug($"Not taking trades as we are past {priceTime.Hour}:{priceTime.Minute}.");
-                filteredByTimeOfDay = true;
-                return (tradeBias, false);
-            }
-            else
-            {
-                filteredByTimeOfDay = false;
-            }
-
-            if (owner.SkipHoursParsed.Contains(priceTime.Hour))
-            {
-                owner.PrintDebug($"Not taking trades as we are in hour {priceTime.Hour}:{priceTime.Minute}.");
-                return (tradeBias, false);
-            }
-
-            strongBreakIntoRange = StrongBreak(open, close, currentRange, atr, owner);
-
-            if (RangeBias == RangeBias.Bullish)
-            {
-                if (owner.BearishBOSDetected)
-                {
-                    tradeBias = TradeBias.Short;
-                    isTradeInThisRange = false;
-                }
-
-                if (owner.BullishBOSDetected)
-                    tradeBias = TradeBias.Long;
-
-                owner.PrintDebug($"Set trade to {tradeBias}, range bias {RangeBias}, range position is {rangePosition}.");
-            }
-
-            if (RangeBias == RangeBias.Bearish)
-            {
-                if (owner.BearishBOSDetected)
-                {
-                    tradeBias = TradeBias.Short;
-                }
-
-                if (owner.BullishBOSDetected)
-                {
-                    tradeBias = TradeBias.Long;
-                    isTradeInThisRange = false;
-                }
-
-                owner.PrintDebug($"Set trade to {tradeBias}, range bias {RangeBias}, range position is {rangePosition}.");
-            }
-
-            //This gets skipped before London open.
-            if (priceTime.Hour < 8)
-                return (tradeBias, false);
-
-            // Don't take continuation trades if we at the low of the day.
-            if (tradeBias == TradeBias.Long && IsPriceInHighOfDayArea(close))
-            {
-                tradeBias = TradeBias.Neutral;
-                filteredByPriceAtHighOfDay = true;
-                filteredByPriceAtLowOfDay = false;
-                owner.PrintDebug($"Price at HOD set trade to {tradeBias} price {close}.");
-            }
-
-            if (tradeBias == TradeBias.Short && IsPriceInLowOfDayArea(close))
-            {
-                tradeBias = TradeBias.Neutral;
-                filteredByPriceAtHighOfDay = false;
-                filteredByPriceAtLowOfDay = true;
-                owner.PrintDebug($"Price at LOD set trade to {tradeBias} price {close}.");
-            }
-
-            return (tradeBias, isTradeInThisRange);
         }
 
         public static bool StrongBreak(double open, double close, DealingRange currentRange, double atr, AlgoPO3Base owner)
@@ -313,9 +220,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private bool IsPriceInHighOfDayArea(double price)
         {
             var dayRange = HighOfDay - LowOfDay;
-            var dayRangePercentage = dayRange * DAILY_RANGE_FILTER_PERCENTAGE;
-            var hodHigh = HighOfDay + dayRangePercentage;
-            var hodLow = HighOfDay - dayRangePercentage;
+            var hodHigh = (dayRange * 0.05) + HighOfDay;
+            var hodLow = HighOfDay - (dayRange * 0.05);
 
             owner.PrintDebug($"High D Range Check {dayRange} price {price} hodHighRange {hodHigh} hodLowRange {hodLow} HOD {HighOfDay} LOD {LowOfDay}");
 
@@ -325,18 +231,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private bool IsPriceInLowOfDayArea(double price)
         {
             var dayRange = HighOfDay - LowOfDay;
-            var dayRangePercentage = dayRange * DAILY_RANGE_FILTER_PERCENTAGE;
-            var lodHigh = LowOfDay + dayRangePercentage;
-            var lodLow = LowOfDay - dayRangePercentage;
+            var lodHigh = LowOfDay + (dayRange * 0.05);
+            var lodLow = LowOfDay - (dayRange * 0.05);
 
             owner.PrintDebug($"Low D Range Check {dayRange} price {price} hodHigh {lodHigh} hodLow {lodLow} HOD {HighOfDay} LOD {LowOfDay}");
 
             return price >= lodLow && price <= lodHigh;
-        }
-
-        internal bool IsPriceAtDailyRangeLevels(double price)
-        {
-            return IsPriceInHighOfDayArea(price) || IsPriceInLowOfDayArea(price);
         }
     }
 }

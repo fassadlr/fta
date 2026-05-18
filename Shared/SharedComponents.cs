@@ -60,10 +60,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
 
     public enum FractalType
     {
-        HighFive = 0,
-        LowFive,
-        HighThree,
-        LowThree,
+        HighFiveBar = 0,
+        LowFiveBar,
+        HighThreeBar,
+        LowThreeBar,
         LowLookback,
         HighLookback,
     }
@@ -92,10 +92,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
             if (isFractalHigh)
             {
                 if (upperBound > 0 && h1 > upperBound)
-                    Fractals[(timeFrame, FractalType.HighThree)] = (h1, owner.Time[1]);
+                    Fractals[(timeFrame, FractalType.HighThreeBar)] = (h1, owner.Time[1]);
 
                 if (upperBound == 0)
-                    Fractals[(timeFrame, FractalType.HighThree)] = (h1, owner.Time[1]);
+                    Fractals[(timeFrame, FractalType.HighThreeBar)] = (h1, owner.Time[1]);
 
                 //owner.PrintDebug($"[FRACTAL_3B_HIGH] {timeFrame}m upperBound {upperBound} h1 {h1} time {owner.Time[1]}");
             }
@@ -112,12 +112,52 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
             if (isFractalLow)
             {
                 if (lowerBound > 0 && l1 < lowerBound)
-                    Fractals[(timeFrame, FractalType.LowThree)] = (l1, owner.Time[1]);
+                    Fractals[(timeFrame, FractalType.LowThreeBar)] = (l1, owner.Time[1]);
 
                 if (lowerBound == 0)
-                    Fractals[(timeFrame, FractalType.LowThree)] = (l1, owner.Time[1]);
+                    Fractals[(timeFrame, FractalType.LowThreeBar)] = (l1, owner.Time[1]);
 
                 //owner.PrintDebug($"[FRACTAL_3B_LOW] {timeFrame}m lowerBound {lowerBound} l1 {l1} time {owner.Time[1]}");
+            }
+        }
+
+        internal void DetectFractalWithPlatos(int timeFrame)
+        {
+            // Need at least 3 bars
+            if (owner.CurrentBar < 2)
+                return;
+
+            // --- FRACTAL HIGH LOGIC ---
+            double h0 = owner.High[0];
+            double h1 = owner.High[1];
+            double h2 = owner.High[2];
+
+            // Must be >= both neighbors (allows equal highs)
+            bool isPeakShape = h1 >= h0 && h1 >= h2;
+
+            // At least one side must be strictly lower (prevents flat triple-equal highs)
+            bool hasStrictEdge = h1 > h0 || h1 > h2;
+
+            if (isPeakShape && hasStrictEdge)
+            {
+                Fractals[(timeFrame, FractalType.HighThreeBar)] = (h1, owner.Time[1]);
+                //PrintDebug($"[FRACTAL_5M_HIGH] {LastFractalHigh} upperBound {upperBound} h1 {h1} time {LastFractalHighTime}");
+            }
+
+            // --- FRACTAL LOW LOGIC ---
+            double l0 = owner.Low[0];
+            double l1 = owner.Low[1];
+            double l2 = owner.Low[2];
+
+            // Must be <= both neighbors (allows equal lows)
+            bool isValleyShape = l1 <= l0 && l1 <= l2;
+
+            // At least one side must be strictly higher (prevents flat triple-equal lows)
+            bool hasStrictEdgeLow = l1 < l0 || l1 < l2;
+
+            if (isValleyShape && hasStrictEdgeLow)
+            {
+                Fractals[(timeFrame, FractalType.LowThreeBar)] = (l1, owner.Time[1]);
             }
         }
 
@@ -142,7 +182,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
 
             if (isFractalHigh)
             {
-                Fractals[(timeFrame, FractalType.HighFive)] = (h2, owner.Time[2]);
+                Fractals[(timeFrame, FractalType.HighFiveBar)] = (h2, owner.Time[2]);
                 //owner.PrintDebug($"[FRACTAL_5B_HIGH] {timeFrame}m {h2} at {owner.Time[2]}");
             }
 
@@ -161,7 +201,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
 
             if (isFractalLow)
             {
-                Fractals[(timeFrame, FractalType.LowFive)] = (l2, owner.Time[2]);
+                Fractals[(timeFrame, FractalType.LowFiveBar)] = (l2, owner.Time[2]);
                 //owner.PrintDebug($"[FRACTAL_5B_LOW] {timeFrame}m {l2} at {owner.Time[2]}");
             }
         }
@@ -184,7 +224,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
 
             if (isFractalLow)
             {
-                Fractals[(timeFrame, FractalType.LowFive)] = (l2, owner.Times[2][2]);
+                Fractals[(timeFrame, FractalType.LowFiveBar)] = (l2, owner.Times[2][2]);
                 owner.PrintDebug($"[FRACTAL_5B_LOW_DELAYED] {timeFrame}m {l2} at {owner.Times[2][2]}");
             }
 
@@ -201,7 +241,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
 
             if (isFractalHigh)
             {
-                Fractals[(timeFrame, FractalType.HighFive)] = (h2, owner.Times[2][2]);
+                Fractals[(timeFrame, FractalType.HighFiveBar)] = (h2, owner.Times[2][2]);
                 owner.PrintDebug($"[FRACTAL_5B_HIGH_DELAYED] {timeFrame}m {h2} at {owner.Times[2][2]}");
             }
         }
@@ -241,10 +281,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         {
             var lowest = new List<(double Price, DateTime Time)>
             {
-                Fractals[(15, FractalType.LowFive)],
-                Fractals[(15, FractalType.LowThree)],
-                Fractals[(5, FractalType.LowThree)],
-                Fractals[(5, FractalType.LowFive)],
+                Fractals[(15, FractalType.LowFiveBar)],
+                Fractals[(15, FractalType.LowThreeBar)],
+                Fractals[(5, FractalType.LowThreeBar)],
+                Fractals[(5, FractalType.LowFiveBar)],
                 Fractals[(15, FractalType.LowLookback)],
                 (owner.Low[0], owner.Time[0])
             }
@@ -263,10 +303,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         public (double Price, DateTime Time) RecentHigh()
         {
             var highest = new List<(double Price, DateTime Time)>() {
-                Fractals[(15, FractalType.HighFive)],
-                Fractals[(15, FractalType.HighThree)],
-                Fractals[(5, FractalType.HighThree)],
-                Fractals[(5, FractalType.HighFive)],
+                Fractals[(15, FractalType.HighFiveBar)],
+                Fractals[(15, FractalType.HighThreeBar)],
+                Fractals[(5, FractalType.HighThreeBar)],
+                Fractals[(5, FractalType.HighFiveBar)],
                 Fractals[(15, FractalType.HighLookback)],
                 (owner.High[0], owner.Time[0])
             }

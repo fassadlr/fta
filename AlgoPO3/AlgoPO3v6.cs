@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NinjaTrader.Cbi;
-using NinjaTrader.Custom.Strategies.FTA.AlgoPO3;
 using NinjaTrader.Data;
 using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
@@ -150,7 +149,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 DetectMSS();
                 DetectBOS();
 
-                TradingSession.Update(Close[0], atr[0]);
+                //TradingSession.Update(Close[0], atr[0]);
             }
 
             if (BarsInProgress != 0)

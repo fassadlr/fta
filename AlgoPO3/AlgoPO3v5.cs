@@ -79,9 +79,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private List<NewsEvent> NewsEvents { get; set; }
 
         private int ConsecutiveLosses { get; set; }
-        private int ConsecutiveRangeLosses { get; set; }
-
-        private double RiskMultiplier { get; set; }
 
         private double lastFractalHigh = 0;
         private double lastFractalLow = 0;
@@ -112,10 +109,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
             else if (State == State.Configure)
             {
-                //AddDataSeries("MNQ 03-26", BarsPeriodType.Tick, 1);
                 AddDataSeries("MNQ 06-26", BarsPeriodType.Minute, 5);
 
-                Ranges = new List<DealingRange>();
+                Ranges = [];
 
                 NewsEvents = new List<NewsEvent>();
 
@@ -220,7 +216,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 NewsEvents.Add(new NewsEvent(new DateTime(2026, 4, 6, 08, 00, 0)));
 
                 ConsecutiveLosses = 0;
-                ConsecutiveRangeLosses = 0;
 
                 Bias = TradeBias.Neutral;
                 RangeBias = RangeBias.Neutral;
@@ -273,7 +268,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PreviousRange = null;
 
                 InvalidRange = null;
-                ConsecutiveRangeLosses = 0;
 
                 lastFractalHigh = 0;
                 lastFractalLow = 0;
@@ -576,7 +570,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 PrintDebugWithTime($"[Rng Inv] Price {Close[0]} cleared the invalid range, resetting.");
                 InvalidRange = null;
-                ConsecutiveRangeLosses = 0;
 
                 sharedBorderTrade = null;
 
@@ -683,7 +676,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     TakeProfitPriceThreshold = 0;
 
                     ConsecutiveLosses = 0;
-                    ConsecutiveRangeLosses = 0;
 
                     rangeBreakDetected = false;
                 }
@@ -698,7 +690,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     ProcessSharedBorderRange(true);
 
                     ConsecutiveLosses++;
-                    ConsecutiveRangeLosses++;
 
                     LimitOrder = null;
 

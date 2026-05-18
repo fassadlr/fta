@@ -1,9 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using NinjaTrader.NinjaScript;
-using NinjaTrader.NinjaScript.Strategies.FTA;
-using NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3;
 
-namespace NinjaTrader.Custom.Strategies.FTA.AlgoPO3
+namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 {
     public abstract class AlgoPO3Base : AlgoBase
     {
