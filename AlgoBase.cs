@@ -1,0 +1,169 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
+using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
+
+namespace NinjaTrader.NinjaScript.Strategies.FTA
+{
+    public abstract class AlgoBase : Strategy
+    {
+        [NinjaScriptProperty]
+        [Display(Name = "Is Live", Order = 0, GroupName = "Parameters")]
+        public bool IsLive { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Risk", Order = 1, GroupName = "Parameters")]
+        public double Risk { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Display Debug Logs", Order = 2, GroupName = "Parameters")]
+        public bool DebugLogEnabled { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Display Trade Logs", Order = 3, GroupName = "Parameters")]
+        public bool TradeLogEnabled { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Time Offset", Order = 4, GroupName = "Parameters")]
+        public int SessionTimeOffset { get; set; }
+
+        internal double LastFractalHigh = 0;
+        internal DateTime LastFractalHighTime;
+
+        internal double LastFractalLow = 0;
+        internal DateTime LastFractalLowTime;
+
+        internal double LastFractalFiveBarHigh = 0;
+        internal DateTime LastFractalFiveBarHighTime;
+
+        internal double LastFractalFiveBarLow = 0;
+        internal DateTime LastFractalFiveBarLowTime;
+
+        internal List<NewsEvent> Events = NewsEvents.Events();
+
+        internal int AddMinutesToTime(int ninjaTime, int minutes)
+        {
+            var ts = TimeSpan.ParseExact(
+                ninjaTime.ToString("D6"),
+                "hhmmss",
+                null
+            );
+
+            ts = ts.Add(TimeSpan.FromMinutes(minutes));
+
+            return ts.Hours * 10000 +
+                   ts.Minutes * 100 +
+                   ts.Seconds;
+        }
+
+        internal int AddHoursToTime(int ninjaTime, int hours)
+        {
+            var ts = TimeSpan.ParseExact(
+                ninjaTime.ToString("D6"),
+                "hhmmss",
+                null
+            );
+
+            ts = ts.Add(TimeSpan.FromHours(hours));
+
+            return ts.Hours * 10000 +
+                   ts.Minutes * 100 +
+                   ts.Seconds;
+        }
+
+        internal int CalculatePositionSize(double stopLossDistance, double risk)
+        {
+            var stopLossTicks = Math.Round(stopLossDistance, 1, MidpointRounding.ToEven) / Instrument.MasterInstrument.TickSize;
+            var tickValue = Instrument.MasterInstrument.PointValue * Instrument.MasterInstrument.TickSize;
+            return (int)Math.Round(risk / (stopLossTicks * tickValue), MidpointRounding.AwayFromZero);
+        }
+
+        internal void DetectFractalWithPlatos()
+        {
+            // Need at least 3 bars
+            if (CurrentBar < 2)
+                return;
+
+            // --- FRACTAL HIGH LOGIC ---
+            double h0 = High[0];
+            double h1 = High[1];
+            double h2 = High[2];
+
+            // Must be >= both neighbors (allows equal highs)
+            bool isPeakShape = h1 >= h0 && h1 >= h2;
+
+            // At least one side must be strictly lower (prevents flat triple-equal highs)
+            bool hasStrictEdge = h1 > h0 || h1 > h2;
+
+            if (isPeakShape && hasStrictEdge)
+            {
+                LastFractalHigh = h1;
+                LastFractalHighTime = Time[1];
+                //PrintDebug($"[FRACTAL_5M_HIGH] {LastFractalHigh} upperBound {upperBound} h1 {h1} time {LastFractalHighTime}");
+            }
+
+            // --- FRACTAL LOW LOGIC ---
+            double l0 = Low[0];
+            double l1 = Low[1];
+            double l2 = Low[2];
+
+            // Must be <= both neighbors (allows equal lows)
+            bool isValleyShape = l1 <= l0 && l1 <= l2;
+
+            // At least one side must be strictly higher (prevents flat triple-equal lows)
+            bool hasStrictEdgeLow = l1 < l0 || l1 < l2;
+
+            if (isValleyShape && hasStrictEdgeLow)
+            {
+                LastFractalLow = l1;
+                LastFractalLowTime = Time[1];
+            }
+        }
+
+        internal bool IsDSTOverlap()
+        {
+            if ((Time[0].Date >= new DateTime(2024, 10, 27) && Time[0].Date <= new DateTime(2024, 11, 03)) ||
+                (Time[0].Date >= new DateTime(2025, 3, 9) && Time[0].Date <= new DateTime(2025, 3, 30)) ||
+                (Time[0].Date >= new DateTime(2025, 10, 26) && Time[0].Date <= new DateTime(2025, 11, 2)) ||
+                (Time[0].Date >= new DateTime(2026, 3, 9) && Time[0].Date <= new DateTime(2026, 3, 29)))
+            {
+                //PrintDebug("Currently in DST overlap period, adjusting session end time to 12:00 to 13:00...");
+                return true;
+            }
+
+            return false;
+        }
+
+        public void PrintDebug(string toPrint)
+        {
+            if (DebugLogEnabled)
+                Print($"{Time[0]} {toPrint}");
+        }
+
+        public void PrintTrade(string toPrint)
+        {
+            if (TradeLogEnabled)
+                Print($"{toPrint}");
+        }
+
+        public bool FilterByEvents()
+        {
+            var newsEvent = Events.FirstOrDefault(n => Time[0].Date == n.EventTime.Date && Time[0].TimeOfDay >= n.EventTime.TimeOfDay);
+            return newsEvent != null;
+        }
+
+        public bool FilterAllDay()
+        {
+            var newsEvent = Events.AllDay().FirstOrDefault(n => Time[0].Date == n.EventTime.Date);
+            return newsEvent != null;
+        }
+    }
+
+    public enum TradeBias
+    {
+        Long,
+        Short,
+        Neutral
+    }
+}
