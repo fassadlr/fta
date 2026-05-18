@@ -194,7 +194,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 NewsEvent.CreateNFPEvent(new DateTime(2025, 12, 16, 13, 00, 0)),    // NFP
                 NewsEvent.CreateCPIEvent(new DateTime(2025, 12, 18, 13, 00, 0)),    // CPI
 
-
                 // January 2026
                 new(new DateTime(2026, 1, 07, 13, 15, 0)),
                 new(new DateTime(2026, 1, 08, 13, 30, 0)),
@@ -241,7 +240,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 NewsEvent.CreateFOMCEvent(new DateTime(2026, 04, 29, 19, 00, 0)),       // FOMC
 
                 // May 2026
-                new(new DateTime(2026, 4, 01, 13, 30, 0)),
                 NewsEvent.CreateNFPEvent(new DateTime(2026, 05, 08, 13, 00, 0)),        // NFP
                 NewsEvent.CreateCPIEvent(new DateTime(2026, 05, 12, 13, 00, 0)),        // CPI
             };

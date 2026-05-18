@@ -300,8 +300,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             {
                 InitializeTradeRange();
 
-                PrintDebug($"Session start parameters Range Low {rangeLow} Range High {rangeHigh}");
-
                 sessionInitialized = true;
             }
 

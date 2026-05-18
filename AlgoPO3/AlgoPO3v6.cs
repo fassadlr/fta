@@ -45,7 +45,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "FassaPO3 v6.2";
+                Name = "PO3 Algo v6.3";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -174,7 +174,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     CurrentRange = found;
 
                     rangeBreakDetected = true;
-                    PrintDebug($"Range break detected, range set to {CurrentRange}, Bias {tradeBias}");
+                    PrintDebug($"[RANGE_BREAK] new range {CurrentRange}, Bias {tradeBias}");
                 }
             }
 
@@ -221,7 +221,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 {
                     rangeBreakDetected = false;
 
-                    PrintDebug($"Range break ignored as last BOS in previous range {lastBOSLocation}");
+                    PrintDebug($"[RANGE_BREAK_IGNORED_SHORT] last BOS in previous range {lastBOSLocation}");
                     return;
                 }
             }
@@ -233,7 +233,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 {
                     rangeBreakDetected = false;
 
-                    PrintDebug($"Range break ignored as last BOS in previous range {lastBOSLocation}");
+                    PrintDebug($"[RANGE_BREAK_IGNORED_LONG] last BOS in previous range {lastBOSLocation}");
                     return;
                 }
             }
@@ -248,14 +248,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (lastTradeBias != tradeBias)
                 {
                     shouldCancel = true;
-                    PrintDebug($"Trade bias changed from {lastTradeBias} to {tradeBias}, resetting.");
+                    PrintDebug($"[LIMIT_ORDER_CANCEL] Trade bias changed from {lastTradeBias} to {tradeBias}.");
                 }
                 else
                 {
                     if ((tradeBias == TradeBias.Long && High[0] >= TradeMissedThreshold) ||
                        (tradeBias == TradeBias.Short && Low[0] <= TradeMissedThreshold))
                     {
-                        PrintDebug($"{tradeBias} price went to TP threshold {TradeMissedThreshold}, resetting");
+                        PrintDebug($"[LIMIT_ORDER_CANCEL] {tradeBias} price went to TP threshold {TradeMissedThreshold}.");
                         shouldCancel = true;
                     }
                 }
@@ -391,7 +391,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 }
 
                 SetStopLoss("long entry", CalculationMode.Price, StopLoss, true);
-                PrintDebug($"Stop {StopLoss}");
+                PrintDebug($"[STOP_LOSS] {StopLoss}");
                 SetProfitTarget("long entry", CalculationMode.Price, TakeProfitPrice, true);
             }
 
@@ -418,7 +418,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 }
 
                 SetStopLoss("short entry", CalculationMode.Price, StopLoss, true);
-                PrintDebug($"Stop {StopLoss}");
+                PrintDebug($"[STOP_LOSS] {StopLoss}");
                 SetProfitTarget("short entry", CalculationMode.Price, TakeProfitPrice, true);
             }
         }
@@ -472,13 +472,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (tradeBias == TradeBias.Short && Close[0] > LastFractalHigh && LastFractalHigh != 0)
             {
                 mssBias = MSSBias.Bullish;
-                PrintDebug($"Bullish MSS detected");
+                PrintDebug($"[BULLISH_MSS]");
             }
 
             if (tradeBias == TradeBias.Long && Close[0] < LastFractalLow && LastFractalLow != 0)
             {
                 mssBias = MSSBias.Bearish;
-                PrintDebug($"Bearish MSS detected");
+                PrintDebug($"[BEARISH_MSS]");
             }
         }
 
@@ -556,7 +556,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             consecutiveLosses = 0;
 
-            PrintDebug("Start of session, resetting state...");
+            PrintDebug("[SESSION_START] resetting state");
         }
 
         private void BreakEvenOrCloseTrade()
@@ -565,7 +565,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (Time[0].Hour == marketOpen && Time[0].Minute == 29)
             {
-                PrintDebug($"Closing trade before market open, PnL {Position.GetUnrealizedProfitLoss(PerformanceUnit.Currency, Close[0])}");
+                PrintDebug($"[CLOSE_TRADE] market open, PnL {Position.GetUnrealizedProfitLoss(PerformanceUnit.Currency, Close[0])}");
 
                 if (Position.MarketPosition == MarketPosition.Short)
                     ExitShort("short entry");
@@ -584,14 +584,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 {
                     if (lastTradeBias == TradeBias.Long && High[0] >= BreakEvenThreshold)
                     {
-                        PrintDebug($"Setting trade to BE trade bias changed from {lastTradeBias} to {tradeBias}, {Position.AveragePrice}");
+                        PrintDebug($"[BREAK_EVEN] trade bias changed from {lastTradeBias} to {tradeBias}, {Position.AveragePrice}");
                         breakEvenDirection = "long entry";
                     }
 
                     if (lastTradeBias == TradeBias.Short && Low[0] <= BreakEvenThreshold)
                     {
                         breakEvenDirection = "short entry";
-                        PrintDebug($"Setting trade to BE trade bias changed from {lastTradeBias} to {tradeBias}, {Position.AveragePrice}");
+                        PrintDebug($"[BREAK_EVEN] trade bias changed from {lastTradeBias} to {tradeBias}, {Position.AveragePrice}");
                     }
                 }
                 else
@@ -599,13 +599,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     if (tradeBias == TradeBias.Long && High[0] >= BreakEvenThreshold)
                     {
                         breakEvenDirection = "long entry";
-                        PrintDebug($"Setting trade to BE as threshold reached, {Position.AveragePrice}");
+                        PrintDebug($"[BREAK_EVEN] TP threshold reached");
                     }
 
                     if (tradeBias == TradeBias.Short && Low[0] <= BreakEvenThreshold)
                     {
                         breakEvenDirection = "short entry";
-                        PrintDebug($"Setting trade to BE as threshold reached, {Position.AveragePrice}");
+                        PrintDebug($"[BREAK_EVEN] TP threshold reached");
                     }
                 }
 
@@ -613,7 +613,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 {
                     SetStopLoss(breakEvenDirection, CalculationMode.Price, Position.AveragePrice, true);
                     StopLoss = Position.AveragePrice;
-                    PrintDebug($"BE set, {Position.AveragePrice}");
+                    PrintDebug($"[BREAK_EVEN] set {Position.AveragePrice}");
                 }
             }
         }
@@ -625,35 +625,19 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (AdjustRiskBasedOnLosses && consecutiveLosses >= 2)
             {
                 riskAdjusted = Risk / 2;
-                PrintDebug($"Adjust risk to {riskAdjusted}");
+                PrintDebug($"[RISK_ADJ_CONSECUTIVE_LOSSES] risk {riskAdjusted}");
             }
 
-            if (EdgeHoursParsed.Contains(Time[0].Hour))
+            if (EdgeHoursParsed.Contains(Time[0].Hour) && atr[0] < 30)
             {
                 riskAdjusted = riskAdjusted * EdgeHourMultiplier;
-                PrintDebug($"Edge hour, adjust risk to {riskAdjusted}");
+                PrintDebug($"[RISK_ADJ_EDGE_HOUR] risk {riskAdjusted}");
             }
 
-            var atrNow = atr[0];
-            if (atrNow > 16)
+            if (atr[0] > 30)
             {
-                //if (dailyAtr.Atr >= 20 && dailyAtr.Atr < 25)
-                //{
-                //    riskAdjusted = riskAdjusted * 0.75;
-                //}
-
-                //if (dailyAtr.Atr >= 25 && dailyAtr.Atr < 30)
-                //{
-                //    riskAdjusted = riskAdjusted * 0.5;
-                //}
-
-                if (atrNow > 30)
-                {
-                    riskAdjusted = riskAdjusted * 0.50;
-                    PrintDebug($"[ATR_ABOVE_STOP_RA] {atrNow} risk {riskAdjusted}");
-                }
-
-                PrintDebug($"[ATR_ABOVE_STOP] {atrNow} risk {riskAdjusted}");
+                riskAdjusted = riskAdjusted * 0.50;
+                PrintDebug($"[RISK_ADJ_ATR_ABOVE_STOP] {atr[0]} risk {riskAdjusted}");
             }
 
             return Math.Round(riskAdjusted);
@@ -737,7 +721,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             CancelOrder(LimitOrder);
             LimitOrder = null;
-            PrintDebug("Cancel limit order...");
+            PrintDebug("[CANCEL_LIMIT_ORDER]");
             lastTradeBias = TradeBias.Neutral;
         }
     }
