@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
 {
@@ -26,6 +27,49 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         public override string ToString()
         {
             return $"MSSDetectedBullish: {MSSDetectedBullish}, MSSDetectedBearish: {MSSDetectedBearish}, MSSConfirmed: {MSSConfirmed}, RangeBreakConfirmed: {RangeBreakConfirmed}";
+        }
+    }
+
+    public class TradeDetails
+    {
+        public TradeBias Bias { get; set; }
+        public TradeRangeInitiator RangeInitiater { get; set; }
+        public TradeType Type { get; set; }
+        public double Entry { get; set; } = 0;
+        public DateTime EntryTime { get; set; }
+        public double StopLoss { get; set; } = 0;
+        public double TakeProfit { get; set; } = 0;
+        public double ProfitLoss { get; set; } = 0;
+        public double MaxDrawdown { get; set; } = 0;
+        public double DrawdownStopPercentage { get; set; } = 0;
+
+        public override string ToString()
+        {
+            return string.Join(",",
+                EscapeCsv(Bias.ToString()),
+                EscapeCsv(RangeInitiater.ToString()),
+                EscapeCsv(Type.ToString()),
+                Entry.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                EntryTime,
+                StopLoss,
+                TakeProfit,
+                ProfitLoss,
+                MaxDrawdown,
+                DrawdownStopPercentage
+            );
+        }
+
+        private static string EscapeCsv(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return "";
+
+            if (value.Contains(",") || value.Contains("\"") || value.Contains("\n"))
+            {
+                return $"\"{value.Replace("\"", "\"\"")}\"";
+            }
+
+            return value;
         }
     }
 
@@ -58,6 +102,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         }
     }
 
+    public enum TradeType
+    {
+        Reversal,
+        Continuation,
+    }
+
     public enum FractalType
     {
         HighFiveBar = 0,
@@ -68,7 +118,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         HighLookback,
     }
 
-    public class MultiFractalManager(AlgoBase owner)
+    public class FractalManager(AlgoBase owner)
     {
         public Dictionary<(int, FractalType), (double Price, DateTime PriceTime)> Fractals = [];
 

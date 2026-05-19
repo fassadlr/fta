@@ -11,62 +11,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 {
     public class AlgoORSv1 : AlgoBase
     {
-        private enum TradeRangeInitiator
-        {
-            None,
-            RangeHighEngaged,
-            RangeLowEngaged,
-            ContinueAboveHigh,
-            ContinueBelowLow
-        }
-
         private enum TradeType
         {
             Reversal,
             Continuation,
-        }
-
-        private class TradeDetails
-        {
-            public TradeBias Bias { get; set; }
-            public TradeRangeInitiator RangeInitiater { get; set; }
-            public TradeType Type { get; set; }
-            public double Entry { get; set; } = 0;
-            public DateTime EntryTime { get; set; }
-            public double StopLoss { get; set; } = 0;
-            public double TakeProfit { get; set; } = 0;
-            public double ProfitLoss { get; set; } = 0;
-            public double MaxDrawdown { get; set; } = 0;
-            public double DrawdownStopPercentage { get; set; } = 0;
-
-            public override string ToString()
-            {
-                return string.Join(",",
-                    EscapeCsv(Bias.ToString()),
-                    EscapeCsv(RangeInitiater.ToString()),
-                    EscapeCsv(Type.ToString()),
-                    Entry.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    EntryTime,
-                    StopLoss,
-                    TakeProfit,
-                    ProfitLoss,
-                    MaxDrawdown,
-                    DrawdownStopPercentage
-                );
-            }
-
-            private static string EscapeCsv(string value)
-            {
-                if (string.IsNullOrEmpty(value))
-                    return "";
-
-                if (value.Contains(",") || value.Contains("\"") || value.Contains("\n"))
-                {
-                    return $"\"{value.Replace("\"", "\"\"")}\"";
-                }
-
-                return value;
-            }
         }
 
         [NinjaScriptProperty]
@@ -108,7 +56,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         private bool tradingComplete;
 
         private DailyRangeTracker dailyRangeTracker = new();
-        private MultiFractalManager fractalManager;
+        private FractalManager fractalManager;
         private bool sessionInitialized;
 
         private double rangeLow;
@@ -158,7 +106,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             }
             else if (State == State.DataLoaded)
             {
-                fractalManager = new MultiFractalManager(this);
+                fractalManager = new FractalManager(this);
 
                 dailyRangeTracker = new();
 
