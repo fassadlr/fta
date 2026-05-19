@@ -45,7 +45,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "PO3 Algo v6.3";
+                Name = "PO3 Algo v6.4";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -374,12 +374,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 if (Close[0] > entryPrice)
                 {
-                    PrintDebug($"[PLACE_TRADE_LIMIT] {tradeBias} : {entryPrice} {Close[0]}");
+                    PrintDebug($"[PLACE_TRADE_LIMIT] {tradeBias}, {entryPrice}, atr {atr[0]}");
                     LimitOrder = EnterLongLimit(0, true, CalculatePositionSize(entryPrice - StopLoss, adjustedRisk), entryPrice, "long entry");
                 }
                 else
                 {
-                    PrintDebug($"[PLACE_TRADE_STOP_MARKET] {tradeBias} : {entryPrice} {Close[0]}");
+                    PrintDebug($"[PLACE_TRADE_STOP_MARKET] {tradeBias}, {entryPrice} atr {atr[0]}");
                     LimitOrder = EnterLongStopMarket(0, true, CalculatePositionSize(entryPrice - StopLoss, adjustedRisk), entryPrice, "long entry");
                 }
 
@@ -401,12 +401,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 if (Close[0] < entryPrice)
                 {
-                    PrintDebug($"[PLACE_TRADE_LIMIT] {tradeBias} : {entryPrice} {Close[0]}");
+                    PrintDebug($"[PLACE_TRADE_LIMIT] {tradeBias}, {entryPrice}, atr {atr[0]}");
                     LimitOrder = EnterShortLimit(0, true, CalculatePositionSize(StopLoss - entryPrice, adjustedRisk), entryPrice, "short entry");
                 }
                 else
                 {
-                    PrintDebug($"[PLACE_TRADE_STOP_MARKET] {tradeBias} : {entryPrice} {Close[0]}");
+                    PrintDebug($"[PLACE_TRADE_STOP_MARKET] {tradeBias}, {entryPrice} atr {atr[0]}");
                     LimitOrder = EnterShortStopMarket(0, true, CalculatePositionSize(StopLoss - entryPrice, adjustedRisk), entryPrice, "short entry");
                 }
 
@@ -628,7 +628,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PrintDebug($"[RISK_ADJ_CONSECUTIVE_LOSSES] risk {riskAdjusted}");
             }
 
-            if (EdgeHoursParsed.Contains(Time[0].Hour) && atr[0] < 30)
+            if (EdgeHoursParsed.Contains(Time[0].Hour) && atr[0] < 25)
             {
                 riskAdjusted = riskAdjusted * EdgeHourMultiplier;
                 PrintDebug($"[RISK_ADJ_EDGE_HOUR] risk {riskAdjusted}");
