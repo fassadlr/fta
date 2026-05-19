@@ -53,20 +53,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         private FractalManager fractalManager;
         private bool sessionInitialized;
 
-        private double rangeLow;
-        private DateTime rangeLowTime;
+        //private double rangeLow;
+        //private DateTime rangeLowTime;
 
-        private double rangeHigh;
-        private DateTime rangeHighTime;
+        //private double rangeHigh;
+        //private DateTime rangeHighTime;
 
-        private TradeRangeInitiator rangeInitiator;
+        //private TradeRangeInitiator rangeInitiator;
         private int tradeCount;
         private TradeBias tradeBias;
         private bool breakEvenSet;
 
-        private TradeDetails currentTrade;
-
-        private Order currentLimitOrder;
+        //private Order currentLimitOrder;
 
         private StrategyRunner runner;
 
@@ -74,7 +72,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         {
             if (State == State.SetDefaults)
             {
-                Name = "Fassa ORS v1";
+                Name = "Fassa ORS v2";
 
                 Calculate = Calculate.OnBarClose;
                 IsOverlay = true;
@@ -105,7 +103,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 fractalManager = new FractalManager(this);
 
                 dailyRangeTracker = new();
-                runner = new StrategyRunner(this);
 
                 SessionMarketOpen = AddHoursToTime(SessionMarketOpen, SessionTimeOffset);
                 SessionStartTime = AddHoursToTime(SessionStartTime, SessionTimeOffset);
@@ -124,6 +121,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 return;
             }
 
+            runner ??= StrategyRunner.Configure(this, fractalManager, EntryPercentage, MaxRR);
+
             // Filter by event days, skip days etc.
             if (FilterAllDay() && Position.MarketPosition == MarketPosition.Flat)
                 return;
@@ -135,12 +134,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 breakEvenSet = false;
                 dailyRangeTracker = new();
                 sessionInitialized = false;
-                rangeLow = 0;
-                rangeHigh = 0;
                 tradingComplete = false;
                 tradeBias = TradeBias.Neutral;
                 tradeCount = 0;
-                rangeInitiator = TradeRangeInitiator.None;
+
+                runner.Criteria.RangeLow = 0;
+                runner.Criteria.RangeHigh = 0;
+                runner.Criteria.RangeInitiator = TradeRangeInitiator.None;
 
                 return;
             }
@@ -175,24 +175,24 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 // Calc max drawdown on the 1 min series
                 if (BarsInProgress == 0)
                 {
-                    if (currentTrade.Bias == TradeBias.Long && Low[0] < Position.AveragePrice &&
+                    if (runner.CurrentTrade.Bias == TradeBias.Long && Low[0] < Position.AveragePrice &&
                         (
-                            (Position.AveragePrice - Low[0] > currentTrade.MaxDrawdown)
-                            || currentTrade.MaxDrawdown == 0
+                            (Position.AveragePrice - Low[0] > runner.CurrentTrade.MaxDrawdown)
+                            || runner.CurrentTrade.MaxDrawdown == 0
                         ))
                     {
-                        currentTrade.MaxDrawdown = Position.AveragePrice - Low[0];
-                        currentTrade.DrawdownStopPercentage = Math.Round(currentTrade.MaxDrawdown / (Position.AveragePrice - currentTrade.StopLoss), 2);
+                        runner.CurrentTrade.MaxDrawdown = Position.AveragePrice - Low[0];
+                        runner.CurrentTrade.DrawdownStopPercentage = Math.Round(runner.CurrentTrade.MaxDrawdown / (Position.AveragePrice - runner.CurrentTrade.StopLoss), 2);
                     }
 
-                    if (currentTrade.Bias == TradeBias.Short && High[0] > Position.AveragePrice &&
+                    if (runner.CurrentTrade.Bias == TradeBias.Short && High[0] > Position.AveragePrice &&
                         (
-                            (High[0] - Position.AveragePrice > currentTrade.MaxDrawdown)
-                            || currentTrade.MaxDrawdown == 0
+                            (High[0] - Position.AveragePrice > runner.CurrentTrade.MaxDrawdown)
+                            || runner.CurrentTrade.MaxDrawdown == 0
                         ))
                     {
-                        currentTrade.MaxDrawdown = High[0] - Position.AveragePrice;
-                        currentTrade.DrawdownStopPercentage = Math.Round(currentTrade.MaxDrawdown / (currentTrade.StopLoss - Position.AveragePrice), 2);
+                        runner.CurrentTrade.MaxDrawdown = High[0] - Position.AveragePrice;
+                        runner.CurrentTrade.DrawdownStopPercentage = Math.Round(runner.CurrentTrade.MaxDrawdown / (runner.CurrentTrade.StopLoss - Position.AveragePrice), 2);
                     }
                 }
 
@@ -220,16 +220,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             // No more processing after session end
             if (ToTime(Time[0]) >= adjustedSessionEnd || tradingComplete)
             {
-                if (currentLimitOrder != null)
+                if (runner.LimitOrder != null)
                 {
-                    CancelOrder(currentLimitOrder);
-                    currentLimitOrder = null;
+                    CancelOrder(runner.LimitOrder);
+                    runner.LimitOrder = null;
                 }
 
                 return;
             }
 
-            fractalManager.DetectFractalThreeBar(5, rangeHigh, rangeLow);
+            fractalManager.DetectFractalThreeBar(5, runner.Criteria.RangeHigh, runner.Criteria.RangeLow);
             fractalManager.DetectFractalFiveBar(5);
 
             if (ToTime(Time[0]) < adjustedMarketOpen)
@@ -250,206 +250,81 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
             if (ToTime(Time[0]) > adjustedMarketOpen)
             {
-                if (High[0] > rangeHigh && rangeInitiator != TradeRangeInitiator.RangeHighEngaged)
+                if (High[0] > runner.Criteria.RangeHigh && runner.Criteria.RangeInitiator != TradeRangeInitiator.RangeHighEngaged)
                 {
-                    PrintDebug($"[RANGE_HIGH_ENGAGED] {High[0]} > {rangeHigh}");
-                    rangeInitiator = TradeRangeInitiator.RangeHighEngaged;
+                    PrintDebug($"[RANGE_HIGH_ENGAGED] {High[0]} > {runner.Criteria.RangeHigh}");
+                    runner.Criteria.RangeInitiator = TradeRangeInitiator.RangeHighEngaged;
                 }
 
-                if (Low[0] < rangeLow && rangeInitiator != TradeRangeInitiator.RangeLowEngaged)
+                if (Low[0] < runner.Criteria.RangeLow && runner.Criteria.RangeInitiator != TradeRangeInitiator.RangeLowEngaged)
                 {
-                    PrintDebug($"[RANGE_LOW_ENGAGED] {Low[0]} < {rangeLow}");
-                    rangeInitiator = TradeRangeInitiator.RangeLowEngaged;
+                    PrintDebug($"[RANGE_LOW_ENGAGED] {Low[0]} < {runner.Criteria.RangeLow}");
+                    runner.Criteria.RangeInitiator = TradeRangeInitiator.RangeLowEngaged;
                 }
             }
 
             // A pending order is in play.
-            if (currentLimitOrder != null)
+            if (runner.LimitOrder != null)
                 return;
 
-            if (rangeInitiator == TradeRangeInitiator.RangeHighEngaged)
-            {
-                /* 
-                * We can either close back in the range to go short or keep bullish momentum by going long
-                */
+            runner.Run();
 
-                // LONG TRADE CONTINUATION
-                // Wait for 2 consecutive bullish candles to form outside of the range
-                if (ToTime(Time[0]) > AddMinutesToTime(adjustedSessionStart, 5) &&
-                    BodyCandle(0) &&
-                    BodyCandle(1) &&
-                    BullishCandle(0) && Close[0] > rangeHigh &&
-                    BullishCandle(1) && Close[1] > rangeHigh)
-                {
-                    var stopLoss = Low[0] - StopGrace;
-                    var stopDistance = (Close[0] - Low[0]) + StopGrace;
-                    var size = CalculatePositionSize(stopDistance);
-                    if (size < 0.75)
-                    {
-                        PrintDebug($"[POSITION_SUBOPTIMAL_LONG] Position {size}, Stop {stopLoss}");
-                        return;
-                    }
+            //if (rangeInitiator == TradeRangeInitiator.RangeHighEngaged)
+            //{
+            //    /* 
+            //    * We can either close back in the range to go short or keep bullish momentum by going long
+            //    */
 
-                    var profitTarget = Close[0] + (stopDistance * TPMultiplier);
-                    EnterLongTrade("LONG_ENTRY_CONTINUATION", false, TradeType.Continuation, (int)size, 1, stopLoss, profitTarget);
-                }
+            //    // LONG TRADE CONTINUATION
+            //    // Wait for 2 consecutive bullish candles to form outside of the range
+            //    if (ToTime(Time[0]) > AddMinutesToTime(adjustedSessionStart, 5) &&
+            //        BodyCandle(0) &&
+            //        BodyCandle(1) &&
+            //        BullishCandle(0) && Close[0] > rangeHigh &&
+            //        BullishCandle(1) && Close[1] > rangeHigh)
+            //    {
+            //        var stopLoss = Low[0] - StopGrace;
+            //        var stopDistance = (Close[0] - Low[0]) + StopGrace;
+            //        var size = CalculatePositionSize(stopDistance);
+            //        if (size < 0.75)
+            //        {
+            //            PrintDebug($"[POSITION_SUBOPTIMAL_LONG] Position {size}, Stop {stopLoss}");
+            //            return;
+            //        }
 
-                // SHORT TRADE REVERSAL
-                // Wait for the first bearish candle to close inside the range
-                if (ToTime(Time[0]) > adjustedSessionStart && Close[0] < rangeHigh && Open[0] - Close[0] >= 1)
-                {
-                    var stopLoss = fractalManager.RecentHigh();
-                    var stopDistance = stopLoss.Price - Close[0];
-                    double entry = 0;
-                    if (EntryPercentage > 0)
-                    {
-                        entry = Math.Round(Close[0] + (stopDistance * EntryPercentage), 2);
-                        stopDistance = Math.Round(stopLoss.Price - entry, 2);
-                        PrintDebug($"[LIMIT_ADJUST_SHORT] stop distance {stopDistance}, entry {entry}");
-                    }
+            //        var profitTarget = Close[0] + (stopDistance * TPMultiplier);
+            //        EnterLongTrade("LONG_ENTRY_CONTINUATION", false, TradeType.Continuation, (int)size, 1, stopLoss, profitTarget);
+            //    }
 
-                    var size = CalculatePositionSize(stopDistance);
-                    if (size < 0.75)
-                    {
-                        PrintDebug($"[POSITION_SUBOPTIMAL_SHORT] Position {size}, Stop {stopLoss}");
-                        return;
-                    }
+            //}
 
-                    var rr = CalculateRR(stopDistance, Close[0] - rangeLow);
-                    if (rr < 0.5)
-                    {
-                        PrintDebug($"[RR_SUBOPTIMAL_SHORT] RR {rr}");
-                        return;
-                    }
+            //    if (rangeInitiator == TradeRangeInitiator.RangeLowEngaged)
+            //    {
 
-                    var takeProfit = rangeLow;
-                    if (rr >= MaxRR)
-                    {
-                        rr = MaxRR;
-                        takeProfit = Close[0] - (stopDistance * MaxRR);
-                        PrintDebug($"[RR_ADJUST_SHORT] RR {rr}");
-                    }
+            //        // SHORT TRADE CONTINUATION
+            //        // Wait for 2 consecutive bearish candles to form outside of the range AFTER session start
+            //        if (ToTime(Time[0]) > AddMinutesToTime(adjustedSessionStart, 5) &&
+            //            BodyCandle(0) &&
+            //            BodyCandle(1) &&
+            //            BearishCandle(0) && Close[0] < rangeLow &&
+            //            BearishCandle(1) && Close[1] < rangeLow)
+            //        {
+            //            var stopLoss = High[0] + StopGrace;
+            //            var stopDistance = (High[0] - Close[0]) + StopGrace;
+            //            var size = CalculatePositionSize(stopDistance);
+            //            if (size < 0.75)
+            //            {
+            //                PrintDebug($"[POSITION_SUBOPTIMAL_SHORT] Position {size}, Stop {stopLoss}");
+            //                return;
+            //            }
 
-                    EnterShortTrade("SHORT_ENTRY_REVERSAL", EntryPercentage > 0, TradeType.Reversal, (int)size, rr, stopLoss.Price, takeProfit, entry);
-                }
-            }
+            //            var profitTarget = Close[0] - (stopDistance * TPMultiplier);
 
-            if (rangeInitiator == TradeRangeInitiator.RangeLowEngaged)
-            {
-                // LONG TRADE REVERSAL
-                // Wait for the first bullish candle to close inside the range
-                if (ToTime(Time[0]) > adjustedSessionStart && Close[0] > rangeLow && Close[0] - Open[0] >= 1)
-                {
-                    var stopLoss = fractalManager.RecentLow();
-                    var stopDistance = Close[0] - stopLoss.Price;
-                    double entry = 0;
-                    if (EntryPercentage > 0)
-                    {
-                        entry = Math.Round(Close[0] - (stopDistance * EntryPercentage), 2);
-                        stopDistance = entry - stopLoss.Price;
-                        PrintDebug($"[LIMIT_ADJUST_LONG] stop distance {stopDistance}, entry {entry}");
-                    }
+            //            EnterShortTrade("SHORT_ENTRY_CONTINUATION", false, TradeType.Continuation, (int)size, 1, stopLoss, profitTarget);
+            //        }
+            //    }
+            //}
 
-                    var takeProfit = rangeHigh;
-                    var size = CalculatePositionSize(stopDistance);
-                    if (size < 0.75)
-                    {
-                        PrintDebug($"[POSITION_SUBOPTIMAL_LONG] Position {size}, Stop {stopLoss}");
-                        return;
-                    }
-
-                    var rr = CalculateRR(stopDistance, rangeHigh - Close[0]);
-                    if (rr < 0.5)
-                    {
-                        PrintDebug($"[RR_SUBOPTIMAL_LONG] RR {rr}");
-                        return;
-                    }
-
-                    if (rr >= MaxRR)
-                    {
-                        PrintDebug($"[RR_ADJUST_LONG] RR {rr} to {MaxRR}");
-                        rr = MaxRR;
-                        takeProfit = Close[0] + (stopDistance * MaxRR);
-                    }
-
-                    EnterLongTrade("LONG_ENTRY_REVERSAL", EntryPercentage > 0, TradeType.Reversal, (int)size, rr, stopLoss.Price, takeProfit, entry);
-                }
-
-                // SHORT TRADE CONTINUATION
-                // Wait for 2 consecutive bearish candles to form outside of the range AFTER session start
-                if (ToTime(Time[0]) > AddMinutesToTime(adjustedSessionStart, 5) &&
-                    BodyCandle(0) &&
-                    BodyCandle(1) &&
-                    BearishCandle(0) && Close[0] < rangeLow &&
-                    BearishCandle(1) && Close[1] < rangeLow)
-                {
-                    var stopLoss = High[0] + StopGrace;
-                    var stopDistance = (High[0] - Close[0]) + StopGrace;
-                    var size = CalculatePositionSize(stopDistance);
-                    if (size < 0.75)
-                    {
-                        PrintDebug($"[POSITION_SUBOPTIMAL_SHORT] Position {size}, Stop {stopLoss}");
-                        return;
-                    }
-
-                    var profitTarget = Close[0] - (stopDistance * TPMultiplier);
-
-                    EnterShortTrade("SHORT_ENTRY_CONTINUATION", false, TradeType.Continuation, (int)size, 1, stopLoss, profitTarget);
-                }
-            }
-        }
-
-        private void EnterShortTrade(string log, bool isLimit, TradeType tradeType, int positionSize, double rr, double stopLoss, double takeProfit, double entryPrice = 0)
-        {
-            if (isLimit)
-                currentLimitOrder = EnterShortLimit(0, true, positionSize, entryPrice, "short");
-            else
-                EnterShort(positionSize, "short");
-
-            SetStopLoss("short", CalculationMode.Price, stopLoss, true);
-            SetProfitTarget("short", CalculationMode.Price, takeProfit, true);
-
-            currentTrade = new TradeDetails
-            {
-                Bias = TradeBias.Short,
-                Entry = Position.AveragePrice,
-                EntryTime = Time[0],
-                RangeInitiater = rangeInitiator,
-                StopLoss = stopLoss,
-                TakeProfit = takeProfit,
-                Type = tradeType
-            };
-
-            PrintDebug($"[{log}] Size {positionSize} RR {rr} Stop Loss {stopLoss} Profit Target {takeProfit}");
-        }
-
-        private void EnterLongTrade(string log, bool isLimit, TradeType tradeType, int positionSize, double rr, double stopLoss, double takeProfit, double entryPrice = 0)
-        {
-            if (isLimit)
-                currentLimitOrder = EnterLongLimit(0, true, positionSize, entryPrice, "long");
-            else
-                EnterLong(positionSize, "long");
-
-            SetStopLoss("long", CalculationMode.Price, stopLoss, true);
-            SetProfitTarget("long", CalculationMode.Price, takeProfit, true);
-
-            currentTrade = new TradeDetails
-            {
-                Bias = TradeBias.Long,
-                Entry = Position.AveragePrice,
-                EntryTime = Time[0],
-                RangeInitiater = rangeInitiator,
-                StopLoss = stopLoss,
-                TakeProfit = takeProfit,
-                Type = tradeType
-            };
-
-            PrintDebug($"[{log}] Size {positionSize} RR {rr} Stop Loss {stopLoss} Profit Target {takeProfit}");
-        }
-
-        private double CalculateRR(double stopLossDistance, double profitTargetDistance)
-        {
-            return Math.Round(profitTargetDistance / stopLossDistance, 2);
         }
 
         protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
@@ -464,11 +339,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 tradingComplete = true;
 
                 var lastTrade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
-                currentTrade.ProfitLoss = lastTrade.ProfitCurrency;
+                runner.CurrentTrade.ProfitLoss = lastTrade.ProfitCurrency;
 
-                currentLimitOrder = null;
+                runner.LimitOrder = null;
 
-                PrintTrade($"{currentTrade}");
+                PrintTrade($"{runner.CurrentTrade}");
             }
 
             if (execution.Order.Name == "Stop loss" && execution.Order.OrderState == OrderState.Filled && Position.MarketPosition == MarketPosition.Flat)
@@ -480,13 +355,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                     tradingComplete = true;
 
                 var lastTrade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
-                currentTrade.ProfitLoss = lastTrade.ProfitCurrency;
-                currentTrade.MaxDrawdown = 0;
-                currentTrade.DrawdownStopPercentage = 0;
+                runner.CurrentTrade.ProfitLoss = lastTrade.ProfitCurrency;
+                runner.CurrentTrade.MaxDrawdown = 0;
+                runner.CurrentTrade.DrawdownStopPercentage = 0;
 
-                currentLimitOrder = null;
+                runner.LimitOrder = null;
 
-                PrintTrade($"{currentTrade}");
+                PrintTrade($"{runner.CurrentTrade}");
             }
         }
 
@@ -497,24 +372,22 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
             // LOW
             var lowestPoint = fractalManager.RecentLow();
-            rangeLow = lowestPoint.Price;
-            rangeLowTime = lowestPoint.Time;
-            PrintDebug($"[RANGE_LOW_INIT] {rangeLow} at {rangeLowTime}");
+            PrintDebug($"[RANGE_LOW_INIT] {lowestPoint.Price} at {lowestPoint.Time}");
 
             // HIGH
             var highestPoint = fractalManager.RecentHigh();
-            rangeHigh = highestPoint.Price;
-            rangeHighTime = highestPoint.Time;
-            PrintDebug($"[RANGE_HIGH_INIT] {rangeHigh} at {rangeHighTime}");
+            PrintDebug($"[RANGE_HIGH_INIT] {highestPoint.Price} at {highestPoint.Time}");
+
+            runner.UpdateTradeRange(highestPoint.Price, lowestPoint.Price);
 
             Draw.Line(
                 this,
-                "Last15SwingHigh_" + rangeHighTime.ToString("yyyyMMdd"),
+                "Last15SwingHigh_" + highestPoint.Time.ToString("yyyyMMdd"),
                 false,
-                rangeHighTime,
-                rangeHigh,
-                rangeHighTime.AddHours(2),
-                rangeHigh,
+                highestPoint.Time,
+                highestPoint.Price,
+                highestPoint.Time.AddHours(2),
+                highestPoint.Price,
                 Brushes.DodgerBlue,
                 DashStyleHelper.Solid,
                 2
@@ -522,25 +395,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
             Draw.Line(
                 this,
-                "Last15SwingLow_" + rangeLowTime.ToString("yyyyMMdd"),
+                "Last15SwingLow_" + lowestPoint.Time.ToString("yyyyMMdd"),
                 false,
-                rangeLowTime,
-                rangeLow,
-                rangeLowTime.AddHours(2),
-                rangeLow,
+                lowestPoint.Time,
+                lowestPoint.Price,
+                lowestPoint.Time.AddHours(2),
+                lowestPoint.Price,
                 Brushes.DodgerBlue,
                 DashStyleHelper.Solid,
                 2
             );
-        }
-
-        private double CalculatePositionSize(double stopLossDistance)
-        {
-            var risk = Risk;
-            var stopLossTicks = Math.Round(stopLossDistance, 1, MidpointRounding.ToEven) / Instrument.MasterInstrument.TickSize;
-            var tickValue = Instrument.MasterInstrument.PointValue * Instrument.MasterInstrument.TickSize;
-            var position = Math.Round(risk / (stopLossTicks * tickValue), 2);
-            return Math.Round(position, 2);
         }
 
         private bool BodyCandle(int index)

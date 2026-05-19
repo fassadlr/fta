@@ -1,65 +1,69 @@
-using System.Collections.Generic;
-using System.Linq;
+using NinjaTrader.Cbi;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 {
-    public enum TradeRangeInitiator
+    public enum TradeType
     {
-        None,
-        RangeHighEngaged,
-        RangeLowEngaged,
-        ContinueAboveHigh,
-        ContinueBelowLow
+        Reversal,
+        Continuation,
     }
 
-    internal abstract class Condition(AlgoORSv1 owner, FractalManager fractalManager)
+    public class StrategyRunner
     {
-        protected readonly AlgoORSv1 Owner = owner;
-        protected readonly FractalManager FractalManager = fractalManager;
+        public TradeExecutionResult CurrentTrade { get; private set; }
+        public Order LimitOrder { get; set; }
 
-        internal double RangeLow { get; set; }
-        internal double RangeHigh { get; set; }
-        internal int ValidFromTime { get; set; }
-        internal TradeRangeInitiator RangeInitiator { get; set; }
+        private LongReversalCondition longReversal;
+        private ShortReversalCondition shortReversal;
 
-        internal abstract bool IsSatisfied();
+        public ExecutionCriteria Criteria { get; private set; }
 
-        internal bool CandleBodyPoints(int minPoints)
+        public static StrategyRunner Configure(AlgoBase strategyBase, FractalManager fractalManager, double entryPercentage, double maxRiskReward)
         {
-            return Owner.Open[0] - Owner.Close[0] >= minPoints || Owner.Close[0] - Owner.Open[0] >= minPoints;
+            var runner = new StrategyRunner()
+            {
+                Criteria = new ExecutionCriteria()
+                {
+                    EntryPercentage = entryPercentage,
+                    MaxRiskReward = maxRiskReward
+                },
+
+                longReversal = new LongReversalCondition(strategyBase, fractalManager),
+                shortReversal = new ShortReversalCondition(strategyBase, fractalManager)
+            };
+
+            strategyBase.PrintDebug($"StrategyRunner configured with EntryPercentage: {entryPercentage}, MaxRiskReward: {maxRiskReward}");
+
+            return runner;
         }
-    }
 
-    interface ITimeCondition
-    {
-        int Time { get; }
-        bool IsSatisfied(int currentTime);
-        void Execute();
-    }
+        public void UpdateRangeInitiator(TradeRangeInitiator rangeInitiator)
+        {
+            Criteria.RangeInitiator = rangeInitiator;
+        }
 
-    internal class StrategyRunner
-    {
-        private readonly List<ITimeCondition> timeConditions;
+        public void UpdateTradeRange(double rangeHigh, double rangeLow)
+        {
+            Criteria.RangeHigh = rangeHigh;
+            Criteria.RangeLow = rangeLow;
+        }
 
         public void Run()
         {
-            // Run time conditions
-            var startCondition = timeConditions.FirstOrDefault();
-            if (startCondition != null) startCondition.Execute();
+            if (longReversal.IsSatisfied(Criteria))
+            {
+                CurrentTrade = longReversal.Execute(Criteria);
+            }
 
-            var endCondition = timeConditions.FirstOrDefault();
-            if (endCondition != null) endCondition.Execute();
-
+            if (shortReversal.IsSatisfied(Criteria))
+            {
+                CurrentTrade = shortReversal.Execute(Criteria);
+            }
 
             // Run entry conditions
 
             // Run trade management conditions
-        }
-
-        public void AddTimeCondition(ITimeCondition conditions)
-        {
-            timeConditions.Add(conditions);
         }
     }
 }

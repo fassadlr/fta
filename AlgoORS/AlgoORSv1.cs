@@ -11,12 +11,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 {
     public class AlgoORSv1 : AlgoBase
     {
-        private enum TradeType
-        {
-            Reversal,
-            Continuation,
-        }
-
         [NinjaScriptProperty]
         [Display(Name = "Session Start Time", Order = 5, GroupName = "Parameters")]
         public int SessionStartTime { get; set; }
@@ -70,7 +64,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         private TradeBias tradeBias;
         private bool breakEvenSet;
 
-        private TradeDetails currentTrade;
+        private TradeExecutionResult currentTrade;
 
         private Order currentLimitOrder;
 
@@ -412,7 +406,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             SetStopLoss("short", CalculationMode.Price, stopLoss, true);
             SetProfitTarget("short", CalculationMode.Price, takeProfit, true);
 
-            currentTrade = new TradeDetails
+            currentTrade = new TradeExecutionResult
             {
                 Bias = TradeBias.Short,
                 Entry = Position.AveragePrice,
@@ -436,7 +430,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             SetStopLoss("long", CalculationMode.Price, stopLoss, true);
             SetProfitTarget("long", CalculationMode.Price, takeProfit, true);
 
-            currentTrade = new TradeDetails
+            currentTrade = new TradeExecutionResult
             {
                 Bias = TradeBias.Long,
                 Entry = Position.AveragePrice,

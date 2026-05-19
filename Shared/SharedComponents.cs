@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using NinjaTrader.Cbi;
 using NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
@@ -30,18 +31,21 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         }
     }
 
-    public class TradeDetails
+    public class TradeExecutionResult
     {
         public TradeBias Bias { get; set; }
         public TradeRangeInitiator RangeInitiater { get; set; }
         public TradeType Type { get; set; }
         public double Entry { get; set; } = 0;
         public DateTime EntryTime { get; set; }
+        public Order LimitOrder { get; set; }
         public double StopLoss { get; set; } = 0;
         public double TakeProfit { get; set; } = 0;
         public double ProfitLoss { get; set; } = 0;
         public double MaxDrawdown { get; set; } = 0;
         public double DrawdownStopPercentage { get; set; } = 0;
+
+        public bool Executed { get; set; }
 
         public override string ToString()
         {
@@ -70,6 +74,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
             }
 
             return value;
+        }
+
+        internal static TradeExecutionResult Failed()
+        {
+            return new TradeExecutionResult() { Executed = false };
         }
     }
 
@@ -100,12 +109,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
             if (trQueue.Count == period)
                 Atr = Math.Round(trQueue.Average());
         }
-    }
-
-    public enum TradeType
-    {
-        Reversal,
-        Continuation,
     }
 
     public enum FractalType
