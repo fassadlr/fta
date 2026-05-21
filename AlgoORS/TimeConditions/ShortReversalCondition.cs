@@ -12,7 +12,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
         internal override bool IsSatisfied(ExecutionCriteria criteria)
         {
-            if (criteria.RangeInitiator == TradeRangeInitiator.None || criteria.RangeInitiator == TradeRangeInitiator.RangeHighEngaged)
+            if (criteria.RangeInitiator == TradeRangeInitiator.None || criteria.RangeInitiator == TradeRangeInitiator.RangeLowEngaged)
                 return false;
 
             if (ValidFromTime <= NinjaScriptBase.ToTime(Owner.Time[0]))
