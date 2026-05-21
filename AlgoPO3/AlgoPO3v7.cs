@@ -500,11 +500,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private double AdjustRisk()
         {
             var riskAdjusted = Risk;
-            if (AdjustRiskBasedOnLosses && ConsecutiveLosses >= 2)
-            {
-                riskAdjusted = Risk / 2;
-                PrintDebug($"Adjust risk to {riskAdjusted}");
-            }
+            //if (AdjustRiskBasedOnLosses && ConsecutiveLosses >= 2)
+            //{
+            //    riskAdjusted = Risk / 2;
+            //    PrintDebug($"Adjust risk to {riskAdjusted}");
+            //}
 
             if (EdgeHours.Split(',').Contains(Time[0].Hour.ToString()))
             {
@@ -639,5 +639,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         internal double TakeProfit { get; set; } = 0;
         internal double TradeMissedThreshold { get; set; } = 0;
         internal double BreakEvenThreshold { get; set; } = 0;
+        internal OrderType OrderType { get; set; }
+        internal double VWAPDistance { get; set; }
     }
 }

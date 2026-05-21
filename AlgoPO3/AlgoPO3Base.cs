@@ -37,27 +37,19 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         public double EdgeHourMultiplier { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Adjust Risk on Consec Loss", Order = 13, GroupName = "Parameters")]
-        public bool AdjustRiskBasedOnLosses { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Cumm. Loss Streak", Order = 14, GroupName = "Parameters")]
-        public int LossStreak { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Include CPI Week", Order = 15, GroupName = "Parameters")]
+        [Display(Name = "Include CPI Week", Order = 14, GroupName = "Parameters")]
         public bool IncludeCPIWeek { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Include NFP Week", Order = 16, GroupName = "Parameters")]
+        [Display(Name = "Include NFP Week", Order = 15, GroupName = "Parameters")]
         public bool IncludeNFPWeek { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Include No Events Week", Order = 17, GroupName = "Parameters")]
+        [Display(Name = "Include No Events Week", Order = 16, GroupName = "Parameters")]
         public bool IncludeNoEventsWeek { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Include FOMC Week", Order = 18, GroupName = "Parameters")]
+        [Display(Name = "Include FOMC Week", Order = 17, GroupName = "Parameters")]
         public bool IncludeFOMCWeek { get; set; }
 
         internal bool BearishBOSDetected = false;

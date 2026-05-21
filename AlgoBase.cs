@@ -76,7 +76,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         {
             var stopLossTicks = Math.Round(stopLossDistance, 1, MidpointRounding.ToEven) / Instrument.MasterInstrument.TickSize;
             var tickValue = Instrument.MasterInstrument.PointValue * Instrument.MasterInstrument.TickSize;
-            return (int)Math.Round(risk / (stopLossTicks * tickValue), MidpointRounding.AwayFromZero);
+            PrintDebug($"[CALCULATE_POSITION_SIZE] risk / (stopLossTicks * tickValue) {(int)(risk / (stopLossTicks * tickValue))}");
+            return (int)Math.Round(risk / (stopLossTicks * tickValue), MidpointRounding.ToEven);
         }
 
         internal void DetectFractalWithPlatos()
