@@ -49,7 +49,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PO3 = 81;
                 SessionStart = 0;
                 SessionEnd = 13;
-                Risk = 300;
+                PositionSize = 4;
                 IsOverlay = true;
                 EdgeHours = "0,3,9,11";
                 EdgeHourMultiplier = 1.5;
@@ -254,7 +254,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (Close[0] < currentTrade.Entry)
                 {
                     PrintDebug($"[PLACE_TRADE] {tradeBias} entry at {currentTrade.Entry} TMT {currentTrade.TradeMissedThreshold} BET {currentTrade.BreakEvenThreshold}");
-                    LimitOrder = EnterShortLimit(0, true, CalculatePositionSize(currentTrade.StopLoss - currentTrade.Entry), currentTrade.Entry, "short entry");
+                    LimitOrder = EnterShortLimit(0, true, CalculatePositionSize(), currentTrade.Entry, "short entry");
 
                     if (atr[0] > 16)
                     {
@@ -295,7 +295,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (Close[0] > currentTrade.Entry)
                 {
                     PrintDebug($"[PLACE_TRADE] {currentTrade.Bias} entry at {currentTrade.Entry} TMT {currentTrade.TradeMissedThreshold} BET");
-                    LimitOrder = EnterLongLimit(0, true, CalculatePositionSize(currentTrade.Entry - currentTrade.StopLoss), currentTrade.Entry, "long entry");
+                    LimitOrder = EnterLongLimit(0, true, CalculatePositionSize(), currentTrade.Entry, "long entry");
 
                     if (atr[0] > 16)
                     {
@@ -497,52 +497,35 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
         }
 
-        private double AdjustRisk()
+        private int CalculatePositionSize()
         {
-            var riskAdjusted = Risk;
-            //if (AdjustRiskBasedOnLosses && ConsecutiveLosses >= 2)
+            int positionSize = 4;
+
+            if (EdgeHoursParsed.Contains(Time[0].Hour))// && atrCurrent <= 20)
+            {
+                positionSize = 6;
+                PrintDebug($"[POSITION_ADJUSTED_EDGEHOUR] {positionSize}");
+            }
+
+            //if (atrCurrent > 20 && atrCurrent <= 25)
             //{
-            //    riskAdjusted = Risk / 2;
-            //    PrintDebug($"Adjust risk to {riskAdjusted}");
+            //    positionSize = 4;
+            //    PrintDebug($"[POSITION_ADJUSTED_ATR] {positionSize}");
             //}
 
-            if (EdgeHours.Split(',').Contains(Time[0].Hour.ToString()))
-            {
-                riskAdjusted = riskAdjusted * EdgeHourMultiplier;
-                PrintDebug($"Edge hour, adjust risk to {riskAdjusted}");
-            }
+            //if (atrCurrent > 25 && atrCurrent <= 36)
+            //{
+            //    positionSize = 4;
+            //    PrintDebug($"[POSITION_ADJUSTED_ATR] {positionSize}");
+            //}
 
-            if (atr[0] > 16)
-            {
-                //if (dailyAtr.Atr >= 20 && dailyAtr.Atr < 25)
-                //{
-                //    riskAdjusted = riskAdjusted * 0.75;
-                //}
+            //if (atrCurrent > 36)
+            //{
+            //    positionSize = 3;
+            //    PrintDebug($"[POSITION_ADJUSTED_ATR] {positionSize}");
+            //}
 
-                //if (dailyAtr.Atr >= 25 && dailyAtr.Atr < 30)
-                //{
-                //    riskAdjusted = riskAdjusted * 0.5;
-                //}
-
-                if (atr[0] > 30)
-                {
-                    riskAdjusted = riskAdjusted * 0.50;
-                    PrintDebug($"[ATR_ABOVE_STOP_RA] {atr[0]} risk {riskAdjusted}");
-                }
-
-                PrintDebug($"[ATR_ABOVE_STOP] {atr[0]} risk {riskAdjusted}");
-            }
-
-            return riskAdjusted;
-        }
-
-        private int CalculatePositionSize(double stopLossDistance)
-        {
-            var adjustedRisk = AdjustRisk();
-
-            var stopLossTicks = Math.Round(stopLossDistance, 1, MidpointRounding.ToEven) / Instrument.MasterInstrument.TickSize;
-            var tickValue = Instrument.MasterInstrument.PointValue * Instrument.MasterInstrument.TickSize;
-            return (int)Math.Round(adjustedRisk / (stopLossTicks * tickValue), MidpointRounding.AwayFromZero);
+            return positionSize;
         }
 
         private void ProcessSharedBorderRange(bool isLoss)
@@ -641,5 +624,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         internal double BreakEvenThreshold { get; set; } = 0;
         internal OrderType OrderType { get; set; }
         internal double VWAPDistance { get; set; }
+        public string VWAPLocation { get; internal set; }
     }
 }

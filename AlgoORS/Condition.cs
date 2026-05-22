@@ -39,7 +39,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
         internal double CalculatePositionSize(double stopLossDistance)
         {
-            var risk = Owner.Risk;
+            var risk = 300; // TODO hardcoded
             var stopLossTicks = Math.Round(stopLossDistance, 1, MidpointRounding.ToEven) / Owner.Instrument.MasterInstrument.TickSize;
             var tickValue = Owner.Instrument.MasterInstrument.PointValue * Owner.Instrument.MasterInstrument.TickSize;
             var position = Math.Round(risk / (stopLossTicks * tickValue), 2);

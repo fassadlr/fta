@@ -86,12 +86,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
     {
         public double Atr { get; private set; }
         private double prevClose = 0;
-        private readonly Queue<double> trQueue = new();
+        public readonly Queue<double> trQueue = new();
         private readonly int period = 14;
 
         public void Calculate(double high, double low, double close)
         {
-
             // Calculate True Range
             double tr = Math.Max(high - low,
                         Math.Max(Math.Abs(high - prevClose),

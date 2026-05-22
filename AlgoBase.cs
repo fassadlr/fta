@@ -13,16 +13,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         public bool IsLive { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Risk", Order = 1, GroupName = "Parameters")]
-        public double Risk { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Display Debug Logs", Order = 2, GroupName = "Parameters")]
+        [Display(Name = "Display Debug Logs", Order = 1, GroupName = "Parameters")]
         public bool DebugLogEnabled { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Display Trade Logs", Order = 3, GroupName = "Parameters")]
+        [Display(Name = "Display Trade Logs", Order = 2, GroupName = "Parameters")]
         public bool TradeLogEnabled { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Position Size", Order = 3, GroupName = "Parameters")]
+        public int PositionSize { get; set; }
 
         [NinjaScriptProperty]
         [Display(Name = "Time Offset", Order = 4, GroupName = "Parameters")]

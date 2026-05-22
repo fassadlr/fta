@@ -12,6 +12,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
     public class AlgoORSv1 : AlgoBase
     {
         [NinjaScriptProperty]
+        [Display(Name = "Risk", Order = 4, GroupName = "Parameters")]
+        public double Risk { get; set; }
+
+        [NinjaScriptProperty]
         [Display(Name = "Session Start Time", Order = 5, GroupName = "Parameters")]
         public int SessionStartTime { get; set; }
 

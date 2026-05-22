@@ -15,7 +15,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
     public class AlgoPO3v6 : AlgoPO3Base
     {
         [NinjaScriptProperty]
-        [Display(Name = "Stop Grace", Order = 18, GroupName = "Parameters")]
+        [Display(Name = "Stop Grace", Order = 19, GroupName = "Parameters")]
         public int StopGrace { get; set; }
 
         private Order PendingOrder { get; set; }
@@ -23,6 +23,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private DealingRange CurrentRange { get; set; }
         private DealingRange PreviousRange { get; set; }
+        private bool sessionInitialized;
 
         private MSSBias mssBias;
         private RangeBias rangeBias;
@@ -51,7 +52,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PO3 = 81;
                 SessionStart = 0;
                 SessionEnd = 13;
-                Risk = 140;
+                PositionSize = 4;
                 IsOverlay = true;
 
                 BlockEndHours = "3,9,12";
@@ -106,13 +107,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         protected override void OnBarUpdate()
         {
-            if (BarsInProgress == 0 && Time[0].Hour == SessionStart && Time[0].Minute == 0 && Time[0].Second == 0)
+            if (!sessionInitialized)
             {
                 PerformCleanupBeforeSessionStart();
+                sessionInitialized = true;
                 return;
             }
-
-            dailyAtr ??= new DailyAtr();
 
             if (SkipMonths.Split(',').Contains(Time[0].Month.ToString()))
                 return;
@@ -133,18 +133,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PrintDebug($"Creating new trading session.");
             }
 
-            // Adjust time for NY/UK BST overlap
-            var adjustSessionEnd = AdjustSessionEnd();
-
-            // If the session has ended stop processing.
-            if (Time[0].Hour >= adjustSessionEnd && Position.MarketPosition == MarketPosition.Flat)
-            {
-                CancelLimitOrder();
-                return;
-            }
-
             // Always process fractal and BOS detection.
-            if (CurrentBar >= 5 && BarsInProgress == 1)
+            if (BarsInProgress == 1)
             {
                 dailyAtr.Calculate(High[0], Low[0], Close[0]);
 
@@ -155,6 +145,17 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 //TradingSession.Update(Close[0], atrCurrent);
             }
 
+            // Adjust time for NY/UK BST overlap
+            var adjustSessionEnd = AdjustSessionEnd();
+
+            // If the session has ended stop processing.
+            if (Time[0].Hour >= adjustSessionEnd && Position.MarketPosition == MarketPosition.Flat)
+            {
+                CancelLimitOrder();
+                return;
+            }
+
+            //atrCurrent = atr[0];
             atrCurrent = dailyAtr.Atr;
 
             if (BarsInProgress != 0)
@@ -336,7 +337,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         TakeProfit = PreviousRange.MBCE1,
                         TradeMissedThreshold = PreviousRange.BR3,
                         BreakEvenThreshold = PreviousRange.BR2,
-                        VWAPDistance = vwap.VWAP[0]
                     };
                 }
 
@@ -352,7 +352,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         TakeProfit = CurrentRange.MBCE2,
                         TradeMissedThreshold = CurrentRange.BR2,
                         BreakEvenThreshold = CurrentRange.BR3,
-                        VWAPDistance = vwap.VWAP[0]
                     };
                 }
             }
@@ -371,7 +370,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         TakeProfit = CurrentRange.MBCE1,
                         TradeMissedThreshold = CurrentRange.BR3,
                         BreakEvenThreshold = CurrentRange.BR2,
-                        VWAPDistance = vwap.VWAP[0]
                     };
                 }
 
@@ -387,12 +385,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         TakeProfit = PreviousRange.MBCE2,
                         TradeMissedThreshold = PreviousRange.BR2,
                         BreakEvenThreshold = PreviousRange.BR3,
-                        VWAPDistance = vwap.VWAP[0]
                     };
                 }
             }
 
             CurrentTrade.Entry = Math.Round(CurrentTrade.Entry / 0.25) * 0.25;
+
+            CalculateVWAPDistance();
 
             if (CurrentTrade.Bias == TradeBias.Long)
             {
@@ -407,12 +406,26 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 if (Close[0] > CurrentTrade.Entry)
                 {
+                    //if (Time[0].Hour == 6)
+                    //{
+                    //    PrintDebug($"[LIMIT_ORDER_SKIPPED_VWAP] {CurrentTrade.VWAPDistance}");
+                    //    return;
+                    //}
+
                     PrintDebug($"[PLACE_TRADE_LIMIT] {CurrentTrade.Bias}, {CurrentTrade.Entry}, atr {atrCurrent}");
+                    CurrentTrade.OrderType = OrderType.Limit;
                     PendingOrder = EnterLongLimit(0, true, CalculatePositionSize(), CurrentTrade.Entry, "long entry");
                 }
                 else
                 {
+                    if (CurrentTrade.VWAPDistance < 20)
+                    {
+                        PrintDebug($"[STOP_ORDER_SKIPPED_VWAP] {CurrentTrade.VWAPDistance}");
+                        return;
+                    }
+
                     PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias}, {CurrentTrade.Entry} atr {atrCurrent}");
+                    CurrentTrade.OrderType = OrderType.StopMarket;
                     PendingOrder = EnterLongStopMarket(0, true, CalculatePositionSize(), CurrentTrade.Entry, "long entry");
                 }
 
@@ -434,18 +447,46 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 if (Close[0] < CurrentTrade.Entry)
                 {
+                    //if (Time[0].Hour == 6)
+                    //{
+                    //    PrintDebug($"[LIMIT_ORDER_SKIPPED_VWAP] {CurrentTrade.VWAPDistance}");
+                    //    return;
+                    //}
+
                     PrintDebug($"[PLACE_TRADE_LIMIT] {CurrentTrade.Bias}, {CurrentTrade.Entry}, atr {atrCurrent}");
+                    CurrentTrade.OrderType = OrderType.Limit;
                     PendingOrder = EnterShortLimit(0, true, CalculatePositionSize(), CurrentTrade.Entry, "short entry");
                 }
                 else
                 {
+                    if (CurrentTrade.VWAPDistance < 20)
+                    {
+                        PrintDebug($"[STOP_ORDER_SKIPPED_VWAP] {CurrentTrade.VWAPDistance}");
+                        return;
+                    }
+
                     PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias}, {CurrentTrade.Entry} atr {atrCurrent}");
+                    CurrentTrade.OrderType = OrderType.StopMarket;
                     PendingOrder = EnterShortStopMarket(0, true, CalculatePositionSize(), CurrentTrade.Entry, "short entry");
                 }
 
                 SetStopLoss("short entry", CalculationMode.Price, CurrentTrade.StopLoss, true);
                 PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
                 SetProfitTarget("short entry", CalculationMode.Price, CurrentTrade.TakeProfit, true);
+            }
+        }
+
+        private void CalculateVWAPDistance()
+        {
+            if (CurrentTrade.Entry > vwap.VWAP[0])
+            {
+                CurrentTrade.VWAPLocation = "Above";
+                CurrentTrade.VWAPDistance = Math.Round(CurrentTrade.Entry - vwap.VWAP[0]);
+            }
+            else
+            {
+                CurrentTrade.VWAPLocation = "Below";
+                CurrentTrade.VWAPDistance = Math.Round(vwap.VWAP[0] - CurrentTrade.Entry);
             }
         }
 
@@ -459,7 +500,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-            PrintTrade($"{trade.Entry.Time},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance}");
+            PrintTrade($"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.VWAPLocation}");
 
             if (trade.ProfitCurrency >= 0)
                 ProcessSharedBorderRange(false);
@@ -534,6 +575,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private void PerformCleanupBeforeSessionStart()
         {
+            PrintDebug("[SESSION_START] resetting state");
+
             Ranges.Clear();
 
             CancelLimitOrder();
@@ -556,11 +599,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             BearishBOSDetected = false;
             lastBOSLocation = 0;
 
-            dailyAtr = null;
+            dailyAtr ??= new DailyAtr();
 
             CurrentTrade = null;
-
-            PrintDebug("[SESSION_START] resetting state");
         }
 
         private void BreakEvenOrCloseTrade()
@@ -624,29 +665,29 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private int CalculatePositionSize()
         {
-            int positionSize = 4;
+            int positionSize = PositionSize;
 
             if (EdgeHoursParsed.Contains(Time[0].Hour) && atrCurrent <= 20)
             {
-                positionSize = 6;
+                positionSize = (int)(PositionSize * 1.5);
                 PrintDebug($"[POSITION_ADJUSTED_EDGEHOUR] {positionSize}");
             }
 
             if (atrCurrent > 20 && atrCurrent <= 25)
             {
-                positionSize = 5;
+                positionSize = PositionSize + 1;
                 PrintDebug($"[POSITION_ADJUSTED_ATR] {positionSize}");
             }
 
             if (atrCurrent > 25 && atrCurrent <= 36)
             {
-                positionSize = 4;
+                positionSize = PositionSize;
                 PrintDebug($"[POSITION_ADJUSTED_ATR] {positionSize}");
             }
 
             if (atrCurrent > 36)
             {
-                positionSize = 3;
+                positionSize = PositionSize - 1;
                 PrintDebug($"[POSITION_ADJUSTED_ATR] {positionSize}");
             }
 
