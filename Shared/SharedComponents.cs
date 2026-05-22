@@ -397,4 +397,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
             return $"LOD: {LowOfDay} HOD: {HighOfDay}";
         }
     }
+
+    public class TradeDetails
+    {
+        internal TradeBias Bias { get; set; }
+        internal double Atr { get; set; }
+        internal double Entry { get; set; } = 0;
+        internal double StopLoss { get; set; } = 0;
+        internal double TakeProfit { get; set; } = 0;
+        internal double TradeMissedThreshold { get; set; } = 0;
+        internal double BreakEvenThreshold { get; set; } = 0;
+        internal OrderType OrderType { get; set; }
+        internal double VWAPDistance { get; set; } = 0;
+        public string VWAPLocation { get; internal set; }
+    }
 }

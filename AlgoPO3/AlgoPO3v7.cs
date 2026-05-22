@@ -612,18 +612,4 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             currentTrade = null;
         }
     }
-
-    internal class TradeDetails
-    {
-        internal TradeBias Bias { get; set; }
-        internal double Atr { get; set; }
-        internal double Entry { get; set; } = 0;
-        internal double StopLoss { get; set; } = 0;
-        internal double TakeProfit { get; set; } = 0;
-        internal double TradeMissedThreshold { get; set; } = 0;
-        internal double BreakEvenThreshold { get; set; } = 0;
-        internal OrderType OrderType { get; set; }
-        internal double VWAPDistance { get; set; }
-        public string VWAPLocation { get; internal set; }
-    }
 }

@@ -50,13 +50,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
                 PO3 = 81;
-                SessionStart = 0;
+                SessionStart = 1;
                 SessionEnd = 13;
                 PositionSize = 4;
                 IsOverlay = true;
 
                 BlockEndHours = "3,9,12";
-                EdgeHours = "0,3,9,11";
+                EdgeHours = "1,3,9,11";
                 EdgeHourMultiplier = 1.5;
                 SkipHours = "4,5,7,10";
                 SkipMonths = "8";
@@ -424,7 +424,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         return;
                     }
 
-                    PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias}, {CurrentTrade.Entry} atr {atrCurrent}");
+                    PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias} at {CurrentTrade.Entry}, {Close[0]}, atr {atrCurrent}");
                     CurrentTrade.OrderType = OrderType.StopMarket;
                     PendingOrder = EnterLongStopMarket(0, true, CalculatePositionSize(), CurrentTrade.Entry, "long entry");
                 }
@@ -432,6 +432,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 SetStopLoss("long entry", CalculationMode.Price, CurrentTrade.StopLoss, true);
                 PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
                 SetProfitTarget("long entry", CalculationMode.Price, CurrentTrade.TakeProfit, true);
+
+                return;
             }
 
             if (CurrentTrade.Bias == TradeBias.Short)
@@ -465,14 +467,17 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         return;
                     }
 
-                    PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias}, {CurrentTrade.Entry} atr {atrCurrent}");
+                    PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias} at {CurrentTrade.Entry}, {Close[0]}, atr {atrCurrent}");
                     CurrentTrade.OrderType = OrderType.StopMarket;
                     PendingOrder = EnterShortStopMarket(0, true, CalculatePositionSize(), CurrentTrade.Entry, "short entry");
                 }
+                //else return;
 
                 SetStopLoss("short entry", CalculationMode.Price, CurrentTrade.StopLoss, true);
                 PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
                 SetProfitTarget("short entry", CalculationMode.Price, CurrentTrade.TakeProfit, true);
+
+                return;
             }
         }
 
@@ -546,7 +551,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                         lastBOSLocation = LastFractalHigh;
 
-                        PrintDebug($"Bullish BOS detected, MSS bias set to {mssBias} BOS price {lastBOSLocation}");
+                        PrintDebug($"[BULLISH_BOS] MSS bias set to {mssBias} BOS price {lastBOSLocation}");
                     }
                 }
             }
@@ -567,7 +572,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                         lastBOSLocation = LastFractalLow;
 
-                        PrintDebug($"Bearish BOS detected, MSS bias set to {mssBias} BOS price {lastBOSLocation}");
+                        PrintDebug($"[BEARISH_BOS] MSS bias set to {mssBias} BOS price {lastBOSLocation}");
                     }
                 }
             }
