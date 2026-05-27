@@ -23,7 +23,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private DealingRange CurrentRange { get; set; }
         private DealingRange PreviousRange { get; set; }
-        private bool sessionInitialized;
+        private DateTime? lastInitialization;
 
         private MSSBias mssBias;
         private RangeBias rangeBias;
@@ -60,6 +60,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 EdgeHourMultiplier = 1.5;
                 SkipHours = "4,5,7,10";
                 SkipMonths = "8";
+                StopGrace = 3;
 
                 IncludeCPIWeek = true;
                 IncludeFOMCWeek = false;
@@ -107,10 +108,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         protected override void OnBarUpdate()
         {
-            if (!sessionInitialized)
+            if (lastInitialization == null || lastInitialization?.Date != Time[0].Date)
             {
                 PerformCleanupBeforeSessionStart();
-                sessionInitialized = true;
+                lastInitialization = Time[0].Date;
                 return;
             }
 
@@ -371,6 +372,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         TradeMissedThreshold = CurrentRange.BR3,
                         BreakEvenThreshold = CurrentRange.BR2,
                     };
+
+                    CurrentTrade.OneR_Threshold = CurrentTrade.Entry + (CurrentTrade.Entry - CurrentTrade.StopLoss) * 1;
                 }
 
                 if (tradeBias == TradeBias.Short)
@@ -386,6 +389,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         TradeMissedThreshold = PreviousRange.BR2,
                         BreakEvenThreshold = PreviousRange.BR3,
                     };
+
+                    CurrentTrade.OneR_Threshold = CurrentTrade.Entry - (CurrentTrade.StopLoss - CurrentTrade.Entry) * 1;
                 }
             }
 
@@ -471,7 +476,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     CurrentTrade.OrderType = OrderType.StopMarket;
                     PendingOrder = EnterShortStopMarket(0, true, CalculatePositionSize(), CurrentTrade.Entry, "short entry");
                 }
-                //else return;
 
                 SetStopLoss("short entry", CalculationMode.Price, CurrentTrade.StopLoss, true);
                 PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
@@ -646,6 +650,27 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 }
                 else
                 {
+                    //if (!CurrentTrade.StopLossAdjusted_OneR)
+                    //{
+                    //    if (CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.OneR_Threshold)
+                    //    {
+                    //        CurrentTrade.StopLoss = CurrentTrade.StopLoss + StopGrace;
+                    //        CurrentTrade.StopLossAdjusted_OneR = true;
+
+                    //        SetStopLoss("long entry", CalculationMode.Price, CurrentTrade.StopLoss, true);
+                    //        PrintDebug($"[BREAK_EVEN_ONE_R_LONG] {CurrentTrade.StopLoss}");
+                    //    }
+
+                    //    if (CurrentTrade.Bias == TradeBias.Short && Low[0] <= CurrentTrade.OneR_Threshold)
+                    //    {
+                    //        CurrentTrade.StopLoss = CurrentTrade.StopLoss - StopGrace;
+                    //        CurrentTrade.StopLossAdjusted_OneR = true;
+
+                    //        SetStopLoss("short entry", CalculationMode.Price, CurrentTrade.StopLoss, true);
+                    //        PrintDebug($"[BREAK_EVEN_ONE_R_SHORT]");
+                    //    }
+                    //}
+
                     if (CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.BreakEvenThreshold)
                     {
                         breakEvenDirection = "long entry";
