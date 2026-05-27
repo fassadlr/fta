@@ -5,6 +5,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
     public abstract class AlgoPO3Base : AlgoBase
     {
         [NinjaScriptProperty]
+        [Display(Name = "Position Size", Order = 4, GroupName = "Parameters")]
+        public int PositionSize { get; set; }
+
+        [NinjaScriptProperty]
         [Display(Name = "Session Start", Order = 5, GroupName = "Parameters")]
         public int SessionStart { get; set; }
 

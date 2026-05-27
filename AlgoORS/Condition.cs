@@ -23,7 +23,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         public double CandleBodyPercentage { get; set; }
         public double StopGrace { get; internal set; }
         public double TPMultiplier { get; internal set; }
-        public double PositionSize { get; internal set; }
+        public int Risk { get; internal set; }
     }
 
     internal abstract class Condition(AlgoBase owner, FractalManager fractalManager)
@@ -54,15 +54,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         internal bool CloseLower()
         {
             return Owner.Close[0] < Owner.Close[1];
-        }
-
-        internal double CalculatePositionSize(double stopLossDistance)
-        {
-            var risk = 300; // TODO hardcoded
-            var stopLossTicks = Math.Round(stopLossDistance, 1, MidpointRounding.ToEven) / Owner.Instrument.MasterInstrument.TickSize;
-            var tickValue = Owner.Instrument.MasterInstrument.PointValue * Owner.Instrument.MasterInstrument.TickSize;
-            var position = Math.Round(risk / (stopLossTicks * tickValue), 2);
-            return Math.Round(position, 2);
         }
 
         internal double CalculateRiskReward(double stopLossDistance, double profitTargetDistance)

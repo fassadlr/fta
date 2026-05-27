@@ -39,15 +39,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         {
             var stopLoss = Owner.Low[0] - settings.StopGrace;
             var stopDistance = (Owner.Close[0] - Owner.Low[0]) + settings.StopGrace;
-            var size = CalculatePositionSize(stopDistance);
-            if (size < 0.75)
+            var positionSize = Owner.CalculatePositionSize(stopDistance, settings.Risk);
+            if (positionSize < 0.75)
             {
-                Owner.PrintDebug($"[POSITION_SUBOPTIMAL_LONG] Position {size}, Stop {stopLoss}");
+                Owner.PrintDebug($"[POSITION_SUBOPTIMAL_LONG] Position {positionSize}, Stop {stopLoss}");
                 return TradeExecutionResult.Failed();
             }
 
             var profitTarget = Owner.Close[0] + (stopDistance * settings.TPMultiplier);
-            return EnterLongTrade("LONG_ENTRY_CONTINUATION", false, settings.RangeInitiator, TradeType.Continuation, (int)size, settings.PositionSize, stopLoss, profitTarget);
+            return EnterLongTrade("LONG_ENTRY_CONTINUATION", false, settings.RangeInitiator, TradeType.Continuation, positionSize, 1, stopLoss, profitTarget);
         }
     }
 }

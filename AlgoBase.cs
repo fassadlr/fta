@@ -21,11 +21,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         public bool TradeLogEnabled { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Position Size", Order = 3, GroupName = "Parameters")]
-        public int PositionSize { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Time Offset", Order = 4, GroupName = "Parameters")]
+        [Display(Name = "Time Offset", Order = 3, GroupName = "Parameters")]
         public int SessionTimeOffset { get; set; }
 
         internal double LastFractalHigh = 0;

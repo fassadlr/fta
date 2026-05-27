@@ -47,6 +47,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         [Display(Name = "Entry Percentage", Order = 12, GroupName = "Parameters")]
         public double EntryPercentage { get; set; }
 
+        [NinjaScriptProperty]
+        [Display(Name = "Risk", Order = 13, GroupName = "Parameters")]
+        public int Risk { get; set; }
+
         private bool tradingComplete;
 
         private DailyRangeTracker dailyRangeTracker = new();
@@ -130,7 +134,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 CandleBodyPercentage = CandleBodyPercentage,
                 EntryPercentage = EntryPercentage,
                 MaxRiskReward = MaxRiskReward,
-                PositionSize = PositionSize,
+                Risk = Risk,
                 StopGrace = StopGrace,
                 TPMultiplier = TPMultiplier,
             });
