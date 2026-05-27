@@ -42,6 +42,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         internal List<NewsEvent> Events = NewsEvents.Events();
 
+        internal int AdjustedSessionStart = 0;
+        internal int AdjustedSessionEnd = 0;
+
+        internal int AdjustSessionEnd()
+        {
+            var adjustSessionEnd = AdjustedSessionEnd;
+            if (IsDSTOverlap())
+                adjustSessionEnd = AdjustedSessionEnd - 1;
+
+            return adjustSessionEnd;
+        }
+
         internal int AddMinutesToTime(int ninjaTime, int minutes)
         {
             var ts = TimeSpan.ParseExact(

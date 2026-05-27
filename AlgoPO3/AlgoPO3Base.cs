@@ -64,15 +64,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         internal TradeSessionState TradingSession;
 
-        internal int AdjustSessionEnd()
-        {
-            var adjustSessionEnd = SessionEnd;
-            if (IsDSTOverlap())
-                adjustSessionEnd = SessionEnd - 1;
-
-            return adjustSessionEnd;
-        }
-
         internal void DetectFractalFiveBar()
         {
             // Need at least 5 bars

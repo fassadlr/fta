@@ -89,10 +89,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 EdgeHoursParsed = [.. EdgeHours.Split(',').Select((i) => int.Parse(i) + SessionTimeOffset)];
                 SkipHoursParsed = [.. SkipHours.Split(',').Select((i) => int.Parse(i) + SessionTimeOffset)];
 
-                SessionStart = SessionStart + SessionTimeOffset;
-                SessionEnd = SessionEnd + SessionTimeOffset;
+                AdjustedSessionStart = SessionStart + SessionTimeOffset;
+                AdjustedSessionEnd = SessionEnd + SessionTimeOffset;
 
-                PrintDebug($"Session Start: {SessionStart}, Session End: {SessionEnd}");
+                PrintDebug($"Session Start: {AdjustedSessionStart}, Session End: {AdjustedSessionEnd}");
                 PrintDebug($"BlockEndHoursParsed: {string.Join(",", BlockEndHoursParsed)}");
                 PrintDebug($"EdgeHoursParsed: {string.Join(",", EdgeHoursParsed)}");
                 PrintDebug($"SkipHoursParsed: {string.Join(",", SkipHoursParsed)}");
@@ -189,7 +189,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             PreviousRange?.UpdateCoverage(Close[0]);
 
             // The strategy only runs from a given time in the morning (8am)
-            if (Time[0].Hour < SessionStart)
+            if (Time[0].Hour < AdjustedSessionStart)
                 return;
 
             // If we are in a position then break even or close and stop processing.
@@ -699,7 +699,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (EdgeHoursParsed.Contains(Time[0].Hour) && atrCurrent <= 20)
             {
-                positionSize = (int)(PositionSize * 1.5);
+                positionSize = (int)(PositionSize * EdgeHourMultiplier);
                 PrintDebug($"[POSITION_ADJUSTED_EDGEHOUR] {positionSize}");
             }
 
