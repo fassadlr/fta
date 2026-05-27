@@ -10,15 +10,22 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             ValidFromTime = 144500;
         }
 
-        internal override bool IsSatisfied(ExecutionCriteria criteria)
+        internal override bool IsSatisfied(StrategySettings criteria)
         {
             if (criteria.RangeInitiator == TradeRangeInitiator.None || criteria.RangeInitiator == TradeRangeInitiator.RangeHighEngaged)
                 return false;
 
-            if (ValidFromTime <= NinjaScriptBase.ToTime(Owner.Time[0]))
+            // This equates to the open of the 14:50 candle
+            var timeCondition = NinjaScriptBase.ToTime(Owner.Time[0]) > ValidFromTime;
+            if (!timeCondition)
                 return false;
 
-            if (Owner.Close[0] < criteria.RangeLow)
+            var closeInsideCondition = Owner.Close[0] > criteria.RangeLow;
+            if (!closeInsideCondition)
+                return false;
+
+            var candleEngulfCondition = CandleBodyRange(0) > CandleBodyRange(1) && CloseHigher();
+            if (!candleEngulfCondition)
                 return false;
 
             if (!CandleBodyRangeInPoints(1))
@@ -29,7 +36,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             return true;
         }
 
-        internal override TradeExecutionResult Execute(ExecutionCriteria criteria)
+        internal override TradeExecutionResult Execute(StrategySettings criteria)
         {
             var stopLoss = FractalManager.RecentLow();
             var stopDistance = Owner.Close[0] - stopLoss.Price;

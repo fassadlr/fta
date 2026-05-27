@@ -14,51 +14,59 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         public TradeExecutionResult CurrentTrade { get; private set; }
         public Order LimitOrder { get; set; }
 
+        private LongContinuation longContinuation;
+        private ShortContinuation shortContinuation;
         private LongReversalCondition longReversal;
         private ShortReversalCondition shortReversal;
 
-        public ExecutionCriteria Criteria { get; private set; }
+        public StrategySettings Settings { get; private set; }
 
-        public static StrategyRunner Configure(AlgoBase strategyBase, FractalManager fractalManager, double entryPercentage, double maxRiskReward)
+        public static StrategyRunner Configure(AlgoBase strategyBase, FractalManager fractalManager, StrategySettings settings)
         {
             var runner = new StrategyRunner()
             {
-                Criteria = new ExecutionCriteria()
-                {
-                    EntryPercentage = entryPercentage,
-                    MaxRiskReward = maxRiskReward
-                },
+                Settings = settings,
 
+                longContinuation = new LongContinuation(strategyBase, fractalManager),
+                shortContinuation = new ShortContinuation(strategyBase, fractalManager),
                 longReversal = new LongReversalCondition(strategyBase, fractalManager),
                 shortReversal = new ShortReversalCondition(strategyBase, fractalManager)
             };
-
-            strategyBase.PrintDebug($"StrategyRunner configured with EntryPercentage: {entryPercentage}, MaxRiskReward: {maxRiskReward}");
 
             return runner;
         }
 
         public void UpdateRangeInitiator(TradeRangeInitiator rangeInitiator)
         {
-            Criteria.RangeInitiator = rangeInitiator;
+            Settings.RangeInitiator = rangeInitiator;
         }
 
         public void UpdateTradeRange(double rangeHigh, double rangeLow)
         {
-            Criteria.RangeHigh = rangeHigh;
-            Criteria.RangeLow = rangeLow;
+            Settings.RangeHigh = rangeHigh;
+            Settings.RangeLow = rangeLow;
         }
 
         public void Run()
         {
-            if (longReversal.IsSatisfied(Criteria))
+            if (longReversal.IsSatisfied(Settings))
             {
-                CurrentTrade = longReversal.Execute(Criteria);
+                CurrentTrade = longReversal.Execute(Settings);
             }
 
-            if (shortReversal.IsSatisfied(Criteria))
+            if (shortReversal.IsSatisfied(Settings))
             {
-                CurrentTrade = shortReversal.Execute(Criteria);
+                CurrentTrade = shortReversal.Execute(Settings);
+            }
+
+            if (longContinuation.IsSatisfied(Settings))
+            {
+                CurrentTrade = longContinuation.Execute(Settings);
+            }
+
+            if (shortContinuation.IsSatisfied(Settings))
+            {
+                CurrentTrade = shortContinuation.Execute(Settings);
             }
 
             // Run entry conditions

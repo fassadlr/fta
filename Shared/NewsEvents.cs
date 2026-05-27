@@ -242,6 +242,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 // May 2026
                 NewsEvent.CreateNFPEvent(new DateTime(2026, 05, 08, 13, 00, 0)),        // NFP
                 NewsEvent.CreateCPIEvent(new DateTime(2026, 05, 12, 13, 00, 0)),        // CPI
+                NewsEvent.CreateAllDay(new DateTime(2026, 05, 25)),                     // US BANK Holiday
             };
 
             // Add xmas period

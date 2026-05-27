@@ -84,6 +84,42 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                    ts.Seconds;
         }
 
+        internal bool BullishCandle(int index)
+        {
+            return Close[index] > Open[index];
+        }
+
+        internal bool BearishCandle(int index)
+        {
+            return Close[index] < Open[index];
+        }
+
+        internal bool BodyCandle(int index, double candleBodyPercentage)
+        {
+            var result = false;
+            double bodyPercentage = 0;
+            if (Close[index] > Open[index])
+            {
+                var bodyRange = Close[index] - Open[index];
+                var candleRange = High[0] - Low[index];
+                bodyPercentage = Math.Round(bodyRange / candleRange, 2);
+                result = bodyPercentage >= candleBodyPercentage;
+            }
+
+            if (Close[index] < Open[index])
+            {
+                var bodyRange = Open[index] - Close[index];
+                var candleRange = High[0] - Low[index];
+                bodyPercentage = Math.Round(bodyRange / candleRange, 2);
+                result = bodyPercentage >= candleBodyPercentage;
+            }
+
+            if (!result)
+                PrintDebug($"[BODY_CANDLE_SUBOP] {index} {bodyPercentage}");
+
+            return result;
+        }
+
         internal int CalculatePositionSize(double stopLossDistance, double risk)
         {
             var stopLossTicks = Math.Round(stopLossDistance, 1, MidpointRounding.ToEven) / Instrument.MasterInstrument.TickSize;

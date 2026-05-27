@@ -16,7 +16,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         public int SessionStartTime { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Session Start Time", Order = 6, GroupName = "Parameters")]
+        [Display(Name = "Session End Time", Order = 6, GroupName = "Parameters")]
         public int SessionEndTime { get; set; }
 
         [NinjaScriptProperty]
@@ -29,7 +29,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
         [NinjaScriptProperty]
         [Display(Name = "Max RR", Order = 8, GroupName = "Parameters")]
-        public double MaxRR { get; set; }
+        public double MaxRiskReward { get; set; }
 
         [NinjaScriptProperty]
         [Display(Name = "Max Trades", Order = 9, GroupName = "Parameters")]
@@ -68,6 +68,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
         private StrategyRunner runner;
 
+        private int adjustedMarketOpen = 0;
+        private int adjustedSessionStart = 0;
+        private int adjustedSessionEnd = 0;
+
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
@@ -81,8 +85,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 IsExitOnSessionCloseStrategy = true;
 
                 CandleBodyPercentage = 0.1;
-                EntryPercentage = 0.3;
-                MaxRR = 1.75; // This can be 3 if we set EntryPercentage to 0.3 
+                EntryPercentage = 0;
+                MaxRiskReward = 1.75; // This can be 3 if we set EntryPercentage to 0.3 
                 MaxTrades = 1;
                 TPMultiplier = 1;
 
@@ -104,13 +108,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
                 dailyRangeTracker = new();
 
-                SessionMarketOpen = AddHoursToTime(SessionMarketOpen, SessionTimeOffset);
-                SessionStartTime = AddHoursToTime(SessionStartTime, SessionTimeOffset);
-                SessionEndTime = AddHoursToTime(SessionEndTime, SessionTimeOffset);
+                adjustedMarketOpen = AddHoursToTime(SessionMarketOpen, SessionTimeOffset);
+                adjustedSessionStart = AddHoursToTime(SessionStartTime, SessionTimeOffset);
+                adjustedSessionEnd = AddHoursToTime(SessionEndTime, SessionTimeOffset);
 
-                PrintDebug($"Market Open {SessionMarketOpen}");
-                PrintDebug($"Session Start {SessionStartTime}");
-                PrintDebug($"Session End {SessionEndTime}");
+                PrintDebug($"Market Open {adjustedMarketOpen}");
+                PrintDebug($"Session Start {adjustedSessionStart}");
+                PrintDebug($"Session End {adjustedSessionEnd}");
             }
         }
 
@@ -121,7 +125,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 return;
             }
 
-            runner ??= StrategyRunner.Configure(this, fractalManager, EntryPercentage, MaxRR);
+            runner ??= StrategyRunner.Configure(this, fractalManager, new StrategySettings()
+            {
+                CandleBodyPercentage = CandleBodyPercentage,
+                EntryPercentage = EntryPercentage,
+                MaxRiskReward = MaxRiskReward,
+                PositionSize = PositionSize,
+                StopGrace = StopGrace,
+                TPMultiplier = TPMultiplier,
+            });
 
             // Filter by event days, skip days etc.
             if (FilterAllDay() && Position.MarketPosition == MarketPosition.Flat)
@@ -138,16 +150,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 tradeBias = TradeBias.Neutral;
                 tradeCount = 0;
 
-                runner.Criteria.RangeLow = 0;
-                runner.Criteria.RangeHigh = 0;
-                runner.Criteria.RangeInitiator = TradeRangeInitiator.None;
+                runner.Settings.RangeLow = 0;
+                runner.Settings.RangeHigh = 0;
+                runner.Settings.RangeInitiator = TradeRangeInitiator.None;
 
                 return;
             }
-
-            var adjustedMarketOpen = SessionMarketOpen;
-            var adjustedSessionStart = SessionStartTime;
-            var adjustedSessionEnd = SessionEndTime;
 
             if (IsDSTOverlap())
             {
@@ -218,7 +226,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 return;
 
             // No more processing after session end
-            if (ToTime(Time[0]) >= adjustedSessionEnd || tradingComplete)
+            // We can still look at the previous candles at the open of the 16:00 candle
+            if (ToTime(Time[0]) > adjustedSessionEnd || tradingComplete)
             {
                 if (runner.LimitOrder != null)
                 {
@@ -229,7 +238,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 return;
             }
 
-            fractalManager.DetectFractalThreeBar(5, runner.Criteria.RangeHigh, runner.Criteria.RangeLow);
+            fractalManager.DetectFractalThreeBar(5, runner.Settings.RangeHigh, runner.Settings.RangeLow);
             fractalManager.DetectFractalFiveBar(5);
 
             if (ToTime(Time[0]) < adjustedMarketOpen)
@@ -250,16 +259,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
             if (ToTime(Time[0]) > adjustedMarketOpen)
             {
-                if (High[0] > runner.Criteria.RangeHigh && runner.Criteria.RangeInitiator != TradeRangeInitiator.RangeHighEngaged)
+                if (High[0] > runner.Settings.RangeHigh && runner.Settings.RangeInitiator != TradeRangeInitiator.RangeHighEngaged)
                 {
-                    PrintDebug($"[RANGE_HIGH_ENGAGED] {High[0]} > {runner.Criteria.RangeHigh}");
-                    runner.Criteria.RangeInitiator = TradeRangeInitiator.RangeHighEngaged;
+                    PrintDebug($"[RANGE_HIGH_ENGAGED] {High[0]} > {runner.Settings.RangeHigh}");
+                    runner.Settings.RangeInitiator = TradeRangeInitiator.RangeHighEngaged;
                 }
 
-                if (Low[0] < runner.Criteria.RangeLow && runner.Criteria.RangeInitiator != TradeRangeInitiator.RangeLowEngaged)
+                if (Low[0] < runner.Settings.RangeLow && runner.Settings.RangeInitiator != TradeRangeInitiator.RangeLowEngaged)
                 {
-                    PrintDebug($"[RANGE_LOW_ENGAGED] {Low[0]} < {runner.Criteria.RangeLow}");
-                    runner.Criteria.RangeInitiator = TradeRangeInitiator.RangeLowEngaged;
+                    PrintDebug($"[RANGE_LOW_ENGAGED] {Low[0]} < {runner.Settings.RangeLow}");
+                    runner.Settings.RangeInitiator = TradeRangeInitiator.RangeLowEngaged;
                 }
             }
 
@@ -268,63 +277,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 return;
 
             runner.Run();
-
-            //if (rangeInitiator == TradeRangeInitiator.RangeHighEngaged)
-            //{
-            //    /* 
-            //    * We can either close back in the range to go short or keep bullish momentum by going long
-            //    */
-
-            //    // LONG TRADE CONTINUATION
-            //    // Wait for 2 consecutive bullish candles to form outside of the range
-            //    if (ToTime(Time[0]) > AddMinutesToTime(adjustedSessionStart, 5) &&
-            //        BodyCandle(0) &&
-            //        BodyCandle(1) &&
-            //        BullishCandle(0) && Close[0] > rangeHigh &&
-            //        BullishCandle(1) && Close[1] > rangeHigh)
-            //    {
-            //        var stopLoss = Low[0] - StopGrace;
-            //        var stopDistance = (Close[0] - Low[0]) + StopGrace;
-            //        var size = CalculatePositionSize(stopDistance);
-            //        if (size < 0.75)
-            //        {
-            //            PrintDebug($"[POSITION_SUBOPTIMAL_LONG] Position {size}, Stop {stopLoss}");
-            //            return;
-            //        }
-
-            //        var profitTarget = Close[0] + (stopDistance * TPMultiplier);
-            //        EnterLongTrade("LONG_ENTRY_CONTINUATION", false, TradeType.Continuation, (int)size, 1, stopLoss, profitTarget);
-            //    }
-
-            //}
-
-            //    if (rangeInitiator == TradeRangeInitiator.RangeLowEngaged)
-            //    {
-
-            //        // SHORT TRADE CONTINUATION
-            //        // Wait for 2 consecutive bearish candles to form outside of the range AFTER session start
-            //        if (ToTime(Time[0]) > AddMinutesToTime(adjustedSessionStart, 5) &&
-            //            BodyCandle(0) &&
-            //            BodyCandle(1) &&
-            //            BearishCandle(0) && Close[0] < rangeLow &&
-            //            BearishCandle(1) && Close[1] < rangeLow)
-            //        {
-            //            var stopLoss = High[0] + StopGrace;
-            //            var stopDistance = (High[0] - Close[0]) + StopGrace;
-            //            var size = CalculatePositionSize(stopDistance);
-            //            if (size < 0.75)
-            //            {
-            //                PrintDebug($"[POSITION_SUBOPTIMAL_SHORT] Position {size}, Stop {stopLoss}");
-            //                return;
-            //            }
-
-            //            var profitTarget = Close[0] - (stopDistance * TPMultiplier);
-
-            //            EnterShortTrade("SHORT_ENTRY_CONTINUATION", false, TradeType.Continuation, (int)size, 1, stopLoss, profitTarget);
-            //        }
-            //    }
-            //}
-
         }
 
         protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
@@ -405,42 +357,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 DashStyleHelper.Solid,
                 2
             );
-        }
-
-        private bool BodyCandle(int index)
-        {
-            var result = false;
-            double bodyPercentage = 0;
-            if (Close[index] > Open[index])
-            {
-                var bodyRange = Close[index] - Open[index];
-                var candleRange = High[0] - Low[index];
-                bodyPercentage = Math.Round(bodyRange / candleRange, 2);
-                result = bodyPercentage >= CandleBodyPercentage;
-            }
-
-            if (Close[index] < Open[index])
-            {
-                var bodyRange = Open[index] - Close[index];
-                var candleRange = High[0] - Low[index];
-                bodyPercentage = Math.Round(bodyRange / candleRange, 2);
-                result = bodyPercentage >= CandleBodyPercentage;
-            }
-
-            if (!result)
-                PrintDebug($"[BODY_CANDLE_SUBOP] {index} {bodyPercentage}");
-
-            return result;
-        }
-
-        private bool BullishCandle(int index)
-        {
-            return Close[index] > Open[index];
-        }
-
-        private bool BearishCandle(int index)
-        {
-            return Close[index] < Open[index];
         }
     }
 }

@@ -13,13 +13,17 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         ContinueBelowLow
     }
 
-    public class ExecutionCriteria
+    public class StrategySettings
     {
         public double EntryPercentage { get; set; }
         public double MaxRiskReward { get; set; }
         public double RangeHigh { get; set; }
         public double RangeLow { get; set; }
         public TradeRangeInitiator RangeInitiator { get; set; }
+        public double CandleBodyPercentage { get; set; }
+        public double StopGrace { get; internal set; }
+        public double TPMultiplier { get; internal set; }
+        public double PositionSize { get; internal set; }
     }
 
     internal abstract class Condition(AlgoBase owner, FractalManager fractalManager)
@@ -29,12 +33,27 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
         internal int ValidFromTime { get; set; }
 
-        internal abstract bool IsSatisfied(ExecutionCriteria criteria);
-        internal abstract TradeExecutionResult Execute(ExecutionCriteria criteria);
+        internal abstract bool IsSatisfied(StrategySettings settings);
+        internal abstract TradeExecutionResult Execute(StrategySettings settings);
 
         internal bool CandleBodyRangeInPoints(int minPoints)
         {
             return Owner.Open[0] - Owner.Close[0] >= minPoints || Owner.Close[0] - Owner.Open[0] >= minPoints;
+        }
+
+        internal double CandleBodyRange(int index)
+        {
+            return Owner.Open[index] - Owner.Close[index];
+        }
+
+        internal bool CloseHigher()
+        {
+            return Owner.Close[0] > Owner.Close[1];
+        }
+
+        internal bool CloseLower()
+        {
+            return Owner.Close[0] < Owner.Close[1];
         }
 
         internal double CalculatePositionSize(double stopLossDistance)
