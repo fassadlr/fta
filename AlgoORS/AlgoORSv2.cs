@@ -297,7 +297,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
             var tradeDetails = runner.Run();
 
-            if (tradeDetails == null)
+            if (tradeDetails == null || tradeDetails.TradeDetailsSubOptimal)
                 return;
 
             if (tradeDetails.Bias == TradeBias.Short)

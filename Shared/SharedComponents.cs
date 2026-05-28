@@ -45,7 +45,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         public double MaxDrawdown { get; set; } = 0;
         public double DrawdownStopPercentage { get; set; } = 0;
 
-        public bool Executed { get; set; }
+        public bool TradeDetailsSubOptimal { get; set; }
         public bool IsLimit { get; internal set; }
         public string Log { get; internal set; }
         public double RiskReward { get; internal set; }
@@ -82,7 +82,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
 
         internal static TradeExecutionDetails Failed()
         {
-            return new TradeExecutionDetails() { Executed = false };
+            return new TradeExecutionDetails() { TradeDetailsSubOptimal = true };
         }
     }
 

@@ -35,7 +35,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             }
 
             // If this is false, this condition will be permanently disabled for the rest of the day.
-            var openingCandlesCondition = Owner.Close[2] > config.RangeHigh && Owner.Close[1] > config.RangeHigh && Owner.Close[0] > config.RangeHigh;
+            var openingCandlesCondition =
+                Owner.BullishCandle(2) && Owner.Close[2] > config.RangeHigh &&
+                Owner.BullishCandle(1) && Owner.Close[1] > config.RangeHigh &&
+                Owner.BullishCandle(0) && Owner.Close[0] > config.RangeHigh;
+
             if (!openingCandlesCondition)
             {
                 Owner.PrintDebug("[LONG_CONTINUATION_VWAP_RETRACE_INVALID] openingCandlesCondition - disabled");
@@ -90,6 +94,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             }
 
             var profitTarget = Owner.Close[0] + (stopDistance * config.TPMultiplier);
+
+            ExecuteOnlyMe = false;
 
             return new()
             {

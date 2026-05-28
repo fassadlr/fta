@@ -120,7 +120,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         {
             var stopLossTicks = Math.Round(stopLossDistance, 1, MidpointRounding.ToEven) / Instrument.MasterInstrument.TickSize;
             var tickValue = Instrument.MasterInstrument.PointValue * Instrument.MasterInstrument.TickSize;
-            PrintDebug($"[CALCULATE_POSITION_SIZE] {(int)(risk / (stopLossTicks * tickValue))}");
+            PrintDebug($"[CALCULATE_POSITION_SIZE] {Math.Round(risk / (stopLossTicks * tickValue), 2)}");
             return (int)Math.Round(risk / (stopLossTicks * tickValue), MidpointRounding.ToEven);
         }
 
