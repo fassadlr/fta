@@ -64,10 +64,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             var vwapDistanceCondition = config.VWAP[0] - Owner.Close[0] <= VWAPDistanceThreshold;
             if (!vwapDistanceCondition)
             {
-                Owner.PrintDebug("[SHORT_CONTINUATION_VWAP_RETRACE_INVALID] vwapDistanceCondition");
+                Owner.PrintDebug($"[SHORT_CONTINUATION_VWAP_RETRACE_INVALID] vwapDistanceCondition {config.VWAP[0] - Owner.High[0]}");
             }
 
-            var vwapRetracement = Math.Round((Owner.Low[0] - lowestCloseSinceOpen) / (config.VWAP[0] - lowestCloseSinceOpen), 2);
+            var vwapRetracement = Math.Round((Owner.High[0] - lowestCloseSinceOpen) / (config.VWAP[0] - lowestCloseSinceOpen), 2);
             var vwapRetracementCondition = vwapRetracement >= VWAPRetracementThreshold;
             if (!vwapRetracementCondition)
             {
@@ -84,25 +84,24 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
 
         internal override TradeExecutionDetails Execute(RunnerConfiguration config)
         {
-            // TODO FIX
-            var stopLoss = Owner.Low[0] - config.StopGrace;
-            var stopDistance = (Owner.Close[0] - Owner.Low[0]) + config.StopGrace;
+            var stopLoss = Owner.High[0] + config.StopGrace;
+            var stopDistance = Owner.High[0] - Owner.Close[0] + config.StopGrace;
             var positionSize = Owner.CalculatePositionSize(stopDistance, config.Risk);
             if (positionSize < 0.75)
             {
-                Owner.PrintDebug($"[POSITION_SUBOPTIMAL_LONG] Position {positionSize}, Stop {stopLoss}");
+                Owner.PrintDebug($"[POSITION_SUBOPTIMAL_SHORT] Position {positionSize}, Stop {stopLoss}");
                 return TradeExecutionDetails.Failed();
             }
 
-            var profitTarget = Owner.Close[0] + (stopDistance * config.TPMultiplier);
+            var profitTarget = Owner.Close[0] - (stopDistance * config.TPMultiplier);
 
             ExecuteOnlyMe = false;
 
             return new()
             {
-                Bias = TradeBias.Long,
+                Bias = TradeBias.Short,
                 IsLimit = false,
-                Log = "LONG_ENTRY_CONTINUATION",
+                Log = "SHORT_CONTINUATION_VWAP_RETRACE",
                 PositionSize = positionSize,
                 RangeInitiator = config.RangeInitiator,
                 RiskReward = 1,

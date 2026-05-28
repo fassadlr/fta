@@ -101,7 +101,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             {
                 Bias = TradeBias.Long,
                 IsLimit = false,
-                Log = "LONG_ENTRY_CONTINUATION",
+                Log = "LONG_ENTRY_CONTINUATION_VWAP_RETRACE",
                 PositionSize = positionSize,
                 RangeInitiator = config.RangeInitiator,
                 RiskReward = 1,

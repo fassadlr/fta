@@ -13,12 +13,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
     public class StrategyRunner
     {
-        private LongContinuation longContinuation;
-        private ShortContinuation shortContinuation;
-        private LongReversalCondition longReversal;
-        private ShortReversalCondition shortReversal;
-        private LongContinuationVWAP_Retrace longContination_VWAP_Retrace;
-
         public RunnerConfiguration Configuration { get; private set; }
 
         private List<Condition> conditions;
@@ -35,7 +29,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                     new ShortContinuation(strategyBase, fractalManager),
                     new LongReversalCondition(strategyBase, fractalManager),
                     new ShortReversalCondition(strategyBase, fractalManager),
-                    new LongContinuationVWAP_Retrace(strategyBase, fractalManager)
+                    new LongContinuationVWAP_Retrace(strategyBase, fractalManager),
+                    new ShortContinuationVWAP_Retrace(strategyBase, fractalManager)
                 ],
             };
 
