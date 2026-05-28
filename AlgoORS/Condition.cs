@@ -1,5 +1,4 @@
 ﻿using System;
-using NinjaTrader.Cbi;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
@@ -13,7 +12,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         ContinueBelowLow
     }
 
-    public class StrategySettings
+    public class RunnerConfiguration
     {
         public double EntryPercentage { get; set; }
         public double MaxRiskReward { get; set; }
@@ -33,8 +32,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
         internal int ValidFromTime { get; set; }
 
-        internal abstract bool IsSatisfied(StrategySettings settings);
-        internal abstract TradeExecutionResult Execute(StrategySettings settings);
+        internal abstract bool IsSatisfied(RunnerConfiguration settings);
+        internal abstract TradeExecutionDetails Execute(RunnerConfiguration settings);
 
         internal bool CandleBodyRangeInPoints(int minPoints)
         {
@@ -62,60 +61,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         internal double CalculateRiskReward(double stopLossDistance, double profitTargetDistance)
         {
             return Math.Round(profitTargetDistance / stopLossDistance, 2);
-        }
-
-        internal TradeExecutionResult EnterLongTrade(string log, bool isLimit, TradeRangeInitiator rangeInitiator, TradeType tradeType, int positionSize, double rr, double stopLoss, double takeProfit, double entryPrice = 0)
-        {
-            Order limitOrder = null;
-
-            if (isLimit)
-                limitOrder = Owner.EnterLongLimit(0, true, positionSize, entryPrice, "long");
-            else
-                Owner.EnterLong(positionSize, "long");
-
-            Owner.SetStopLoss("long", CalculationMode.Price, stopLoss, true);
-            Owner.SetProfitTarget("long", CalculationMode.Price, takeProfit, true);
-
-            Owner.PrintDebug($"[{log}] Size {positionSize} RR {rr} Stop Loss {stopLoss} Profit Target {takeProfit}");
-
-            return new TradeExecutionResult
-            {
-                Bias = TradeBias.Long,
-                Entry = Owner.Position.AveragePrice,
-                EntryTime = Owner.Time[0],
-                LimitOrder = limitOrder,
-                RangeInitiater = rangeInitiator,
-                StopLoss = stopLoss,
-                TakeProfit = takeProfit,
-                Type = tradeType
-            };
-        }
-
-        internal TradeExecutionResult EnterShortTrade(string log, bool isLimit, TradeRangeInitiator rangeInitiator, TradeType tradeType, int positionSize, double rr, double stopLoss, double takeProfit, double entryPrice = 0)
-        {
-            Order limitOrder = null;
-
-            if (isLimit)
-                limitOrder = Owner.EnterShortLimit(0, true, positionSize, entryPrice, "short");
-            else
-                Owner.EnterShort(positionSize, "short");
-
-            Owner.SetStopLoss("short", CalculationMode.Price, stopLoss, true);
-            Owner.SetProfitTarget("short", CalculationMode.Price, takeProfit, true);
-
-            Owner.PrintDebug($"[{log}] Size {positionSize} RR {rr} Stop Loss {stopLoss} Profit Target {takeProfit}");
-
-            return new TradeExecutionResult
-            {
-                Bias = TradeBias.Short,
-                Entry = Owner.Position.AveragePrice,
-                EntryTime = Owner.Time[0],
-                LimitOrder = limitOrder,
-                RangeInitiater = rangeInitiator,
-                StopLoss = stopLoss,
-                TakeProfit = takeProfit,
-                Type = tradeType
-            };
         }
     }
 }

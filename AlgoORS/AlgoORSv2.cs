@@ -51,6 +51,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         [Display(Name = "Risk", Order = 13, GroupName = "Parameters")]
         public int Risk { get; set; }
 
+        public TradeExecutionDetails CurrentTrade { get; private set; }
+
         private bool tradingComplete;
 
         private DailyRangeTracker dailyRangeTracker = new();
@@ -94,11 +96,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 MaxTrades = 1;
                 TPMultiplier = 1;
 
+                Risk = 300;
                 SessionTimeOffset = 0;
                 SessionMarketOpen = 143000;
                 SessionStartTime = 144500;
                 SessionEndTime = 160000;
-                StopGrace = 10;
+                StopGrace = 15;
             }
             else if (State == State.Configure)
             {
@@ -129,7 +132,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 return;
             }
 
-            runner ??= StrategyRunner.Configure(this, fractalManager, new StrategySettings()
+            runner ??= StrategyRunner.Configure(this, fractalManager, new RunnerConfiguration()
             {
                 CandleBodyPercentage = CandleBodyPercentage,
                 EntryPercentage = EntryPercentage,
@@ -154,9 +157,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 tradeBias = TradeBias.Neutral;
                 tradeCount = 0;
 
-                runner.Settings.RangeLow = 0;
-                runner.Settings.RangeHigh = 0;
-                runner.Settings.RangeInitiator = TradeRangeInitiator.None;
+                runner.Configuration.RangeLow = 0;
+                runner.Configuration.RangeHigh = 0;
+                runner.Configuration.RangeInitiator = TradeRangeInitiator.None;
 
                 return;
             }
@@ -182,29 +185,30 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 return;
             }
 
+            // Here we are in a trade so return after in-market processing
             if (Position.MarketPosition != MarketPosition.Flat)
             {
                 // Calc max drawdown on the 1 min series
                 if (BarsInProgress == 0)
                 {
-                    if (runner.CurrentTrade.Bias == TradeBias.Long && Low[0] < Position.AveragePrice &&
+                    if (CurrentTrade.Bias == TradeBias.Long && Low[0] < Position.AveragePrice &&
                         (
-                            (Position.AveragePrice - Low[0] > runner.CurrentTrade.MaxDrawdown)
-                            || runner.CurrentTrade.MaxDrawdown == 0
+                            (Position.AveragePrice - Low[0] > CurrentTrade.MaxDrawdown)
+                            || CurrentTrade.MaxDrawdown == 0
                         ))
                     {
-                        runner.CurrentTrade.MaxDrawdown = Position.AveragePrice - Low[0];
-                        runner.CurrentTrade.DrawdownStopPercentage = Math.Round(runner.CurrentTrade.MaxDrawdown / (Position.AveragePrice - runner.CurrentTrade.StopLoss), 2);
+                        CurrentTrade.MaxDrawdown = Position.AveragePrice - Low[0];
+                        CurrentTrade.DrawdownStopPercentage = Math.Round(CurrentTrade.MaxDrawdown / (Position.AveragePrice - CurrentTrade.StopLoss), 2);
                     }
 
-                    if (runner.CurrentTrade.Bias == TradeBias.Short && High[0] > Position.AveragePrice &&
+                    if (CurrentTrade.Bias == TradeBias.Short && High[0] > Position.AveragePrice &&
                         (
-                            (High[0] - Position.AveragePrice > runner.CurrentTrade.MaxDrawdown)
-                            || runner.CurrentTrade.MaxDrawdown == 0
+                            (High[0] - Position.AveragePrice > CurrentTrade.MaxDrawdown)
+                            || CurrentTrade.MaxDrawdown == 0
                         ))
                     {
-                        runner.CurrentTrade.MaxDrawdown = High[0] - Position.AveragePrice;
-                        runner.CurrentTrade.DrawdownStopPercentage = Math.Round(runner.CurrentTrade.MaxDrawdown / (runner.CurrentTrade.StopLoss - Position.AveragePrice), 2);
+                        CurrentTrade.MaxDrawdown = High[0] - Position.AveragePrice;
+                        CurrentTrade.DrawdownStopPercentage = Math.Round(CurrentTrade.MaxDrawdown / (CurrentTrade.StopLoss - Position.AveragePrice), 2);
                     }
                 }
 
@@ -233,16 +237,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             // We can still look at the previous candles at the open of the 16:00 candle
             if (ToTime(Time[0]) > adjustedSessionEnd || tradingComplete)
             {
-                if (runner.LimitOrder != null)
+                if (CurrentTrade?.LimitOrder != null)
                 {
-                    CancelOrder(runner.LimitOrder);
-                    runner.LimitOrder = null;
+                    CancelOrder(CurrentTrade.LimitOrder);
+                    CurrentTrade = null;
                 }
 
                 return;
             }
 
-            fractalManager.DetectFractalThreeBar(5, runner.Settings.RangeHigh, runner.Settings.RangeLow);
+            fractalManager.DetectFractalThreeBar(5, runner.Configuration.RangeHigh, runner.Configuration.RangeLow);
             fractalManager.DetectFractalFiveBar(5);
 
             if (ToTime(Time[0]) < adjustedMarketOpen)
@@ -263,24 +267,33 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
             if (ToTime(Time[0]) > adjustedMarketOpen)
             {
-                if (High[0] > runner.Settings.RangeHigh && runner.Settings.RangeInitiator != TradeRangeInitiator.RangeHighEngaged)
+                if (High[0] > runner.Configuration.RangeHigh && runner.Configuration.RangeInitiator != TradeRangeInitiator.RangeHighEngaged)
                 {
-                    PrintDebug($"[RANGE_HIGH_ENGAGED] {High[0]} > {runner.Settings.RangeHigh}");
-                    runner.Settings.RangeInitiator = TradeRangeInitiator.RangeHighEngaged;
+                    PrintDebug($"[RANGE_HIGH_ENGAGED] {High[0]} > {runner.Configuration.RangeHigh}");
+                    runner.Configuration.RangeInitiator = TradeRangeInitiator.RangeHighEngaged;
                 }
 
-                if (Low[0] < runner.Settings.RangeLow && runner.Settings.RangeInitiator != TradeRangeInitiator.RangeLowEngaged)
+                if (Low[0] < runner.Configuration.RangeLow && runner.Configuration.RangeInitiator != TradeRangeInitiator.RangeLowEngaged)
                 {
-                    PrintDebug($"[RANGE_LOW_ENGAGED] {Low[0]} < {runner.Settings.RangeLow}");
-                    runner.Settings.RangeInitiator = TradeRangeInitiator.RangeLowEngaged;
+                    PrintDebug($"[RANGE_LOW_ENGAGED] {Low[0]} < {runner.Configuration.RangeLow}");
+                    runner.Configuration.RangeInitiator = TradeRangeInitiator.RangeLowEngaged;
                 }
             }
 
             // A pending order is in play.
-            if (runner.LimitOrder != null)
+            if (CurrentTrade?.LimitOrder != null)
                 return;
 
-            runner.Run();
+            var tradeDetails = runner.Run();
+
+            if (tradeDetails == null)
+                return;
+
+            if (tradeDetails.Bias == TradeBias.Short)
+                EnterShortTrade(tradeDetails);
+
+            if (tradeDetails.Bias == TradeBias.Long)
+                EnterLongTrade(tradeDetails);
         }
 
         protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
@@ -295,11 +308,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 tradingComplete = true;
 
                 var lastTrade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
-                runner.CurrentTrade.ProfitLoss = lastTrade.ProfitCurrency;
+                CurrentTrade.ProfitLoss = lastTrade.ProfitCurrency;
+                PrintTrade($"{CurrentTrade}");
 
-                runner.LimitOrder = null;
-
-                PrintTrade($"{runner.CurrentTrade}");
+                CurrentTrade = null;
             }
 
             if (execution.Order.Name == "Stop loss" && execution.Order.OrderState == OrderState.Filled && Position.MarketPosition == MarketPosition.Flat)
@@ -311,14 +323,55 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                     tradingComplete = true;
 
                 var lastTrade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
-                runner.CurrentTrade.ProfitLoss = lastTrade.ProfitCurrency;
-                runner.CurrentTrade.MaxDrawdown = 0;
-                runner.CurrentTrade.DrawdownStopPercentage = 0;
+                CurrentTrade.ProfitLoss = lastTrade.ProfitCurrency;
+                CurrentTrade.MaxDrawdown = 0;
+                CurrentTrade.DrawdownStopPercentage = 0;
+                PrintTrade($"{CurrentTrade}");
 
-                runner.LimitOrder = null;
-
-                PrintTrade($"{runner.CurrentTrade}");
+                CurrentTrade = null;
             }
+        }
+
+        internal void EnterLongTrade(TradeExecutionDetails tradeDetails)
+        {
+            Order limitOrder = null;
+
+            if (tradeDetails.IsLimit)
+                limitOrder = EnterLongLimit(0, true, tradeDetails.PositionSize, tradeDetails.Entry, "long");
+            else
+                EnterLong(tradeDetails.PositionSize, "long");
+
+            SetStopLoss("long", CalculationMode.Price, tradeDetails.StopLoss, true);
+            SetProfitTarget("long", CalculationMode.Price, tradeDetails.TakeProfit, true);
+
+            PrintDebug($"[{tradeDetails.Log}] Size {tradeDetails.PositionSize} RR {tradeDetails.RiskReward} Stop Loss {tradeDetails.StopLoss} Profit Target {tradeDetails.TakeProfit}");
+
+            tradeDetails.Entry = tradeDetails.IsLimit ? tradeDetails.Entry : Position.AveragePrice;
+            tradeDetails.EntryTime = Time[0];
+            tradeDetails.LimitOrder = limitOrder;
+
+            CurrentTrade = tradeDetails;
+        }
+
+        internal void EnterShortTrade(TradeExecutionDetails tradeDetails)
+        {
+            Order limitOrder = null;
+
+            if (tradeDetails.IsLimit)
+                limitOrder = EnterShortLimit(0, true, tradeDetails.PositionSize, tradeDetails.Entry, "short");
+            else
+                EnterShort(tradeDetails.PositionSize, "short");
+
+            SetStopLoss("short", CalculationMode.Price, tradeDetails.StopLoss, true);
+            SetProfitTarget("short", CalculationMode.Price, tradeDetails.TakeProfit, true);
+
+            PrintDebug($"[{tradeDetails.Log}] Size {tradeDetails.PositionSize} RR {tradeDetails.RiskReward} Stop Loss {tradeDetails.StopLoss} Profit Target {tradeDetails.TakeProfit}");
+
+            tradeDetails.Entry = tradeDetails.IsLimit ? tradeDetails.Entry : Position.AveragePrice;
+            tradeDetails.EntryTime = Time[0];
+            tradeDetails.LimitOrder = limitOrder;
+
+            CurrentTrade = tradeDetails;
         }
 
         private void InitializeTradeRange()

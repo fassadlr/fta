@@ -10,7 +10,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             ValidFromTime = 144500;
         }
 
-        internal override bool IsSatisfied(StrategySettings criteria)
+        internal override bool IsSatisfied(RunnerConfiguration criteria)
         {
             if (criteria.RangeInitiator == TradeRangeInitiator.None || criteria.RangeInitiator == TradeRangeInitiator.RangeHighEngaged)
                 return false;
@@ -48,7 +48,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             return true;
         }
 
-        internal override TradeExecutionResult Execute(StrategySettings settings)
+        internal override TradeExecutionDetails Execute(RunnerConfiguration settings)
         {
             var stopLoss = FractalManager.RecentLow();
             var stopDistance = Owner.Close[0] - stopLoss.Price;
@@ -66,24 +66,36 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             if (positionSize < 0.75)
             {
                 Owner.PrintDebug($"[POSITION_SUBOPTIMAL_LONG] Position {positionSize}, Stop {stopLoss}");
-                return TradeExecutionResult.Failed();
+                return TradeExecutionDetails.Failed();
             }
 
-            var rr = CalculateRiskReward(stopDistance, settings.RangeHigh - Owner.Close[0]);
-            if (rr < 0.5)
+            var riskReward = CalculateRiskReward(stopDistance, settings.RangeHigh - Owner.Close[0]);
+            if (riskReward < 0.5)
             {
-                Owner.PrintDebug($"[RR_SUBOPTIMAL_LONG] RR {rr}");
-                return TradeExecutionResult.Failed();
+                Owner.PrintDebug($"[RR_SUBOPTIMAL_LONG] RR {riskReward}");
+                return TradeExecutionDetails.Failed();
             }
 
-            if (rr >= settings.MaxRiskReward)
+            if (riskReward >= settings.MaxRiskReward)
             {
-                Owner.PrintDebug($"[RR_ADJUST_LONG] RR {rr} to {settings.MaxRiskReward}");
-                rr = settings.MaxRiskReward;
+                Owner.PrintDebug($"[RR_ADJUST_LONG] RR {riskReward} to {settings.MaxRiskReward}");
+                riskReward = settings.MaxRiskReward;
                 takeProfit = Owner.Close[0] + (stopDistance * settings.MaxRiskReward);
             }
 
-            return EnterLongTrade("LONG_ENTRY_REVERSAL", settings.EntryPercentage > 0, settings.RangeInitiator, TradeType.Reversal, positionSize, rr, stopLoss.Price, takeProfit, entry);
+            return new()
+            {
+                Bias = TradeBias.Long,
+                Entry = entry,
+                IsLimit = settings.EntryPercentage > 0,
+                Log = "LONG_ENTRY_REVERSAL",
+                PositionSize = positionSize,
+                RangeInitiator = settings.RangeInitiator,
+                RiskReward = riskReward,
+                StopLoss = stopLoss.Price,
+                TakeProfit = takeProfit,
+                Type = TradeType.Reversal,
+            };
         }
     }
 }

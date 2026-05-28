@@ -31,10 +31,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         }
     }
 
-    public class TradeExecutionResult
+    public class TradeExecutionDetails
     {
         public TradeBias Bias { get; set; }
-        public TradeRangeInitiator RangeInitiater { get; set; }
+        public TradeRangeInitiator RangeInitiator { get; set; }
         public TradeType Type { get; set; }
         public double Entry { get; set; } = 0;
         public DateTime EntryTime { get; set; }
@@ -46,12 +46,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         public double DrawdownStopPercentage { get; set; } = 0;
 
         public bool Executed { get; set; }
+        public bool IsLimit { get; internal set; }
+        public string Log { get; internal set; }
+        public double RiskReward { get; internal set; }
+        public int PositionSize { get; internal set; }
 
         public override string ToString()
         {
             return string.Join(",",
                 EscapeCsv(Bias.ToString()),
-                EscapeCsv(RangeInitiater.ToString()),
+                EscapeCsv(RangeInitiator.ToString()),
                 EscapeCsv(Type.ToString()),
                 Entry.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 EntryTime,
@@ -76,9 +80,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
             return value;
         }
 
-        internal static TradeExecutionResult Failed()
+        internal static TradeExecutionDetails Failed()
         {
-            return new TradeExecutionResult() { Executed = false };
+            return new TradeExecutionDetails() { Executed = false };
         }
     }
 

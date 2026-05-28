@@ -9,7 +9,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             ValidFromTime = 144500;
         }
 
-        internal override bool IsSatisfied(StrategySettings settings)
+        internal override bool IsSatisfied(RunnerConfiguration settings)
         {
             if (settings.RangeInitiator == TradeRangeInitiator.None || settings.RangeInitiator == TradeRangeInitiator.RangeLowEngaged)
                 return false;
@@ -35,7 +35,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             return true;
         }
 
-        internal override TradeExecutionResult Execute(StrategySettings settings)
+        internal override TradeExecutionDetails Execute(RunnerConfiguration settings)
         {
             var stopLoss = Owner.Low[0] - settings.StopGrace;
             var stopDistance = (Owner.Close[0] - Owner.Low[0]) + settings.StopGrace;
@@ -43,11 +43,23 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             if (positionSize < 0.75)
             {
                 Owner.PrintDebug($"[POSITION_SUBOPTIMAL_LONG] Position {positionSize}, Stop {stopLoss}");
-                return TradeExecutionResult.Failed();
+                return TradeExecutionDetails.Failed();
             }
 
             var profitTarget = Owner.Close[0] + (stopDistance * settings.TPMultiplier);
-            return EnterLongTrade("LONG_ENTRY_CONTINUATION", false, settings.RangeInitiator, TradeType.Continuation, positionSize, 1, stopLoss, profitTarget);
+
+            return new()
+            {
+                Bias = TradeBias.Long,
+                IsLimit = false,
+                Log = "LONG_ENTRY_CONTINUATION",
+                PositionSize = positionSize,
+                RangeInitiator = settings.RangeInitiator,
+                RiskReward = 1,
+                StopLoss = stopLoss,
+                TakeProfit = profitTarget,
+                Type = TradeType.Continuation,
+            };
         }
     }
 }

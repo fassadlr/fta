@@ -9,7 +9,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             ValidFromTime = 144500;
         }
 
-        internal override bool IsSatisfied(StrategySettings settings)
+        internal override bool IsSatisfied(RunnerConfiguration settings)
         {
             if (settings.RangeInitiator == TradeRangeInitiator.None || settings.RangeInitiator == TradeRangeInitiator.RangeLowEngaged)
                 return false;
@@ -35,20 +35,31 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             return true;
         }
 
-        internal override TradeExecutionResult Execute(StrategySettings settings)
+        internal override TradeExecutionDetails Execute(RunnerConfiguration settings)
         {
             var stopLoss = Owner.High[0] + settings.StopGrace;
-            var stopDistance = (Owner.High[0] - Owner.Close[0]) + settings.StopGrace;
+            var stopDistance = Owner.High[0] - Owner.Close[0] + settings.StopGrace;
             var positionSize = Owner.CalculatePositionSize(stopDistance, settings.Risk);
             if (positionSize < 0.75)
             {
                 Owner.PrintDebug($"[POSITION_SUBOPTIMAL_SHORT] Position {positionSize}, Stop {stopLoss}");
-                return TradeExecutionResult.Failed();
+                return TradeExecutionDetails.Failed();
             }
 
             var profitTarget = Owner.Close[0] - (stopDistance * settings.TPMultiplier);
 
-            return EnterShortTrade("SHORT_ENTRY_CONTINUATION", false, settings.RangeInitiator, TradeType.Continuation, positionSize, 1, stopLoss, profitTarget);
+            return new()
+            {
+                Bias = TradeBias.Short,
+                IsLimit = false,
+                Log = "SHORT_ENTRY_CONTINUATION",
+                PositionSize = positionSize,
+                RangeInitiator = settings.RangeInitiator,
+                RiskReward = 1,
+                StopLoss = stopLoss,
+                TakeProfit = profitTarget,
+                Type = TradeType.Continuation,
+            };
         }
     }
 }

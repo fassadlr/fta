@@ -1,4 +1,3 @@
-using NinjaTrader.Cbi;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
@@ -11,21 +10,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
     public class StrategyRunner
     {
-        public TradeExecutionResult CurrentTrade { get; private set; }
-        public Order LimitOrder { get; set; }
-
         private LongContinuation longContinuation;
         private ShortContinuation shortContinuation;
         private LongReversalCondition longReversal;
         private ShortReversalCondition shortReversal;
 
-        public StrategySettings Settings { get; private set; }
+        public RunnerConfiguration Configuration { get; private set; }
 
-        public static StrategyRunner Configure(AlgoBase strategyBase, FractalManager fractalManager, StrategySettings settings)
+        public static StrategyRunner Configure(AlgoBase strategyBase, FractalManager fractalManager, RunnerConfiguration settings)
         {
             var runner = new StrategyRunner()
             {
-                Settings = settings,
+                Configuration = settings,
 
                 longContinuation = new LongContinuation(strategyBase, fractalManager),
                 shortContinuation = new ShortContinuation(strategyBase, fractalManager),
@@ -38,40 +34,38 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
         public void UpdateRangeInitiator(TradeRangeInitiator rangeInitiator)
         {
-            Settings.RangeInitiator = rangeInitiator;
+            Configuration.RangeInitiator = rangeInitiator;
         }
 
         public void UpdateTradeRange(double rangeHigh, double rangeLow)
         {
-            Settings.RangeHigh = rangeHigh;
-            Settings.RangeLow = rangeLow;
+            Configuration.RangeHigh = rangeHigh;
+            Configuration.RangeLow = rangeLow;
         }
 
-        public void Run()
+        public TradeExecutionDetails Run()
         {
-            if (longReversal.IsSatisfied(Settings))
+            if (longReversal.IsSatisfied(Configuration))
             {
-                CurrentTrade = longReversal.Execute(Settings);
+                return longReversal.Execute(Configuration);
             }
 
-            if (shortReversal.IsSatisfied(Settings))
+            if (shortReversal.IsSatisfied(Configuration))
             {
-                CurrentTrade = shortReversal.Execute(Settings);
+                return shortReversal.Execute(Configuration);
             }
 
-            if (longContinuation.IsSatisfied(Settings))
+            if (longContinuation.IsSatisfied(Configuration))
             {
-                CurrentTrade = longContinuation.Execute(Settings);
+                return longContinuation.Execute(Configuration);
             }
 
-            if (shortContinuation.IsSatisfied(Settings))
+            if (shortContinuation.IsSatisfied(Configuration))
             {
-                CurrentTrade = shortContinuation.Execute(Settings);
+                return shortContinuation.Execute(Configuration);
             }
 
-            // Run entry conditions
-
-            // Run trade management conditions
+            return null;
         }
     }
 }
