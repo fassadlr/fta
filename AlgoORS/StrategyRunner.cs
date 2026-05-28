@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
@@ -19,18 +21,22 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
         public RunnerConfiguration Configuration { get; private set; }
 
+        private List<Condition> conditions;
+
         public static StrategyRunner Configure(AlgoBase strategyBase, FractalManager fractalManager, RunnerConfiguration settings)
         {
             var runner = new StrategyRunner()
             {
                 Configuration = settings,
 
-                longContinuation = new LongContinuation(strategyBase, fractalManager),
-                shortContinuation = new ShortContinuation(strategyBase, fractalManager),
-                longReversal = new LongReversalCondition(strategyBase, fractalManager),
-                shortReversal = new ShortReversalCondition(strategyBase, fractalManager),
-
-                longContination_VWAP_Retrace = new LongContinuationVWAP_Retrace(strategyBase, fractalManager)
+                conditions =
+                [
+                    new LongContinuation(strategyBase, fractalManager),
+                    new ShortContinuation(strategyBase, fractalManager),
+                    new LongReversalCondition(strategyBase, fractalManager),
+                    new ShortReversalCondition(strategyBase, fractalManager),
+                    new LongContinuationVWAP_Retrace(strategyBase, fractalManager)
+                ],
             };
 
             return runner;
@@ -49,29 +55,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
         public TradeExecutionDetails Run()
         {
-            if (longReversal.IsSatisfied(Configuration))
+            var onlyMe = conditions.FirstOrDefault(c => c.ExecuteOnlyMe);
+            if (onlyMe != null && onlyMe.IsSatisfied(Configuration))
             {
-                return longReversal.Execute(Configuration);
+                return onlyMe.Execute(Configuration);
             }
 
-            if (shortReversal.IsSatisfied(Configuration))
+            var satisfiedCondition = conditions.FirstOrDefault(c => c.IsSatisfied(Configuration));
+            if (satisfiedCondition != null)
             {
-                return shortReversal.Execute(Configuration);
-            }
-
-            if (longContinuation.IsSatisfied(Configuration))
-            {
-                return longContinuation.Execute(Configuration);
-            }
-
-            if (shortContinuation.IsSatisfied(Configuration))
-            {
-                return shortContinuation.Execute(Configuration);
-            }
-
-            if (longContination_VWAP_Retrace.IsSatisfied(Configuration))
-            {
-                return longContination_VWAP_Retrace.Execute(Configuration);
+                return satisfiedCondition.Execute(Configuration);
             }
 
             return null;
