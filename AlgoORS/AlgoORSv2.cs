@@ -5,6 +5,7 @@ using NinjaTrader.Cbi;
 using NinjaTrader.Data;
 using NinjaTrader.Gui;
 using NinjaTrader.NinjaScript.DrawingTools;
+using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
@@ -57,6 +58,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
         private DailyRangeTracker dailyRangeTracker = new();
         private FractalManager fractalManager;
+        private OrderFlowVWAP vwap;
+
         private bool sessionInitialized;
 
         //private double rangeLow;
@@ -122,6 +125,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 PrintDebug($"Market Open {adjustedMarketOpen}");
                 PrintDebug($"Session Start {adjustedSessionStart}");
                 PrintDebug($"Session End {adjustedSessionEnd}");
+
+                vwap = OrderFlowVWAP(
+                        VWAPResolution.Standard,
+                        Bars.TradingHours,
+                        VWAPStandardDeviations.One,
+                        1, 2, 3
+                    );
             }
         }
 
@@ -140,6 +150,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 Risk = Risk,
                 StopGrace = StopGrace,
                 TPMultiplier = TPMultiplier,
+                VWAP = vwap
             });
 
             // Filter by event days, skip days etc.

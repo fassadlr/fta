@@ -1,7 +1,7 @@
 ﻿using System;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
-namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
+namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
 {
     internal sealed class ShortReversalCondition : Condition
     {

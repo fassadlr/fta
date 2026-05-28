@@ -1,4 +1,5 @@
 ﻿using System;
+using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
@@ -23,6 +24,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         public double StopGrace { get; internal set; }
         public double TPMultiplier { get; internal set; }
         public int Risk { get; internal set; }
+        public OrderFlowVWAP VWAP { get; internal set; }
     }
 
     internal abstract class Condition(AlgoBase owner, FractalManager fractalManager)
@@ -30,7 +32,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         protected readonly AlgoBase Owner = owner;
         protected readonly FractalManager FractalManager = fractalManager;
 
-        internal int ValidFromTime { get; set; }
+        internal int ValidFromTime { get; set; } = 144500;
+
+        internal bool Disabled { get; set; }
+        internal bool ExecuteOnlyMe { get; set; }
 
         internal abstract bool IsSatisfied(RunnerConfiguration settings);
         internal abstract TradeExecutionDetails Execute(RunnerConfiguration settings);

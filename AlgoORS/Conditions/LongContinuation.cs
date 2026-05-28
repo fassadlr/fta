@@ -1,10 +1,10 @@
 ﻿using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
-namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
+namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
 {
-    internal class ShortContinuation : Condition
+    internal class LongContinuation : Condition
     {
-        internal ShortContinuation(AlgoBase owner, FractalManager fractalManager) : base(owner, fractalManager)
+        internal LongContinuation(AlgoBase owner, FractalManager fractalManager) : base(owner, fractalManager)
         {
             ValidFromTime = 144500;
         }
@@ -20,8 +20,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 return false;
 
             var candleCondition =
-                Owner.BearishCandle(0) && Owner.Close[0] < settings.RangeLow &&
-                Owner.BearishCandle(1) && Owner.Close[1] < settings.RangeLow;
+                Owner.BullishCandle(0) && Owner.Close[0] > settings.RangeHigh &&
+                Owner.BullishCandle(1) && Owner.Close[1] > settings.RangeHigh;
             if (!candleCondition)
                 return false;
 
@@ -37,22 +37,22 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
         internal override TradeExecutionDetails Execute(RunnerConfiguration settings)
         {
-            var stopLoss = Owner.High[0] + settings.StopGrace;
-            var stopDistance = Owner.High[0] - Owner.Close[0] + settings.StopGrace;
+            var stopLoss = Owner.Low[0] - settings.StopGrace;
+            var stopDistance = (Owner.Close[0] - Owner.Low[0]) + settings.StopGrace;
             var positionSize = Owner.CalculatePositionSize(stopDistance, settings.Risk);
             if (positionSize < 0.75)
             {
-                Owner.PrintDebug($"[POSITION_SUBOPTIMAL_SHORT] Position {positionSize}, Stop {stopLoss}");
+                Owner.PrintDebug($"[POSITION_SUBOPTIMAL_LONG] Position {positionSize}, Stop {stopLoss}");
                 return TradeExecutionDetails.Failed();
             }
 
-            var profitTarget = Owner.Close[0] - (stopDistance * settings.TPMultiplier);
+            var profitTarget = Owner.Close[0] + (stopDistance * settings.TPMultiplier);
 
             return new()
             {
-                Bias = TradeBias.Short,
+                Bias = TradeBias.Long,
                 IsLimit = false,
-                Log = "SHORT_ENTRY_CONTINUATION",
+                Log = "LONG_ENTRY_CONTINUATION",
                 PositionSize = positionSize,
                 RangeInitiator = settings.RangeInitiator,
                 RiskReward = 1,
