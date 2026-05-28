@@ -43,7 +43,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
         internal double CandleBodyRange(int index)
         {
-            return Owner.Open[index] - Owner.Close[index];
+            if (Owner.Open[index] > Owner.Close[index])
+                return Owner.Open[index] - Owner.Close[index];
+            else
+                return Owner.Close[index] - Owner.Open[index];
         }
 
         internal bool CloseHigher()

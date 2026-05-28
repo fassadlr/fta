@@ -40,6 +40,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private DailyAtr dailyAtr;
         private double atrCurrent;
         private OrderFlowVWAP vwap;
+        private bool isConnected;
 
         protected override void OnStateChange()
         {
@@ -49,6 +50,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
+                ConnectionLossHandling = ConnectionLossHandling.KeepRunning;
+
                 PO3 = 81;
                 SessionStart = 1;
                 SessionEnd = 13;
@@ -306,6 +309,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (IsLive && State != State.Realtime)
                 return;
 
+            if (IsLive && !isConnected)
+                return;
+
             //if (Time[0].Hour >= (8 + SessionTimeOffset) && TradingSession.IsPriceAtDailyRangeLevels(Close[0]))
             //{
             //    PrintDebug($"[DAILY_RANGE_SKIP] {Close[0]}");
@@ -482,6 +488,20 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 SetProfitTarget("short entry", CalculationMode.Price, CurrentTrade.TakeProfit, true);
 
                 return;
+            }
+        }
+
+        protected override void OnConnectionStatusUpdate(ConnectionStatusEventArgs e)
+        {
+            if (e.Status == ConnectionStatus.Connected)
+            {
+                isConnected = true;
+                Print("[CONNECTED]");
+            }
+            else
+            {
+                isConnected = false;
+                Print("[DISCONNECTED]");
             }
         }
 

@@ -18,18 +18,30 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             // This equates to the open of the 14:50 candle
             var timeCondition = NinjaScriptBase.ToTime(Owner.Time[0]) > ValidFromTime;
             if (!timeCondition)
+            {
+                Owner.PrintDebug("[LONG_REVERSAL_NOT_VALID] time condition");
                 return false;
+            }
 
             var closeInsideCondition = Owner.Close[0] > criteria.RangeLow;
             if (!closeInsideCondition)
+            {
+                Owner.PrintDebug("[LONG_REVERSAL_NOT_VALID] close inside condition");
                 return false;
+            }
 
             var candleEngulfCondition = CandleBodyRange(0) > CandleBodyRange(1) && CloseHigher();
             if (!candleEngulfCondition)
+            {
+                Owner.PrintDebug("[LONG_REVERSAL_NOT_VALID] candle engulf condition");
                 return false;
+            }
 
             if (!CandleBodyRangeInPoints(1))
+            {
+                Owner.PrintDebug("[LONG_REVERSAL_NOT_VALID] candle body range condition");
                 return false;
+            }
 
             Owner.PrintDebug("[LONG_REVERSAL_SATISFIED]");
 
