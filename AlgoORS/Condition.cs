@@ -26,8 +26,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         public int Risk { get; internal set; }
         public OrderFlowVWAP VWAP { get; internal set; }
 
-        public int VWAPDistanceThreshold = 100;
-        public double VWAPRetracementThreshold = 0.25;
+        public const int VWAPDistanceThreshold = 100;
+        public const double VWAPRetracementThreshold = 0.25;
+        public const double RiskRewardMinimum = 0.5;
     }
 
     internal abstract class Condition(AlgoBase owner, FractalManager fractalManager)

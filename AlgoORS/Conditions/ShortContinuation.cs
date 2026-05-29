@@ -6,31 +6,40 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
     {
         internal ShortContinuation(AlgoBase owner, FractalManager fractalManager) : base(owner, fractalManager)
         {
-            ValidFromTime = 144500;
         }
 
-        internal override bool IsSatisfied(RunnerConfiguration settings)
+        internal override bool IsSatisfied(RunnerConfiguration config)
         {
-            if (settings.RangeInitiator == TradeRangeInitiator.None || settings.RangeInitiator == TradeRangeInitiator.RangeLowEngaged)
+            var rangeCondition = config.RangeInitiator == TradeRangeInitiator.RangeLowEngaged;
+            if (!rangeCondition)
                 return false;
 
             // This equates to looking back at when the 14:55 candle opens.
             var timeCondition = NinjaScriptBase.ToTime(Owner.Time[0]) >= Owner.AddMinutesToTime(ValidFromTime, 5);
             if (!timeCondition)
+            {
+                Owner.PrintDebug("[SHORT_CONTINUATION_INVALID] time condition");
                 return false;
+            }
 
             var candleCondition =
-                Owner.BearishCandle(0) && Owner.Close[0] < settings.RangeLow &&
-                Owner.BearishCandle(1) && Owner.Close[1] < settings.RangeLow;
+                Owner.BearishCandle(0) && Owner.Close[0] < config.RangeLow &&
+                Owner.BearishCandle(1) && Owner.Close[1] < config.RangeLow;
             if (!candleCondition)
+            {
+                Owner.PrintDebug("[SHORT_CONTINUATION_INVALID] candleCondition");
                 return false;
+            }
 
             // Either candle's must be at least a given percentage of the candle range
-            var candleBodyCondition = Owner.BodyCandle(0, settings.CandleBodyPercentage) || Owner.BodyCandle(1, settings.CandleBodyPercentage);
+            var candleBodyCondition = Owner.BodyCandle(0, config.CandleBodyPercentage) || Owner.BodyCandle(1, config.CandleBodyPercentage);
             if (!candleBodyCondition)
+            {
+                Owner.PrintDebug("[SHORT_CONTINUATION_INVALID] candleBodyCondition");
                 return false;
+            }
 
-            Owner.PrintDebug("[LONG_CONTINUATION_SATISFIED]");
+            Owner.PrintDebug("[SHORT_CONTINUATION_SATISFIED]");
 
             return true;
         }

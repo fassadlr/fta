@@ -17,11 +17,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
         private List<Condition> conditions;
 
-        public static StrategyRunner Configure(AlgoBase strategyBase, FractalManager fractalManager, RunnerConfiguration settings)
+        public static StrategyRunner Configure(AlgoBase strategyBase, FractalManager fractalManager, RunnerConfiguration config)
         {
             var runner = new StrategyRunner()
             {
-                Configuration = settings,
+                Configuration = config,
 
                 conditions =
                 [

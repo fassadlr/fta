@@ -36,11 +36,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
                 return false;
             }
 
-            // Cant short towards the VWAP.
-            var vwapCondition = config.VWAP[0] >= Owner.Close[0];
+            // VWAP must be below the range low.
+            var vwapCondition = config.VWAP[0] <= config.RangeLow;
             if (!vwapCondition)
             {
-                Owner.PrintDebug("[SHORT_REVERSAL_INVALID] vwapCondition");
+                Owner.PrintDebug($"[SHORT_REVERSAL_INVALID] vwapCondition {Math.Round(Owner.Close[0] - config.VWAP[0])}");
                 return false;
             }
 
@@ -76,7 +76,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             }
 
             var riskReward = CalculateRiskReward(stopDistance, Owner.Close[0] - settings.RangeLow);
-            if (riskReward < 0.5)
+            if (riskReward < RunnerConfiguration.RiskRewardMinimum)
             {
                 Owner.PrintDebug($"[RR_SUBOPTIMAL_SHORT] RR {riskReward}");
                 return TradeExecutionDetails.Failed();

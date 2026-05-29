@@ -54,16 +54,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         public override string ToString()
         {
             return string.Join(",",
+                EntryTime.ToString("dd/MM/yyyy HH:mm"),
                 EscapeCsv(Bias.ToString()),
-                EscapeCsv(RangeInitiator.ToString()),
                 EscapeCsv(Type.ToString()),
-                Entry.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                EntryTime,
-                StopLoss,
-                TakeProfit,
-                ProfitLoss,
-                MaxDrawdown,
-                DrawdownStopPercentage
+                ProfitLoss >= 0 ? "W" : "L"
             );
         }
 

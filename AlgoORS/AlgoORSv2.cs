@@ -168,9 +168,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 tradeBias = TradeBias.Neutral;
                 tradeCount = 0;
 
-                runner.Configuration.RangeLow = 0;
-                runner.Configuration.RangeHigh = 0;
-                runner.Configuration.RangeInitiator = TradeRangeInitiator.None;
+                runner = null;
 
                 return;
             }
@@ -307,40 +305,28 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 EnterLongTrade(tradeDetails);
         }
 
-        protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
+        protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
         {
-            base.OnExecutionUpdate(execution, executionId, price, quantity, marketPosition, orderId, time);
+            if (marketPosition != MarketPosition.Flat)
+                return;
 
-            if (execution.Order.Name == "Profit target" && execution.Order.OrderState == OrderState.Filled && Position.MarketPosition == MarketPosition.Flat)
-            {
-                PrintDebug($"[WIN_TRADE_FILLED] Price {price} Time {time}");
+            if (SystemPerformance.AllTrades.Count == 0)
+                return;
 
-                // Stop if the trade is a win.
+            var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
+            CurrentTrade.ProfitLoss = trade.ProfitCurrency;
+            PrintTrade($"{CurrentTrade}");
+
+            if (trade.ProfitCurrency >= 0)
                 tradingComplete = true;
-
-                var lastTrade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
-                CurrentTrade.ProfitLoss = lastTrade.ProfitCurrency;
-                PrintTrade($"{CurrentTrade}");
-
-                CurrentTrade = null;
-            }
-
-            if (execution.Order.Name == "Stop loss" && execution.Order.OrderState == OrderState.Filled && Position.MarketPosition == MarketPosition.Flat)
+            else
             {
-                PrintDebug($"[LOSS_TRADE_FILLED] Price {price} Time {time}");
-
                 tradeCount++;
                 if (tradeCount >= MaxTrades)
                     tradingComplete = true;
-
-                var lastTrade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
-                CurrentTrade.ProfitLoss = lastTrade.ProfitCurrency;
-                CurrentTrade.MaxDrawdown = 0;
-                CurrentTrade.DrawdownStopPercentage = 0;
-                PrintTrade($"{CurrentTrade}");
-
-                CurrentTrade = null;
             }
+
+            CurrentTrade = null;
         }
 
         internal void EnterLongTrade(TradeExecutionDetails tradeDetails)

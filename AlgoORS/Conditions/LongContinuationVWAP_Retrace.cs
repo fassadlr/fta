@@ -64,7 +64,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             ExecuteOnlyMe = true;
 
             var vwapDistance = Math.Round(Owner.Close[0] - config.VWAP[0], 2); // TODO should this be close or high?
-            var vwapDistanceCondition = vwapDistance <= config.VWAPDistanceThreshold;
+            var vwapDistanceCondition = vwapDistance <= RunnerConfiguration.VWAPDistanceThreshold;
             if (!vwapDistanceCondition)
             {
                 Owner.PrintDebug($"[LONG_CONTINUATION_VWAP_RETRACE_INVALID] vwapDistanceCondition {vwapDistance}");
@@ -76,7 +76,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             }
 
             var vwapRetracement = Math.Round((highestSinceOpen - Owner.Low[0]) / (highestSinceOpen - config.VWAP[0]), 2);
-            var vwapRetracementCondition = vwapRetracement >= config.VWAPRetracementThreshold;
+            var vwapRetracementCondition = vwapRetracement >= RunnerConfiguration.VWAPRetracementThreshold;
             if (!vwapRetracementCondition)
             {
                 Owner.PrintDebug($"[LONG_CONTINUATION_VWAP_RETRACE_INVALID] vwapRetracementCondition - highestSinceOpen: {highestSinceOpen}");

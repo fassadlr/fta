@@ -64,7 +64,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             ExecuteOnlyMe = true;
 
             var vwapDistance = Math.Round(config.VWAP[0] - Owner.Close[0], 2);
-            var vwapDistanceCondition = vwapDistance <= config.VWAPDistanceThreshold;
+            var vwapDistanceCondition = vwapDistance <= RunnerConfiguration.VWAPDistanceThreshold;
             if (!vwapDistanceCondition)
             {
                 Owner.PrintDebug($"[SHORT_CONTINUATION_VWAP_RETRACE_INVALID] vwapDistanceCondition {vwapDistance}");
@@ -76,7 +76,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             }
 
             var vwapRetracement = Math.Round((Owner.High[0] - lowestCloseSinceOpen) / (config.VWAP[0] - lowestCloseSinceOpen), 2);
-            var vwapRetracementCondition = vwapRetracement >= config.VWAPRetracementThreshold;
+            var vwapRetracementCondition = vwapRetracement >= RunnerConfiguration.VWAPRetracementThreshold;
             if (!vwapRetracementCondition)
             {
                 Owner.PrintDebug($"[SHORT_CONTINUATION_VWAP_RETRACE_INVALID] vwapRetracementCondition - lowestCloseSinceOpen: {lowestCloseSinceOpen}");
@@ -85,7 +85,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             if (!vwapDistanceCondition && !vwapRetracementCondition)
                 return false;
 
-            Owner.PrintDebug($"[SHORT_CONTINUATION_VWAP_RETRACE_SATISFIED] VWAP distance {vwapDistanceCondition} VWAP retracement {vwapRetracementCondition} - {vwapRetracement} - lowestCloseSinceOpen: {lowestCloseSinceOpen}");
+            Owner.PrintDebug($"[SHORT_CONTINUATION_VWAP_RETRACE_SATISFIED] VWAP distance {vwapDistanceCondition} distance {vwapDistance} VWAP retracement {vwapRetracementCondition} - {vwapRetracement} - lowestCloseSinceOpen: {lowestCloseSinceOpen}");
 
             return true;
         }
