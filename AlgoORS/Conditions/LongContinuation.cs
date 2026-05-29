@@ -6,7 +6,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
     {
         internal LongContinuation(AlgoBase owner, FractalManager fractalManager) : base(owner, fractalManager)
         {
-            ValidFromTime = 144500;
         }
 
         internal override bool IsSatisfied(RunnerConfiguration settings)

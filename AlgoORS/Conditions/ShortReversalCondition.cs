@@ -7,12 +7,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
     {
         internal ShortReversalCondition(AlgoBase owner, FractalManager fractalManager) : base(owner, fractalManager)
         {
-            ValidFromTime = 144500;
         }
 
-        internal override bool IsSatisfied(RunnerConfiguration criteria)
+        internal override bool IsSatisfied(RunnerConfiguration config)
         {
-            if (criteria.RangeInitiator == TradeRangeInitiator.None || criteria.RangeInitiator == TradeRangeInitiator.RangeLowEngaged)
+            if (config.RangeInitiator == TradeRangeInitiator.None || config.RangeInitiator == TradeRangeInitiator.RangeLowEngaged)
                 return false;
 
             // This equates to the open of the 14:50 candle
@@ -23,7 +22,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
                 return false;
             }
 
-            var closeInsideCondition = Owner.Close[0] < criteria.RangeHigh;
+            var closeInsideCondition = Owner.Close[0] < config.RangeHigh;
             if (!closeInsideCondition)
             {
                 Owner.PrintDebug("[SHORT_REVERSAL_INVALID] closeInsideCondition");
@@ -34,6 +33,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             if (!candleEngulfCondition)
             {
                 Owner.PrintDebug("[SHORT_REVERSAL_INVALID] candleEngulfCondition");
+                return false;
+            }
+
+            // Cant short towards the VWAP.
+            var vwapCondition = config.VWAP[0] >= Owner.Close[0];
+            if (!vwapCondition)
+            {
+                Owner.PrintDebug("[SHORT_REVERSAL_INVALID] vwapCondition");
                 return false;
             }
 
