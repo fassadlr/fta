@@ -6,8 +6,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
     internal class ShortContinuationVWAP_Retrace : Condition
     {
         private double lowestCloseSinceOpen = 0;
-        private const int VWAPDistanceThreshold = 100;
-        private const double VWAPRetracementThreshold = 0.25;
+        private bool openingCandlesCondition;
 
         internal ShortContinuationVWAP_Retrace(AlgoBase owner, FractalManager fractalManager)
             : base(owner, fractalManager)
@@ -18,13 +17,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
         {
             if (Disabled) return false;
 
-            var rangeCondition = config.RangeInitiator == TradeRangeInitiator.RangeLowEngaged;
-            if (!rangeCondition)
-                return false;
-
             // Track value from the open.
             if (lowestCloseSinceOpen == 0 || Owner.Low[0] < lowestCloseSinceOpen)
                 lowestCloseSinceOpen = Owner.Low[0];
+
+            var rangeCondition = config.RangeInitiator == TradeRangeInitiator.RangeLowEngaged;
+            if (!rangeCondition)
+                return false;
 
             // This equates to looking back at when the 14:45 candle opens.
             var timeCondition = NinjaScriptBase.ToTime(Owner.Time[0]) >= ValidFromTime;
@@ -35,10 +34,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             }
 
             // If this is false, this condition will be permanently disabled for the rest of the day.
-            var openingCandlesCondition =
-                Owner.BearishCandle(2) && Owner.Close[2] < config.RangeLow &&
-                Owner.BearishCandle(1) && Owner.Close[1] < config.RangeLow &&
-                Owner.BearishCandle(0) && Owner.Close[0] < config.RangeLow;
+            if (!openingCandlesCondition)
+            {
+                openingCandlesCondition =
+                    Owner.BearishCandle(2) && Owner.Close[2] < config.RangeLow &&
+                    Owner.BearishCandle(1) && Owner.Close[1] < config.RangeLow &&
+                    Owner.BearishCandle(0) && Owner.Close[0] < config.RangeLow;
+            }
 
             if (!openingCandlesCondition)
             {
@@ -58,26 +60,32 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
                 return false;
             }
 
-            // All other strategies needs to wait for this condition to finish.
+            // All other strategies need to wait for this condition to finish.
             ExecuteOnlyMe = true;
 
-            var vwapDistanceCondition = config.VWAP[0] - Owner.Close[0] <= VWAPDistanceThreshold;
+            var vwapDistance = Math.Round(config.VWAP[0] - Owner.Close[0], 2);
+            var vwapDistanceCondition = vwapDistance <= config.VWAPDistanceThreshold;
             if (!vwapDistanceCondition)
             {
-                Owner.PrintDebug($"[SHORT_CONTINUATION_VWAP_RETRACE_INVALID] vwapDistanceCondition {config.VWAP[0] - Owner.High[0]}");
+                Owner.PrintDebug($"[SHORT_CONTINUATION_VWAP_RETRACE_INVALID] vwapDistanceCondition {vwapDistance}");
+                if (NinjaScriptBase.ToTime(Owner.Time[0]) == ValidFromTime)
+                {
+                    Owner.PrintDebug($"[SHORT_CONTINUATION_VWAP_RETRACE_INVALID] first candle vwapDistanceCondition {vwapDistance}");
+                    return false;
+                }
             }
 
             var vwapRetracement = Math.Round((Owner.High[0] - lowestCloseSinceOpen) / (config.VWAP[0] - lowestCloseSinceOpen), 2);
-            var vwapRetracementCondition = vwapRetracement >= VWAPRetracementThreshold;
+            var vwapRetracementCondition = vwapRetracement >= config.VWAPRetracementThreshold;
             if (!vwapRetracementCondition)
             {
-                Owner.PrintDebug("[SHORT_CONTINUATION_VWAP_RETRACE_INVALID] vwapRetracementCondition");
+                Owner.PrintDebug($"[SHORT_CONTINUATION_VWAP_RETRACE_INVALID] vwapRetracementCondition - lowestCloseSinceOpen: {lowestCloseSinceOpen}");
             }
 
             if (!vwapDistanceCondition && !vwapRetracementCondition)
                 return false;
 
-            Owner.PrintDebug($"[SHORT_CONTINUATION_VWAP_RETRACE_SATISFIED] VWAP distance {vwapDistanceCondition} VWAP retracement {vwapRetracementCondition} - {vwapRetracement}");
+            Owner.PrintDebug($"[SHORT_CONTINUATION_VWAP_RETRACE_SATISFIED] VWAP distance {vwapDistanceCondition} VWAP retracement {vwapRetracementCondition} - {vwapRetracement} - lowestCloseSinceOpen: {lowestCloseSinceOpen}");
 
             return true;
         }
