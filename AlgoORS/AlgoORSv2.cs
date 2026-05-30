@@ -118,14 +118,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
                 dailyRangeTracker = new();
 
-                adjustedMarketOpen = AddHoursToTime(SessionMarketOpen, SessionTimeOffset);
-                adjustedSessionStart = AddHoursToTime(SessionStartTime, SessionTimeOffset);
-                adjustedSessionEnd = AddHoursToTime(SessionEndTime, SessionTimeOffset);
-
-                PrintDebug($"Market Open {adjustedMarketOpen}");
-                PrintDebug($"Session Start {adjustedSessionStart}");
-                PrintDebug($"Session End {adjustedSessionEnd}");
-
                 vwap = OrderFlowVWAP(
                         VWAPResolution.Standard,
                         Bars.TradingHours,
@@ -178,10 +170,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 adjustedMarketOpen = AddHoursToTime(SessionMarketOpen, -1);
                 adjustedSessionStart = AddHoursToTime(SessionStartTime, -1);
                 adjustedSessionEnd = AddHoursToTime(SessionEndTime, -1);
+            }
+            else
+            {
+                adjustedMarketOpen = AddHoursToTime(SessionMarketOpen, SessionTimeOffset);
+                adjustedSessionStart = AddHoursToTime(SessionStartTime, SessionTimeOffset);
+                adjustedSessionEnd = AddHoursToTime(SessionEndTime, SessionTimeOffset);
 
-                //PrintDebug($"DST Market Open {adjustedMarketOpen}");
-                //PrintDebug($"DST Session Start {adjustedSessionStart}");
-                //PrintDebug($"DST Session End {adjustedSessionEnd}");
+                PrintDebug($"Market Open {adjustedMarketOpen}");
+                PrintDebug($"Session Start {adjustedSessionStart}");
+                PrintDebug($"Session End {adjustedSessionEnd}");
             }
 
             // --------------------------------------------------
