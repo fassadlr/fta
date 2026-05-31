@@ -13,46 +13,46 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
     public class AlgoORSv2 : AlgoBase
     {
         [NinjaScriptProperty]
-        [Display(Name = "Session Start Time", Order = 5, GroupName = "Parameters")]
+        [Display(Name = "Session Start", Order = 5, GroupName = "Parameters")]
         public int SessionStartTime { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Session End Time", Order = 6, GroupName = "Parameters")]
+        [Display(Name = "Session End", Order = 6, GroupName = "Parameters")]
         public int SessionEndTime { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Session Market Open Time", Order = 5, GroupName = "Parameters")]
+        [Display(Name = "Session Market Open", Order = 7, GroupName = "Parameters")]
         public int SessionMarketOpen { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Stop Grace", Order = 7, GroupName = "Parameters")]
-        public int StopGrace { get; set; }
+        [Display(Name = "Cont. Stop Grace", Order = 8, GroupName = "Parameters")]
+        public int ContinuationStopGrace { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Max RR", Order = 8, GroupName = "Parameters")]
-        public double MaxRiskReward { get; set; }
+        [Display(Name = "Cont. TP Multiplier", Order = 9, GroupName = "Parameters")]
+        public double ContinuationTPMultiplier { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Max Trades", Order = 9, GroupName = "Parameters")]
+        [Display(Name = "Cont. Candle Body Pct", Order = 10, GroupName = "Parameters")]
+        public double ContinuationCandleBodyPercentage { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Rev. Max RR", Order = 11, GroupName = "Parameters")]
+        public double ReversalMaxRiskReward { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Rev. Pullback Entry Pct", Order = 12, GroupName = "Parameters")]
+        public double ReversalPullbackEntryPercentage { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Max Trades", Order = 13, GroupName = "Parameters")]
         public double MaxTrades { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Take Profit Multiplier", Order = 10, GroupName = "Parameters")]
-        public double TPMultiplier { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Candle Body Percentage", Order = 11, GroupName = "Parameters")]
-        public double CandleBodyPercentage { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Entry Percentage", Order = 12, GroupName = "Parameters")]
-        public double EntryPercentage { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Risk", Order = 13, GroupName = "Parameters")]
+        [Display(Name = "Risk", Order = 14, GroupName = "Parameters")]
         public int Risk { get; set; }
 
-        public TradeExecutionDetails CurrentTrade { get; private set; }
+        internal TradeExecutionDetails CurrentTrade { get; set; }
 
         private bool tradingComplete;
 
@@ -93,18 +93,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 EntryHandling = EntryHandling.AllEntries;
                 IsExitOnSessionCloseStrategy = true;
 
-                CandleBodyPercentage = 0.1;
-                EntryPercentage = 0;
-                MaxRiskReward = 1.75; // This can be 3 if we set EntryPercentage to 0.3 
+                ContinuationCandleBodyPercentage = 0.1;
+                ReversalPullbackEntryPercentage = 0;
+                ReversalMaxRiskReward = 1.75; // This can be 3 if we set EntryPercentage to 0.3 
                 MaxTrades = 1;
-                TPMultiplier = 1;
+                ContinuationTPMultiplier = 1;
 
                 Risk = 300;
                 SessionTimeOffset = 0;
                 SessionMarketOpen = 143000;
                 SessionStartTime = 144500;
                 SessionEndTime = 160000;
-                StopGrace = 15;
+                ContinuationStopGrace = 15;
             }
             else if (State == State.Configure)
             {
@@ -136,12 +136,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
             runner ??= StrategyRunner.Configure(this, fractalManager, new RunnerConfiguration()
             {
-                CandleBodyPercentage = CandleBodyPercentage,
-                EntryPercentage = EntryPercentage,
-                MaxRiskReward = MaxRiskReward,
+                CandleBodyPercentage = ContinuationCandleBodyPercentage,
+                EntryPercentage = ReversalPullbackEntryPercentage,
+                MaxRiskReward = ReversalMaxRiskReward,
                 Risk = Risk,
-                StopGrace = StopGrace,
-                TPMultiplier = TPMultiplier,
+                StopGrace = ContinuationStopGrace,
+                TPMultiplier = ContinuationTPMultiplier,
                 VWAP = vwap
             });
 
@@ -177,9 +177,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 adjustedSessionStart = AddHoursToTime(SessionStartTime, SessionTimeOffset);
                 adjustedSessionEnd = AddHoursToTime(SessionEndTime, SessionTimeOffset);
 
-                PrintDebug($"Market Open {adjustedMarketOpen}");
-                PrintDebug($"Session Start {adjustedSessionStart}");
-                PrintDebug($"Session End {adjustedSessionEnd}");
+                //PrintDebug($"Market Open {adjustedMarketOpen}");
+                //PrintDebug($"Session Start {adjustedSessionStart}");
+                //PrintDebug($"Session End {adjustedSessionEnd}");
             }
 
             // --------------------------------------------------

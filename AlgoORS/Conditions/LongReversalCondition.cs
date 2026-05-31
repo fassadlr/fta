@@ -37,12 +37,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             }
 
             // Cant long towards the VWAP.
-            var vwapCondition = config.VWAP[0] <= Owner.Close[0];
-            if (!vwapCondition)
-            {
-                Owner.PrintDebug("[LONG_REVERSAL_INVALID] vwapCondition");
-                return false;
-            }
+            //var vwapCondition = config.VWAP[0] <= Owner.Close[0];
+            //if (!vwapCondition)
+            //{
+            //    Owner.PrintDebug("[LONG_REVERSAL_INVALID] vwapCondition");
+            //    return false;
+            //}
 
             if (!CandleBodyRangeInPoints(1))
             {

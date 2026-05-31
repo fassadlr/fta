@@ -37,12 +37,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             }
 
             // VWAP must be below the range low.
-            var vwapCondition = config.VWAP[0] <= config.RangeLow;
-            if (!vwapCondition)
-            {
-                Owner.PrintDebug($"[SHORT_REVERSAL_INVALID] vwapCondition {Math.Round(Owner.Close[0] - config.VWAP[0])}");
-                return false;
-            }
+            //var vwapCondition = config.VWAP[0] <= config.RangeLow;
+            //if (!vwapCondition)
+            //{
+            //    Owner.PrintDebug($"[SHORT_REVERSAL_INVALID] vwapCondition {Math.Round(Owner.Close[0] - config.VWAP[0])}");
+            //    return false;
+            //}
 
             if (!CandleBodyRangeInPoints(1))
             {
