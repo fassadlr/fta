@@ -46,7 +46,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "PO3 Algo v6.5";
+                Name = "PO3 Algo v6.6";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -442,7 +442,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 SetStopLoss("long entry", CalculationMode.Price, CurrentTrade.StopLoss, true);
                 PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
-                SetProfitTarget("long entry", CalculationMode.Price, CurrentTrade.TakeProfit, true);
+                SetProfitTarget("long entry", CalculationMode.Price, CurrentTrade.TakeProfit);
 
                 return;
             }
@@ -485,7 +485,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 SetStopLoss("short entry", CalculationMode.Price, CurrentTrade.StopLoss, true);
                 PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
-                SetProfitTarget("short entry", CalculationMode.Price, CurrentTrade.TakeProfit, true);
+                SetProfitTarget("short entry", CalculationMode.Price, CurrentTrade.TakeProfit);
 
                 return;
             }
