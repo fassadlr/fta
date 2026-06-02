@@ -29,7 +29,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
                 return false;
             }
 
-            var candleEngulfCondition = CandleBodyRange(0) > CandleBodyRange(1) && CloseLower();
+            var candleEngulfCondition = Owner.CandleBodyRange(0) > Owner.CandleBodyRange(1) && Owner.CloseLower();
             if (!candleEngulfCondition)
             {
                 Owner.PrintDebug("[SHORT_REVERSAL_INVALID] candleEngulfCondition");

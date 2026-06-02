@@ -22,14 +22,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private DealingRange PreviousRange { get; set; }
         private DateTime? lastInitialization;
 
-        private MSSBias mssBias;
         private RangeBias rangeBias;
         private TradeBias tradeBias;
 
         private bool rangeBreakDetected = false;
 
         private TradeDetails CurrentTrade;
-        private double lastBOSLocation = 0;
 
         private NewsFilter newsFilter;
 
@@ -76,7 +74,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 tradeBias = TradeBias.Neutral;
                 rangeBias = RangeBias.Neutral;
-                mssBias = MSSBias.Neutral;
 
                 newsFilter = new NewsFilter(IncludeCPIWeek, IncludeFOMCWeek, IncludeNFPWeek, IncludeNoEventsWeek);
             }
@@ -137,10 +134,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 dailyAtr.Calculate(High[0], Low[0], Close[0]);
 
                 DetectFractalWithPlatos();
-                DetectMSS();
                 DetectBOS();
-
-                //TradingSession.Update(Close[0], atrCurrent);
             }
 
             // Adjust time for NY/UK BST overlap
@@ -215,31 +209,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 CancelLimitOrder();
                 return;
-            }
-
-            // Check where the last BOS happened
-            if (rangeBreakDetected && tradeBias == TradeBias.Short && Close[0] < lastBOSLocation && lastBOSLocation != 0)
-            {
-                var applicableRange = Ranges.FirstOrDefault(r => r.IsInRange(lastBOSLocation));
-                if (applicableRange != null && CurrentRange != applicableRange && Close[0] > applicableRange.Eq)
-                {
-                    rangeBreakDetected = false;
-
-                    PrintDebug($"[RANGE_BREAK_IGNORED_SHORT] last BOS in previous range {lastBOSLocation}");
-                    return;
-                }
-            }
-
-            if (rangeBreakDetected && tradeBias == TradeBias.Long && Close[0] > lastBOSLocation && lastBOSLocation != 0)
-            {
-                var applicableRange = Ranges.FirstOrDefault(r => r.IsInRange(lastBOSLocation));
-                if (applicableRange != null && CurrentRange != applicableRange && Close[0] < applicableRange.Eq)
-                {
-                    rangeBreakDetected = false;
-
-                    PrintDebug($"[RANGE_BREAK_IGNORED_LONG] last BOS in previous range {lastBOSLocation}");
-                    return;
-                }
             }
 
             if (!rangeBreakDetected)
@@ -528,64 +497,28 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             PendingOrder = null;
         }
 
-        private void DetectMSS()
-        {
-            //PrintDebug($"{tradeBias} {lastFractalLow} {lastFractalHigh} {Close[0]}");
-            if (tradeBias == TradeBias.Short && Close[0] > LastFractalHigh && LastFractalHigh != 0)
-            {
-                mssBias = MSSBias.Bullish;
-                PrintDebug($"[BULLISH_MSS]");
-            }
-
-            if (tradeBias == TradeBias.Long && Close[0] < LastFractalLow && LastFractalLow != 0)
-            {
-                mssBias = MSSBias.Bearish;
-                PrintDebug($"[BEARISH_MSS]");
-            }
-        }
-
         private void DetectBOS()
         {
             //---Bullish BOS ---
             if (LastFractalHigh != 0 && Close[0] > LastFractalHigh)
             {
-                if (mssBias == MSSBias.Neutral || mssBias == MSSBias.Bullish)
-                {
-                    if (lastBOSLocation == 0 || lastBOSLocation != LastFractalHigh)
-                    {
-                        BearishBOSDetected = false;
-                        BullishBOSDetected = true;
+                BearishBOSDetected = false;
+                BullishBOSDetected = true;
 
-                        tradeBias = TradeBias.Long;
+                tradeBias = TradeBias.Long;
 
-                        if (mssBias == MSSBias.Neutral) mssBias = MSSBias.Bullish;
-
-                        lastBOSLocation = LastFractalHigh;
-
-                        PrintDebug($"[BULLISH_BOS] MSS bias set to {mssBias} BOS price {lastBOSLocation}");
-                    }
-                }
+                PrintDebug($"[BULLISH_BOS] trade bias {tradeBias}");
             }
 
             // --- Bearish BOS ---
             if (LastFractalLow != 0 && Close[0] < LastFractalLow)
             {
-                if (mssBias == MSSBias.Neutral || mssBias == MSSBias.Bearish)
-                {
-                    if (lastBOSLocation == 0 || lastBOSLocation != LastFractalLow)
-                    {
-                        BearishBOSDetected = true;
-                        BullishBOSDetected = false;
+                BearishBOSDetected = true;
+                BullishBOSDetected = false;
 
-                        tradeBias = TradeBias.Short;
+                tradeBias = TradeBias.Short;
 
-                        if (mssBias == MSSBias.Neutral) mssBias = MSSBias.Bearish;
-
-                        lastBOSLocation = LastFractalLow;
-
-                        PrintDebug($"[BEARISH_BOS] MSS bias set to {mssBias} BOS price {lastBOSLocation}");
-                    }
-                }
+                PrintDebug($"[BEARISH_BOS]trade bias {tradeBias}");
             }
         }
 
@@ -607,13 +540,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             LastFractalHigh = 0;
             LastFractalLow = 0;
 
-            mssBias = MSSBias.Neutral;
             rangeBias = RangeBias.Neutral;
             tradeBias = TradeBias.Neutral;
 
             BullishBOSDetected = false;
             BearishBOSDetected = false;
-            lastBOSLocation = 0;
 
             dailyAtr ??= new DailyAtr();
 

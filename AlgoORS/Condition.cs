@@ -49,24 +49,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             return Owner.Open[0] - Owner.Close[0] >= minPoints || Owner.Close[0] - Owner.Open[0] >= minPoints;
         }
 
-        internal double CandleBodyRange(int index)
-        {
-            if (Owner.Open[index] > Owner.Close[index])
-                return Owner.Open[index] - Owner.Close[index];
-            else
-                return Owner.Close[index] - Owner.Open[index];
-        }
-
-        internal bool CloseHigher()
-        {
-            return Owner.Close[0] > Owner.Close[1];
-        }
-
-        internal bool CloseLower()
-        {
-            return Owner.Close[0] < Owner.Close[1];
-        }
-
         internal double CalculateRiskReward(double stopLossDistance, double profitTargetDistance)
         {
             return Math.Round(profitTargetDistance / stopLossDistance, 2);

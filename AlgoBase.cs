@@ -90,6 +90,24 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             return Close[index] < Open[index];
         }
 
+        internal double CandleBodyRange(int index)
+        {
+            if (Open[index] > Close[index])
+                return Open[index] - Close[index];
+            else
+                return Close[index] - Open[index];
+        }
+
+        internal bool CloseHigher()
+        {
+            return Close[0] > Close[1];
+        }
+
+        internal bool CloseLower()
+        {
+            return Close[0] < Close[1];
+        }
+
         internal bool BodyCandle(int index, double candleBodyPercentage)
         {
             var result = false;
