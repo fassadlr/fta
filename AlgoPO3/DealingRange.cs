@@ -108,8 +108,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         public void UpdateCoverage(double price)
         {
-            //if (price < Low || price > High)
-            //    return;
+            if (MinCovered == 0 || MaxCovered == 0)
+            {
+                MinCovered = price;
+                MaxCovered = price;
+            }
 
             if (price < MinCovered)
                 MinCovered = price;
@@ -168,6 +171,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return DealingRangePosition.Discount;
             else
                 return DealingRangePosition.Premium;
+        }
+
+        public void ClearCovered()
+        {
+            MinCovered = 0;
+            MaxCovered = 0;
         }
     }
 

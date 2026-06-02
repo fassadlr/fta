@@ -9,6 +9,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
     {
         public readonly DateTime EventTime = eventTime;
         public bool AllDay { get; set; } = allDay;
+        public bool BankHoliday { get; set; } = false;
         public bool IsNFP { get; private set; }
         public bool IsCPI { get; private set; }
         public bool IsFOMC { get; private set; }
@@ -16,6 +17,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         public static NewsEvent CreateAllDay(DateTime eventTime)
         {
             return new NewsEvent(eventTime, true);
+        }
+
+        public static NewsEvent CreateUSBankHoliday(DateTime eventTime)
+        {
+            return new NewsEvent(eventTime, false) { BankHoliday = true };
         }
 
         public static NewsEvent CreateNFPEvent(DateTime eventTime)
@@ -242,16 +248,28 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 // May 2026
                 NewsEvent.CreateNFPEvent(new DateTime(2026, 05, 08, 13, 00, 0)),        // NFP
                 NewsEvent.CreateCPIEvent(new DateTime(2026, 05, 12, 13, 00, 0)),        // CPI
-                NewsEvent.CreateAllDay(new DateTime(2026, 05, 25)),                     // US BANK Holiday
+                NewsEvent.CreateUSBankHoliday(new DateTime(2026, 05, 25)),              // US BANK Holiday
             };
 
-            // Add xmas period
-            for (int i = 22; i <= 31; i++)
+            // Add xmas period 2024
+            for (int i = 23; i <= 31; i++)
             {
-                events.Add(NewsEvent.CreateAllDay(new DateTime(2025, 12, i, 00, 00, 0)));
+                events.Add(NewsEvent.CreateAllDay(new DateTime(2024, 12, i)));
             }
 
-            // Skip start of January
+            // Skip start of January 2025
+            for (int i = 1; i <= 5; i++)
+            {
+                events.Add(NewsEvent.CreateAllDay(new DateTime(2026, 01, i, 00, 00, 0)));
+            }
+
+            // Add xmas period 2025
+            for (int i = 22; i <= 31; i++)
+            {
+                events.Add(NewsEvent.CreateAllDay(new DateTime(2025, 12, i)));
+            }
+
+            // Skip start of January 2026
             for (int i = 1; i <= 4; i++)
             {
                 events.Add(NewsEvent.CreateAllDay(new DateTime(2026, 01, i, 00, 00, 0)));

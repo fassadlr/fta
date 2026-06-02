@@ -194,7 +194,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         public bool FilterByEvents()
         {
-            var newsEvent = Events.FirstOrDefault(n => Time[0].Date == n.EventTime.Date && Time[0].TimeOfDay >= n.EventTime.TimeOfDay);
+            var newsEvent = Events.FirstOrDefault(n => Time[0].Date == n.EventTime.Date && Time[0].TimeOfDay >= n.EventTime.TimeOfDay && !n.BankHoliday);
             return newsEvent != null;
         }
 

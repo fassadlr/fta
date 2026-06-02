@@ -1,4 +1,6 @@
-﻿namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
+﻿using System;
+
+namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 {
     public enum MSSBias
     {
@@ -34,6 +36,13 @@
         {
             return $"{High} {Low}";
         }
+    }
+
+    public class DealingRangeTracker
+    {
+        public DealingRange DealingRange { get; set; }
+        public string Action { get; set; }
+        public DateTime Timestamp { get; set; }
     }
 
     public class SharedBorderTrade
