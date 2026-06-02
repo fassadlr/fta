@@ -331,13 +331,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         {
             var lowest = new List<(double Price, DateTime Time)>
             {
-                Fractals[(15, FractalType.LowFiveBar)],
-                Fractals[(15, FractalType.LowThreeBar)],
-                Fractals[(5, FractalType.LowThreeBar)],
-                Fractals[(5, FractalType.LowFiveBar)],
-                Fractals[(15, FractalType.LowLookback)],
+                Fractals.TryGetValue((15, FractalType.LowFiveBar), out var lowFiveBar) ? lowFiveBar : (0, DateTime.MinValue),
+                Fractals.TryGetValue((15, FractalType.LowThreeBar), out var lowThreeBar) ? lowThreeBar : (0, DateTime.MinValue),
+                Fractals.TryGetValue((5, FractalType.LowThreeBar), out var lowThreeBar5) ? lowThreeBar5 : (0, DateTime.MinValue),
+                Fractals.TryGetValue((5, FractalType.LowFiveBar), out var lowFiveBar5) ? lowFiveBar5 : (0, DateTime.MinValue),
+                Fractals.TryGetValue((15, FractalType.LowLookback), out var lowLookback) ? lowLookback : (0, DateTime.MinValue),
                 (owner.Low[0], owner.Time[0])
             }
+            .Where(x => x.Price > 0)
             .OrderBy(x => x.Price)
             .First();
 
@@ -353,13 +354,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         public (double Price, DateTime Time) RecentHigh()
         {
             var highest = new List<(double Price, DateTime Time)>() {
-                Fractals[(15, FractalType.HighFiveBar)],
-                Fractals[(15, FractalType.HighThreeBar)],
-                Fractals[(5, FractalType.HighThreeBar)],
-                Fractals[(5, FractalType.HighFiveBar)],
-                Fractals[(15, FractalType.HighLookback)],
+                Fractals.TryGetValue((15, FractalType.HighFiveBar), out var highFiveBar) ? highFiveBar : (0, DateTime.MinValue),
+                Fractals.TryGetValue((15, FractalType.HighThreeBar), out var highThreeBar) ? highThreeBar : (0, DateTime.MinValue),
+                Fractals.TryGetValue((5, FractalType.HighThreeBar), out var highThreeBar5) ? highThreeBar5 : (0, DateTime.MinValue),
+                Fractals.TryGetValue((5, FractalType.HighFiveBar), out var highFiveBar5) ? highFiveBar5 : (0, DateTime.MinValue),
+                Fractals.TryGetValue((15, FractalType.HighLookback), out var highLookback) ? highLookback : (0, DateTime.MinValue),
                 (owner.High[0], owner.Time[0])
             }
+            .Where(x => x.Price > 0)
             .OrderByDescending(x => x.Price)
             .First();
 

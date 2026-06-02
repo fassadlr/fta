@@ -283,6 +283,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
             return [.. events.Where(a => a.AllDay)];
         }
 
+        public static List<NewsEvent> BankHolidays(this List<NewsEvent> events)
+        {
+            return [.. events.Where(a => a.BankHoliday)];
+        }
+
         public static bool IsInWeek(this List<NewsEvent> events, NewsFilter newsFilter, DateTime currentDate)
         {
             var startOfWeek = currentDate.StartOfWeek(DayOfWeek.Monday);

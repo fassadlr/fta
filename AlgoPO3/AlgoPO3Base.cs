@@ -1,4 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using NinjaTrader.Cbi;
+using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 {
@@ -63,10 +65,26 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         internal int[] EdgeHoursParsed;
         internal int[] SkipHoursParsed;
 
+        internal TradeDetails CurrentTrade;
+        internal Order PendingOrder { get; set; }
+
         internal InvalidRange InvalidRange { get; set; }
         internal SharedBorderTrade SharedBorderTrade { get; set; }
 
         internal TradeSessionState TradingSession;
+
+        internal void CancelLimitOrder()
+        {
+            if (PendingOrder == null)
+                return;
+
+            CancelOrder(PendingOrder);
+
+            PendingOrder = null;
+            CurrentTrade = null;
+
+            PrintDebug("[CANCEL_LIMIT_ORDER]");
+        }
 
         internal bool DetectAndCheckInvalidRange()
         {

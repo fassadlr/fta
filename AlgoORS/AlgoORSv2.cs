@@ -146,7 +146,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             });
 
             // Filter by event days, skip days etc.
-            if (FilterAllDay() && Position.MarketPosition == MarketPosition.Flat)
+            if (FilterAllDayAndBankHolidays() && Position.MarketPosition == MarketPosition.Flat)
                 return;
 
             if (BarsInProgress == 0 && Bars.IsFirstBarOfSession)
@@ -160,6 +160,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 tradeBias = TradeBias.Neutral;
                 tradeCount = 0;
 
+                // The runner resets the fractal manager instance.
                 runner = null;
 
                 return;

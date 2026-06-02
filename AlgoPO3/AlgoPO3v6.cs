@@ -18,7 +18,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         [Display(Name = "Stop Grace", Order = 19, GroupName = "Parameters")]
         public int StopGrace { get; set; }
 
-        private Order PendingOrder { get; set; }
         private List<DealingRange> Ranges { get; set; }
 
         private DealingRange CurrentRange { get; set; }
@@ -31,7 +30,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private bool rangeBreakDetected = false;
 
-        private TradeDetails CurrentTrade;
         private double lastBOSLocation = 0;
 
         private NewsFilter newsFilter;

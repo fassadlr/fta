@@ -221,6 +221,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             var newsEvent = Events.AllDay().FirstOrDefault(n => Time[0].Date == n.EventTime.Date);
             return newsEvent != null;
         }
+
+        public bool FilterAllDayAndBankHolidays()
+        {
+            var newsEvent = Events.FirstOrDefault(n => (n.AllDay || n.BankHoliday) && Time[0].Date == n.EventTime.Date);
+            return newsEvent != null;
+        }
     }
 
     public enum TradeBias
