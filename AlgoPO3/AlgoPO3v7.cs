@@ -506,7 +506,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             //---Bullish BOS ---
             if (fractalManager.Fractals.TryGetValue((5, FractalType.HighThreeBar), out (double Price, DateTime Time) lastFractalHigh))
             {
-                if (lastFractalHigh.Price != 0 && Close[0] > lastFractalHigh.Price)
+                if (Close[0] > lastFractalHigh.Price)
                 {
                     BearishBOSDetected = false;
                     BullishBOSDetected = true;
@@ -520,7 +520,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             // --- Bearish BOS ---
             if (fractalManager.Fractals.TryGetValue((5, FractalType.LowThreeBar), out (double Price, DateTime Time) lastFractalLow))
             {
-                if (lastFractalLow.Price != 0 && Close[0] < lastFractalLow.Price)
+                if (Close[0] < lastFractalLow.Price)
                 {
                     BearishBOSDetected = true;
                     BullishBOSDetected = false;
