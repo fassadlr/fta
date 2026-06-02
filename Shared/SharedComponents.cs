@@ -171,7 +171,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
             }
         }
 
-        internal void DetectFractalWithPlatos(int timeFrame)
+        public void DetectFractalThreeBarWithPlatos(int timeFrame)
         {
             // Need at least 3 bars
             if (owner.CurrentBar < 2)

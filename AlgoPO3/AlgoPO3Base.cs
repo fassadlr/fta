@@ -68,53 +68,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         internal TradeSessionState TradingSession;
 
-        internal void DetectFractalFiveBar()
-        {
-            // Need at least 5 bars
-            if (CurrentBar < 4)
-                return;
-
-            // --- FRACTAL HIGH (strict) ---
-            double h0 = High[0];
-            double h1 = High[1];
-            double h2 = High[2]; // center
-            double h3 = High[3];
-            double h4 = High[4];
-
-            bool isFractalHigh =
-                h2 > h0 &&
-                h2 > h1 &&
-                h2 > h3 &&
-                h2 > h4;
-
-            if (isFractalHigh)
-            {
-                LastFractalFiveBarHigh = h2;
-                LastFractalFiveBarHighTime = Time[2];
-                PrintDebug($"New Fractal High {LastFractalFiveBarHigh} at {LastFractalFiveBarHighTime}");
-            }
-
-            // --- FRACTAL LOW (strict) ---
-            double l0 = Low[0];
-            double l1 = Low[1];
-            double l2 = Low[2]; // center
-            double l3 = Low[3];
-            double l4 = Low[4];
-
-            bool isFractalLow =
-                l2 < l0 &&
-                l2 < l1 &&
-                l2 < l3 &&
-                l2 < l4;
-
-            if (isFractalLow)
-            {
-                LastFractalFiveBarLow = l2;
-                LastFractalFiveBarLowTime = Time[2];
-                PrintDebug($"New Fractal Low {LastFractalFiveBarLow} at {LastFractalFiveBarLowTime}");
-            }
-        }
-
         internal bool DetectAndCheckInvalidRange()
         {
             if (InvalidRange == null)

@@ -36,6 +36,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private OrderFlowVWAP vwap;
         private bool isConnected;
 
+        private FractalManager fractalManager;
+
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
@@ -91,6 +93,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PrintDebug($"EdgeHoursParsed: {string.Join(",", EdgeHoursParsed)}");
                 PrintDebug($"SkipHoursParsed: {string.Join(",", SkipHoursParsed)}");
 
+                fractalManager = new FractalManager(this);
+
                 vwap = OrderFlowVWAP(
                         VWAPResolution.Standard,
                         Bars.TradingHours,
@@ -133,7 +137,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 dailyAtr.Calculate(High[0], Low[0], Close[0]);
 
-                DetectFractalWithPlatos();
+                fractalManager.DetectFractalThreeBarWithPlatos(5);
                 DetectBOS();
             }
 
@@ -500,25 +504,31 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private void DetectBOS()
         {
             //---Bullish BOS ---
-            if (LastFractalHigh != 0 && Close[0] > LastFractalHigh)
+            if (fractalManager.Fractals.TryGetValue((5, FractalType.HighThreeBar), out (double Price, DateTime Time) lastFractalHigh))
             {
-                BearishBOSDetected = false;
-                BullishBOSDetected = true;
+                if (lastFractalHigh.Price != 0 && Close[0] > lastFractalHigh.Price)
+                {
+                    BearishBOSDetected = false;
+                    BullishBOSDetected = true;
 
-                tradeBias = TradeBias.Long;
+                    tradeBias = TradeBias.Long;
 
-                PrintDebug($"[BULLISH_BOS] trade bias {tradeBias}");
+                    PrintDebug($"[BULLISH_BOS] trade bias {tradeBias}");
+                }
             }
 
             // --- Bearish BOS ---
-            if (LastFractalLow != 0 && Close[0] < LastFractalLow)
+            if (fractalManager.Fractals.TryGetValue((5, FractalType.LowThreeBar), out (double Price, DateTime Time) lastFractalLow))
             {
-                BearishBOSDetected = true;
-                BullishBOSDetected = false;
+                if (lastFractalLow.Price != 0 && Close[0] < lastFractalLow.Price)
+                {
+                    BearishBOSDetected = true;
+                    BullishBOSDetected = false;
 
-                tradeBias = TradeBias.Short;
+                    tradeBias = TradeBias.Short;
 
-                PrintDebug($"[BEARISH_BOS]trade bias {tradeBias}");
+                    PrintDebug($"[BEARISH_BOS] trade bias {tradeBias}");
+                }
             }
         }
 
@@ -537,8 +547,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             InvalidRange = null;
             SharedBorderTrade = null;
 
-            LastFractalHigh = 0;
-            LastFractalLow = 0;
+            //LastFractalHigh = 0;
+            //LastFractalLow = 0;
 
             rangeBias = RangeBias.Neutral;
             tradeBias = TradeBias.Neutral;
@@ -547,6 +557,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             BearishBOSDetected = false;
 
             dailyAtr ??= new DailyAtr();
+
+            fractalManager.Fractals.Clear();
 
             CurrentTrade = null;
         }
