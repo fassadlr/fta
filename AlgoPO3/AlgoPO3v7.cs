@@ -375,7 +375,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             var entryRange = Ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.StopLoss));
             if (entryRange != null &&
                 entryRange.CoveredPercentage >= 95 &&
-                (londonTime.Hour >= 8 && londonTime.Hour < 10) || (londonTime.Hour >= 11 && londonTime.Hour < 13))
+                (londonTime.Hour >= 8 && londonTime.Hour < 10))
             {
                 PrintDebug($"[RANGE_COVERED_SKIPPING] {CurrentTrade.OrderType} {CurrentTrade.Bias}, entry {CurrentTrade.Entry}, range {entryRange}");
                 return;
