@@ -213,7 +213,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             // Make sure that range coverings are cleared at the london open.
             DateTime londonTime = TimeZoneInfo.ConvertTime(Time[0], londonZone);
-            if (londonTime.Hour == 8 && londonTime.Minute == 0)
+            if (londonTime.TimeOfDay == new TimeSpan(8, 0, 0))
             {
                 Ranges.ForEach(r =>
                 {
