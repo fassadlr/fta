@@ -121,11 +121,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 MaxCovered = price;
         }
 
-        public bool Covered
+        public int CoveredPercentage
         {
             get
             {
-                return MinCovered <= Low && MaxCovered >= High;
+                return (int)((MaxCovered - MinCovered) / (High - Low) * 100);
             }
         }
 
@@ -155,7 +155,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
         }
 
-        public override string ToString() => $"Low: {Low} High: {High}";
+        public override string ToString() => $"Low: {Low} High: {High} Min Covered: {MinCovered} Max Covered: {MaxCovered}, Covered: {CoveredPercentage}%";
 
         public DealingRangePosition GetPositionInRange(RangeBias rangeBias, double price)
         {
