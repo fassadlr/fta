@@ -40,11 +40,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private OrderFlowVWAP vwap;
         private bool isConnected;
 
+        private TimeZoneInfo newYorkZone;
+
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
             {
-                Name = "PO3 Algo v6.6";
+                Name = "PO3 Algo v6.7";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -53,7 +55,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PO3 = 81;
                 SessionStart = 1;
                 SessionEnd = 13;
-                PositionSize = 4;
+                PositionSize = 3;
                 IsOverlay = true;
 
                 BlockEndHours = "3,9,12";
@@ -81,6 +83,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 mssBias = MSSBias.Neutral;
 
                 newsFilter = new NewsFilter(IncludeCPIWeek, IncludeFOMCWeek, IncludeNFPWeek, IncludeNoEventsWeek);
+
+                newYorkZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
             }
             else if (State == State.DataLoaded)
             {
@@ -129,12 +133,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (FilterByEvents() && Position.MarketPosition == MarketPosition.Flat)
                 return;
 
-            if (TradingSession == null)
-            {
-                TradingSession = new TradeSessionState(this);
-                PrintDebug($"Creating new trading session.");
-            }
-
             // Always process fractal and BOS detection.
             if (BarsInProgress == 1)
             {
@@ -143,8 +141,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 DetectFractalWithPlatos();
                 DetectMSS();
                 DetectBOS();
-
-                //TradingSession.Update(Close[0], atrCurrent);
             }
 
             // Adjust time for NY/UK BST overlap
@@ -633,9 +629,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private void BreakEvenOrCloseTrade()
         {
-            var marketOpen = IsDSTOverlap() ? 13 : 14;
+            DateTime newYorkTime = TimeZoneInfo.ConvertTime(Time[0], newYorkZone);
 
-            if (Time[0].Hour == marketOpen && Time[0].Minute == 29)
+            if (newYorkTime.Hour == 9 && newYorkTime.Minute == 29)
             {
                 PrintDebug($"[CLOSE_TRADE] market open, PnL {Position.GetUnrealizedProfitLoss(PerformanceUnit.Currency, Close[0])}");
 
@@ -668,27 +664,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 }
                 else
                 {
-                    //if (!CurrentTrade.StopLossAdjusted_OneR)
-                    //{
-                    //    if (CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.OneR_Threshold)
-                    //    {
-                    //        CurrentTrade.StopLoss = CurrentTrade.StopLoss + StopGrace;
-                    //        CurrentTrade.StopLossAdjusted_OneR = true;
-
-                    //        SetStopLoss("long entry", CalculationMode.Price, CurrentTrade.StopLoss, true);
-                    //        PrintDebug($"[BREAK_EVEN_ONE_R_LONG] {CurrentTrade.StopLoss}");
-                    //    }
-
-                    //    if (CurrentTrade.Bias == TradeBias.Short && Low[0] <= CurrentTrade.OneR_Threshold)
-                    //    {
-                    //        CurrentTrade.StopLoss = CurrentTrade.StopLoss - StopGrace;
-                    //        CurrentTrade.StopLossAdjusted_OneR = true;
-
-                    //        SetStopLoss("short entry", CalculationMode.Price, CurrentTrade.StopLoss, true);
-                    //        PrintDebug($"[BREAK_EVEN_ONE_R_SHORT]");
-                    //    }
-                    //}
-
                     if (CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.BreakEvenThreshold)
                     {
                         breakEvenDirection = "long entry";
