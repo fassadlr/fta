@@ -15,7 +15,31 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
     public class AlgoPO3v6 : AlgoPO3Base
     {
         [NinjaScriptProperty]
-        [Display(Name = "Stop Grace", Order = 19, GroupName = "Parameters")]
+        [Display(Name = "Time Offset", Order = 3, GroupName = "Parameters")]
+        public int SessionTimeOffset { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Session Start", Order = 4, GroupName = "Parameters")]
+        public int SessionStart { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Session End", Order = 5, GroupName = "Parameters")]
+        public int SessionEnd { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Skip Hours", Order = 6, GroupName = "Parameters")]
+        public string SkipHours { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Block End Hours", Order = 7, GroupName = "Parameters")]
+        public string BlockEndHours { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Edge Hours", Order = 8, GroupName = "Parameters")]
+        public string EdgeHours { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Stop Grace", Order = 21, GroupName = "Parameters")]
         public int StopGrace { get; set; }
 
         private List<DealingRange> Ranges { get; set; }

@@ -100,7 +100,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 ContinuationTPMultiplier = 1;
 
                 Risk = 300;
-                SessionTimeOffset = 0;
                 SessionMarketOpen = 143000;
                 SessionStartTime = 144500;
                 SessionEndTime = 160000;
@@ -174,9 +173,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             }
             else
             {
-                adjustedMarketOpen = AddHoursToTime(SessionMarketOpen, SessionTimeOffset);
-                adjustedSessionStart = AddHoursToTime(SessionStartTime, SessionTimeOffset);
-                adjustedSessionEnd = AddHoursToTime(SessionEndTime, SessionTimeOffset);
+                adjustedMarketOpen = AddHoursToTime(SessionMarketOpen, 0); // ANCHOR to NY time
+                adjustedSessionStart = AddHoursToTime(SessionStartTime, 0);
+                adjustedSessionEnd = AddHoursToTime(SessionEndTime, 0);
 
                 //PrintDebug($"Market Open {adjustedMarketOpen}");
                 //PrintDebug($"Session Start {adjustedSessionStart}");

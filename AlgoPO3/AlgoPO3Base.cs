@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using System.Linq;
 using NinjaTrader.Cbi;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
@@ -8,39 +7,19 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
     public abstract class AlgoPO3Base : AlgoBase
     {
         [NinjaScriptProperty]
-        [Display(Name = "Position Size", Order = 4, GroupName = "Parameters")]
+        [Display(Name = "Position Size", Order = 10, GroupName = "Parameters")]
         public int PositionSize { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Session Start", Order = 5, GroupName = "Parameters")]
-        public int SessionStart { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Session End", Order = 6, GroupName = "Parameters")]
-        public int SessionEnd { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "PO3", Description = "PO3", Order = 7, GroupName = "Parameters")]
+        [Display(Name = "PO3", Description = "PO3", Order = 11, GroupName = "Parameters")]
         public int PO3 { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Skip Hours", Order = 8, GroupName = "Parameters")]
-        public string SkipHours { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Skip Months", Order = 9, GroupName = "Parameters")]
+        [Display(Name = "Skip Months", Order = 12, GroupName = "Parameters")]
         public string SkipMonths { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Block End Hours", Order = 10, GroupName = "Parameters")]
-        public string BlockEndHours { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Edge Hours", Order = 11, GroupName = "Parameters")]
-        public string EdgeHours { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Edge Multiplier", Order = 12, GroupName = "Parameters")]
+        [Display(Name = "Edge Multiplier", Order = 13, GroupName = "Parameters")]
         public double EdgeHourMultiplier { get; set; }
 
         [NinjaScriptProperty]
@@ -94,8 +73,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (InvalidRange.IsInPlay(Close[0]))
             {
-                if (!SkipHoursParsed.Contains(Time[0].Hour))
-                    PrintDebug($"[RANGE_INVALID_IN_PLAY] Skipping as {Close[0]} is in invalid range.");
+                PrintDebug($"[RANGE_INVALID_IN_PLAY] Skipping as {Close[0]} is in invalid range.");
 
                 return true;
             }

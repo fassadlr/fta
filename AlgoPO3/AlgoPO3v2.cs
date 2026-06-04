@@ -13,6 +13,30 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
     public class AlgoPO3v2 : AlgoPO3Base
     {
         [NinjaScriptProperty]
+        [Display(Name = "Time Offset", Order = 3, GroupName = "Parameters")]
+        public int SessionTimeOffset { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Session Start", Order = 4, GroupName = "Parameters")]
+        public int SessionStart { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Session End", Order = 5, GroupName = "Parameters")]
+        public int SessionEnd { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Skip Hours", Order = 6, GroupName = "Parameters")]
+        public string SkipHours { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Block End Hours", Order = 7, GroupName = "Parameters")]
+        public string BlockEndHours { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Edge Hours", Order = 8, GroupName = "Parameters")]
+        public string EdgeHours { get; set; }
+
+        [NinjaScriptProperty]
         [Display(Name = "Adjust Risk on Consec Loss", Order = 18, GroupName = "Parameters")]
         public bool AdjustRiskBasedOnLosses { get; set; }
 

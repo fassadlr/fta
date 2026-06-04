@@ -90,7 +90,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 MaxTrades = 1;
                 TPMultiplier = 1;
 
-                SessionTimeOffset = 0;
+                //SessionTimeOffset = 0;
                 SessionMarketOpen = 143000;
                 SessionStartTime = 144500;
                 SessionEndTime = 160000;
@@ -108,9 +108,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
                 dailyRangeTracker = new();
 
-                SessionMarketOpen = AddHoursToTime(SessionMarketOpen, SessionTimeOffset);
-                SessionStartTime = AddHoursToTime(SessionStartTime, SessionTimeOffset);
-                SessionEndTime = AddHoursToTime(SessionEndTime, SessionTimeOffset);
+                //SessionMarketOpen = AddHoursToTime(SessionMarketOpen, SessionTimeOffset);
+                //SessionStartTime = AddHoursToTime(SessionStartTime, SessionTimeOffset);
+                //SessionEndTime = AddHoursToTime(SessionEndTime, SessionTimeOffset);
 
                 PrintDebug($"Market Open {SessionMarketOpen}");
                 PrintDebug($"Session Start {SessionStartTime}");

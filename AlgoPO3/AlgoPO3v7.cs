@@ -12,15 +12,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
     public class AlgoPO3v7 : AlgoPO3Base
     {
         [NinjaScriptProperty]
-        [Display(Name = "Stop Grace", Order = 19, GroupName = "Parameters")]
+        [Display(Name = "Stop Grace", Order = 21, GroupName = "Parameters")]
         public int StopGrace { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Clear Ranges Hour", Order = 19, GroupName = "Parameters")]
+        [Display(Name = "Clear Ranges Hour", Order = 22, GroupName = "Parameters")]
         public int ClearRangesHour { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Range Covered End Hour", Order = 19, GroupName = "Parameters")]
+        [Display(Name = "Range Covered End Hour", Order = 23, GroupName = "Parameters")]
         public int RangeCoveredEndHour { get; set; }
 
         private List<DealingRange> Ranges { get; set; }
@@ -43,30 +43,21 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private FractalManager fractalManager;
 
-        private TimeZoneInfo tokyoZone;
-        private TimeZoneInfo newYorkZone;
-        private TimeZoneInfo londonZone;
-
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
             {
-                Name = "PO3 Algo v7.0";
+                Name = "PO3 Algo v7.2";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
                 ConnectionLossHandling = ConnectionLossHandling.KeepRunning;
 
                 PO3 = 81;
-                SessionStart = 1;
-                SessionEnd = 13;
                 PositionSize = 4;
                 IsOverlay = true;
 
-                BlockEndHours = "3,9,12";
-                EdgeHours = "1,3,9,11";
                 EdgeHourMultiplier = 1.5;
-                SkipHours = "4,5,7,10";
                 SkipMonths = "8";
                 StopGrace = 3;
 
@@ -74,6 +65,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 IncludeFOMCWeek = false;
                 IncludeNFPWeek = true;
                 IncludeNoEventsWeek = true;
+
+                ClearRangesHour = 7;
+                RangeCoveredEndHour = 10;
             }
             else if (State == State.Configure)
             {
@@ -88,21 +82,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 newsFilter = new NewsFilter(IncludeCPIWeek, IncludeFOMCWeek, IncludeNFPWeek, IncludeNoEventsWeek);
 
-                tokyoZone = TimeZoneInfo.FindSystemTimeZoneById("Tokyo Standard Time");
-                londonZone = TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time");
-                newYorkZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+                TokyoZone = TimeZoneInfo.FindSystemTimeZoneById("Tokyo Standard Time");
+                LondonZone = TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time");
+                NewYorkZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
             }
             else if (State == State.DataLoaded)
             {
-                BlockEndHoursParsed = [.. BlockEndHours.Split(',').Select((i) => int.Parse(i) + SessionTimeOffset)];
-                EdgeHoursParsed = [.. EdgeHours.Split(',').Select((i) => int.Parse(i) + SessionTimeOffset)];
-                SkipHoursParsed = [.. SkipHours.Split(',').Select((i) => int.Parse(i) + SessionTimeOffset)];
-
-                PrintDebug($"Session Start: {AdjustedSessionStart}, Session End: {AdjustedSessionEnd}");
-                PrintDebug($"BlockEndHoursParsed: {string.Join(",", BlockEndHoursParsed)}");
-                PrintDebug($"EdgeHoursParsed: {string.Join(",", EdgeHoursParsed)}");
-                PrintDebug($"SkipHoursParsed: {string.Join(",", SkipHoursParsed)}");
-
                 fractalManager = new FractalManager(this);
 
                 vwap = OrderFlowVWAP(
@@ -146,9 +131,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             // If the session has ended stop processing.
-            DateTime newYorkTime = TimeZoneInfo.ConvertTime(Time[0], newYorkZone);
-            if (newYorkTime.Hour >= 8 &&
-                newYorkTime.Date == Time[0].Date &&
+            if (NewYorkTime().Hour >= 8 && NewYorkTime().Date == Time[0].Date &&
                 Position.MarketPosition == MarketPosition.Flat)
             {
                 CancelLimitOrder();
@@ -191,8 +174,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             CurrentRange.UpdateCoverage(Close[0]);
 
             /* ----- STRATEGY START TIME ANCHORED TO TOKYO-----*/
-            DateTime tokyoTime = TimeZoneInfo.ConvertTime(Time[0], tokyoZone);
-            if (tokyoTime.TimeOfDay < new TimeSpan(9, 00, 0))
+            if (TokyoTime().TimeOfDay < new TimeSpan(9, 0, 0))
                 return;
 
             // If we are in a position then break even or close and stop processing.
@@ -207,8 +189,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             */
 
             // Make sure that range coverings are cleared at the london open.
-            DateTime londonTime = TimeZoneInfo.ConvertTime(Time[0], londonZone);
-            if (londonTime.TimeOfDay == new TimeSpan(ClearRangesHour, 0, 0))
+            if (LondonTime().TimeOfDay == new TimeSpan(ClearRangesHour, 0, 0))
             {
                 Ranges.ForEach(r =>
                 {
@@ -221,14 +202,17 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
 
             // Filter time of day and cancel if we are flat.
-            if (SkipHoursParsed.Contains(Time[0].Hour))
+            var validSkipHour = LondonTime().Hour == 4 || LondonTime().Hour == 5 || LondonTime().Hour == 7 || LondonTime().Hour == 10;
+            if (validSkipHour)
             {
                 CancelLimitOrder();
                 return;
             }
 
             // Cancel limit orders close to end of sessions blocks.
-            if (BlockEndHoursParsed.Contains(Time[0].Hour) && Time[0].Minute >= 40)
+            // TODO: Should everything be LONDON hours?
+            var validBlockEndHour = LondonTime().Hour == 3 || LondonTime().Hour == 9 || LondonTime().Hour == 12;
+            if (validBlockEndHour && Time[0].Minute >= 40)
             {
                 CancelLimitOrder();
                 return;
@@ -398,7 +382,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             var entryRange = Ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.StopLoss));
             if (entryRange != null &&
                 entryRange.CoveredPercentage >= 95 &&
-                londonTime.Hour >= 8 && londonTime.Hour < RangeCoveredEndHour)
+                LondonTime().Hour >= 8 && LondonTime().Hour < RangeCoveredEndHour)
             {
                 PrintDebug($"[RANGE_COVERED_SKIPPING] {CurrentTrade.OrderType} {CurrentTrade.Bias}, entry {CurrentTrade.Entry}, range {entryRange}");
                 return;
@@ -655,7 +639,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             int positionSize = PositionSize;
 
-            if (EdgeHoursParsed.Contains(Time[0].Hour) && atrCurrent <= 20)
+            // TODO: Should everything be LONDON hours?
+            var validEdgeHour = LondonTime().Hour == 1 || LondonTime().Hour == 3 || LondonTime().Hour == 9 || LondonTime().Hour == 11;
+            if (validEdgeHour && atrCurrent <= 20)
             {
                 positionSize = (int)(PositionSize * EdgeHourMultiplier);
                 PrintDebug($"[POSITION_ADJUSTED_EDGEHOUR] {positionSize}");

@@ -20,10 +20,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         [Display(Name = "Display Trade Logs", Order = 2, GroupName = "Parameters")]
         public bool TradeLogEnabled { get; set; }
 
-        [NinjaScriptProperty]
-        [Display(Name = "Time Offset", Order = 3, GroupName = "Parameters")]
-        public int SessionTimeOffset { get; set; }
-
         internal double LastFractalHigh = 0;
         internal DateTime LastFractalHighTime;
 
@@ -40,6 +36,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         internal int AdjustedSessionStart = 0;
         internal int AdjustedSessionEnd = 0;
+
+        internal TimeZoneInfo TokyoZone { get; set; }
+        internal TimeZoneInfo NewYorkZone { get; set; }
+        internal TimeZoneInfo LondonZone { get; set; }
 
         internal int AdjustSessionEnd()
         {
@@ -226,6 +226,21 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         {
             var newsEvent = Events.FirstOrDefault(n => (n.AllDay || n.BankHoliday) && Time[0].Date == n.EventTime.Date);
             return newsEvent != null;
+        }
+
+        public DateTime LondonTime()
+        {
+            return TimeZoneInfo.ConvertTime(Time[0], LondonZone);
+        }
+
+        public DateTime NewYorkTime()
+        {
+            return TimeZoneInfo.ConvertTime(Time[0], NewYorkZone);
+        }
+
+        public DateTime TokyoTime()
+        {
+            return TimeZoneInfo.ConvertTime(Time[0], TokyoZone);
         }
     }
 

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 {
@@ -116,11 +115,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 filteredByTimeOfDay = false;
             }
 
-            if (owner.SkipHours.Split(',').Contains(priceTime.Hour.ToString()))
-            {
-                owner.PrintDebug($"Not taking trades as we are in hour {priceTime.Hour}:{priceTime.Minute}.");
-                return bias;
-            }
+            //if (owner.SkipHours.Split(',').Contains(priceTime.Hour.ToString()))
+            //{
+            //    owner.PrintDebug($"Not taking trades as we are in hour {priceTime.Hour}:{priceTime.Minute}.");
+            //    return bias;
+            //}
 
             if (RangeBias == RangeBias.Bullish)
             {
