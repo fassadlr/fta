@@ -75,8 +75,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             ExtensionRange = Math.Round(Low - ExtensionLow);
 
-            MinCovered = double.MaxValue;
-            MaxCovered = double.MinValue;
+            MinCovered = 0;
+            MaxCovered = 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -114,18 +114,21 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 MaxCovered = price;
             }
 
-            if (price < MinCovered)
-                MinCovered = price;
+            MinCovered = Math.Min(MinCovered, price);
+            MaxCovered = Math.Max(MaxCovered, price);
 
-            if (price > MaxCovered)
-                MaxCovered = price;
+            if (MaxCovered > High)
+                MaxCovered = High;
+
+            if (MinCovered < Low)
+                MinCovered = Low;
         }
 
         public int CoveredPercentage
         {
             get
             {
-                return (int)((MaxCovered - MinCovered) / (High - Low) * 100);
+                return MaxCovered == 0 || MinCovered == 0 ? 0 : (int)((MaxCovered - MinCovered) / (High - Low) * 100);
             }
         }
 

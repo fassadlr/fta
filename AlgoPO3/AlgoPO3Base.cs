@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Linq;
 using NinjaTrader.Cbi;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
@@ -93,7 +94,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (InvalidRange.IsInPlay(Close[0]))
             {
-                PrintDebug($"[RANGE_INVALID_IN_PLAY] Skipping as {Close[0]} is in invalid range.");
+                if (!SkipHoursParsed.Contains(Time[0].Hour))
+                    PrintDebug($"[RANGE_INVALID_IN_PLAY] Skipping as {Close[0]} is in invalid range.");
+
                 return true;
             }
 
