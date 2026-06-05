@@ -38,9 +38,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         [Display(Name = "Include FOMC Week", Order = 17, GroupName = "Parameters")]
         public bool IncludeFOMCWeek { get; set; }
 
-        internal bool BearishBOSDetected = false;
-        internal bool BullishBOSDetected = false;
-
         internal int[] BlockEndHoursParsed;
         internal int[] EdgeHoursParsed;
         internal int[] SkipHoursParsed;

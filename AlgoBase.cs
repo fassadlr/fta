@@ -41,6 +41,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         internal TimeZoneInfo NewYorkZone { get; set; }
         internal TimeZoneInfo LondonZone { get; set; }
 
+        internal bool BearishBOSDetected = false;
+        internal bool BullishBOSDetected = false;
+
         internal int AdjustSessionEnd()
         {
             var adjustSessionEnd = AdjustedSessionEnd;
@@ -88,6 +91,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         internal bool BearishCandle(int index)
         {
             return Close[index] < Open[index];
+        }
+
+        internal double CalculateRiskReward(double stopLossDistance, double profitTargetDistance)
+        {
+            return Math.Round(profitTargetDistance / stopLossDistance, 2);
         }
 
         internal double CandleBodyRange(int index)

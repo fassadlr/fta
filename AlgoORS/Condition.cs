@@ -1,5 +1,4 @@
-﻿using System;
-using NinjaTrader.NinjaScript.Indicators;
+﻿using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
@@ -47,11 +46,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         internal bool CandleBodyRangeInPoints(int minPoints)
         {
             return Owner.Open[0] - Owner.Close[0] >= minPoints || Owner.Close[0] - Owner.Open[0] >= minPoints;
-        }
-
-        internal double CalculateRiskReward(double stopLossDistance, double profitTargetDistance)
-        {
-            return Math.Round(profitTargetDistance / stopLossDistance, 2);
         }
     }
 }

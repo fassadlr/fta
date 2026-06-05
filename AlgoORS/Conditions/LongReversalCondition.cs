@@ -76,7 +76,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
                 return TradeExecutionDetails.Failed();
             }
 
-            var riskReward = CalculateRiskReward(stopDistance, settings.RangeHigh - Owner.Close[0]);
+            var riskReward = Owner.CalculateRiskReward(stopDistance, settings.RangeHigh - Owner.Close[0]);
             if (riskReward < RunnerConfiguration.RiskRewardMinimum)
             {
                 Owner.PrintDebug($"[RR_SUBOPTIMAL_LONG] RR {riskReward}");
