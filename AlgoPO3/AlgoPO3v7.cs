@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.IO;
 using System.Linq;
 using NinjaTrader.Cbi;
 using NinjaTrader.Data;
@@ -23,10 +24,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         [Display(Name = "Range Covered End Hour", Order = 23, GroupName = "Parameters")]
         public int RangeCoveredEndHour { get; set; }
 
+        [NinjaScriptProperty]
+        [Display(Name = "New York End Time", Order = 24, GroupName = "Parameters")]
+        public int NewYorkEndTime { get; set; }
+
         private List<DealingRange> Ranges { get; set; }
 
         private DealingRange CurrentRange { get; set; }
         private DealingRange PreviousRange { get; set; }
+
+
         private DateTime? lastInitialization;
 
         private RangeBias rangeBias;
@@ -42,6 +49,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private bool isConnected;
 
         private FractalManager fractalManager;
+
+        private readonly List<string> tradeLogs = [];
 
         protected override void OnStateChange()
         {
@@ -97,6 +106,24 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         1, 2, 3
                     );
             }
+            else if (State == State.Terminated)
+            {
+                if (tradeLogs.Count > 0 && ExportTradeLogs)
+                {
+                    string path = $@"C:\Users\fassa\Documents\NinjaTrader Testing\TradeLog{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+
+                    using (StreamWriter sw = new(path))
+                    {
+                        sw.WriteLine("EntryTime,Bias,OrderType,Result,Pnl,Quantity,VWAPDistance,VWAPLocation");
+                        foreach (string trade in tradeLogs)
+                        {
+                            sw.WriteLine(trade);
+                        }
+                    }
+
+                    Print($"Trade log written to {path}");
+                }
+            }
         }
 
         protected override void OnBarUpdate()
@@ -131,7 +158,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             // If the session has ended stop processing.
-            if (NewYorkTime().Hour >= 8 && NewYorkTime().Date == Time[0].Date &&
+            if (NewYorkTime().Hour >= NewYorkEndTime && NewYorkTime().Date == Time[0].Date &&
                 Position.MarketPosition == MarketPosition.Flat)
             {
                 CancelLimitOrder();
@@ -505,6 +532,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
+            tradeLogs.Add($"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.VWAPLocation}");
             PrintTrade($"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.VWAPLocation}");
 
             if (trade.ProfitCurrency >= 0)

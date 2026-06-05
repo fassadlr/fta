@@ -20,6 +20,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         [Display(Name = "Display Trade Logs", Order = 2, GroupName = "Parameters")]
         public bool TradeLogEnabled { get; set; }
 
+        [NinjaScriptProperty]
+        [Display(Name = "Export Trade Logs", Order = 3, GroupName = "Parameters")]
+        public bool ExportTradeLogs { get; set; }
+
         internal double LastFractalHigh = 0;
         internal DateTime LastFractalHighTime;
 
