@@ -406,12 +406,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         internal double StopLoss { get; set; } = 0;
         internal double StopLossDistance { get { return Bias == TradeBias.Long ? Entry - StopLoss : StopLoss - Entry; } }
         internal double TakeProfit { get; set; } = 0;
+        internal int Quantity { get; set; } = 0;
         internal double TradeMissedThreshold { get; set; } = 0;
         internal double BreakEvenThreshold { get; set; } = 0;
-        internal double OneR_Threshold { get; set; } = 0;
         internal OrderType OrderType { get; set; }
         internal double VWAPDistance { get; set; } = 0;
         public string VWAPLocation { get; internal set; }
-        public bool StopLossAdjusted_OneR { get; internal set; }
+        internal double OpeningPriceDistance { get; set; } = 0;
     }
 }

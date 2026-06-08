@@ -14,7 +14,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             if (!rangeCondition)
                 return false;
 
-            // This equates to looking back at when the 14:55 candle opens.
+            // This equates to looking back at when the 14:50 candle opens.
             var timeCondition = NinjaScriptBase.ToTime(Owner.Time[0]) >= Owner.AddMinutesToTime(ValidFromTime, 5);
             if (!timeCondition)
             {

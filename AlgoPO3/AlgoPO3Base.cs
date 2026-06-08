@@ -1,6 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using NinjaTrader.Cbi;
-using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 {
@@ -42,7 +41,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         internal int[] EdgeHoursParsed;
         internal int[] SkipHoursParsed;
 
-        internal TradeDetails CurrentTrade;
         internal Order PendingOrder { get; set; }
 
         internal InvalidRange InvalidRange { get; set; }

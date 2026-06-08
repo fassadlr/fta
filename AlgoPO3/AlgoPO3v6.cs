@@ -396,8 +396,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         TradeMissedThreshold = CurrentRange.BR3,
                         BreakEvenThreshold = CurrentRange.BR2,
                     };
-
-                    CurrentTrade.OneR_Threshold = CurrentTrade.Entry + (CurrentTrade.Entry - CurrentTrade.StopLoss) * 1;
                 }
 
                 if (tradeBias == TradeBias.Short)
@@ -413,8 +411,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         TradeMissedThreshold = PreviousRange.BR2,
                         BreakEvenThreshold = PreviousRange.BR3,
                     };
-
-                    CurrentTrade.OneR_Threshold = CurrentTrade.Entry - (CurrentTrade.StopLoss - CurrentTrade.Entry) * 1;
                 }
             }
 

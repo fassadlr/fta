@@ -33,7 +33,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private DealingRange CurrentRange { get; set; }
         private DealingRange PreviousRange { get; set; }
 
-
         private DateTime? lastInitialization;
 
         private RangeBias rangeBias;
@@ -49,8 +48,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private bool isConnected;
 
         private FractalManager fractalManager;
-
-        private readonly List<string> tradeLogs = [];
 
         protected override void OnStateChange()
         {
@@ -108,14 +105,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
             else if (State == State.Terminated)
             {
-                if (tradeLogs.Count > 0 && ExportTradeLogs)
+                if (TradeLogs.Count > 0 && ExportTradeLogs)
                 {
                     string path = $@"C:\Users\fassa\Documents\NinjaTrader Testing\TradeLog{DateTime.Now:yyyyMMdd_HHmmss}.csv";
 
                     using (StreamWriter sw = new(path))
                     {
                         sw.WriteLine("EntryTime,Bias,OrderType,Result,Pnl,Quantity,VWAPDistance,VWAPLocation");
-                        foreach (string trade in tradeLogs)
+                        foreach (string trade in TradeLogs)
                         {
                             sw.WriteLine(trade);
                         }
@@ -532,7 +529,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-            tradeLogs.Add($"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.VWAPLocation}");
+            TradeLogs.Add($"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.VWAPLocation}");
             PrintTrade($"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.VWAPLocation}");
 
             if (trade.ProfitCurrency >= 0)

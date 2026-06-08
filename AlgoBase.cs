@@ -24,6 +24,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         [Display(Name = "Export Trade Logs", Order = 3, GroupName = "Parameters")]
         public bool ExportTradeLogs { get; set; }
 
+        internal TradeDetails CurrentTrade;
+
         internal double LastFractalHigh = 0;
         internal DateTime LastFractalHighTime;
 
@@ -47,6 +49,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         internal bool BearishBOSDetected = false;
         internal bool BullishBOSDetected = false;
+
+        internal readonly List<string> TradeLogs = [];
 
         internal int AdjustSessionEnd()
         {
@@ -220,6 +224,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         {
             if (TradeLogEnabled)
                 Print($"{toPrint}");
+        }
+
+        public NewsEvent GetNewsEventForToday()
+        {
+            var newsEvent = Events.FirstOrDefault(n => Time[0].Date == n.EventTime.Date);
+            return newsEvent;
         }
 
         public bool FilterByEvents()
