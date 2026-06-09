@@ -74,6 +74,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 ClearRangesHour = 7;
                 RangeCoveredEndHour = 10;
+                NewYorkEndTime = 8;
             }
             else if (State == State.Configure)
             {
@@ -132,18 +133,37 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
             }
 
-            if (SkipMonths.Split(',').Contains(Time[0].Month.ToString()))
-                return;
+            if (TradingHalted) return;
 
-            if (!Events.IsInWeek(newsFilter, Time[0]))
+            if (SkipMonths.Split(',').Contains(Time[0].Month.ToString()))
             {
-                //PrintDebug($"Skipping as NFP {newsFilter.IncludeNFP} CPI {newsFilter.IncludeCPI} FOMC {newsFilter.IncludeFOMC} NoEvents {newsFilter.IncludeNoEvents}...");
+                TradingHalted = true;
                 return;
             }
 
-            // Filter by news events (TODO, not sure if this still needed)
-            if (FilterByEvents() && Position.MarketPosition == MarketPosition.Flat)
+            if (!Events.IsInWeek(newsFilter, Time[0]))
+            {
+                PrintInfo($"Skipping as NFP {newsFilter.IncludeNFP} CPI {newsFilter.IncludeCPI} FOMC {newsFilter.IncludeFOMC} NoEvents {newsFilter.IncludeNoEvents}...");
+                TradingHalted = true;
                 return;
+            }
+
+            // Skip all day events (easter etc).
+            var newsForToday = GetNewsEventForToday();
+            if (newsForToday != null && newsForToday.AllDay && Position.MarketPosition == MarketPosition.Flat)
+            {
+                TradingHalted = true;
+                PrintInfo($"Trading skipped for day due to all day event.");
+                return;
+            }
+
+            // Stop trading when the last candle is disproportionally big.
+            if (CandleBodyRange(0) > 300)
+            {
+                TradingHalted = true;
+                PrintInfo($"Trading halted as last candle was {CandleBodyRange(0)} points.");
+                return;
+            }
 
             // Always process fractal and BOS detection.
             if (BarsInProgress == 1)
@@ -159,6 +179,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 Position.MarketPosition == MarketPosition.Flat)
             {
                 CancelLimitOrder();
+                PrintInfo($"Trading session ended.");
+                TradingHalted = true;
                 return;
             }
 
@@ -533,9 +555,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             PrintTrade($"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.VWAPLocation}");
 
             if (trade.ProfitCurrency >= 0)
+            {
                 ProcessSharedBorderRange(false);
+            }
             else
+            {
                 ProcessSharedBorderRange(true);
+            }
 
             rangeBreakDetected = false;
 
@@ -599,6 +625,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             fractalManager.Fractals.Clear();
 
             CurrentTrade = null;
+
+            TradingHalted = false;
         }
 
         private void BreakEvenOrCloseTrade()
@@ -697,6 +725,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             var current = Ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.StopLoss));
             var previous = Ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.TakeProfit));
+
+            // It is possible that we jumped ranges and as such this cannot be processed further.
+            if (current == null || previous == null)
+                return;
+
             if (isLoss == false)
             {
                 current = Ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.TakeProfit));

@@ -234,7 +234,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 new(new DateTime(2026, 3, 13, 12, 30, 0)),
                 NewsEvent.CreateFOMCEvent(new DateTime(2026, 3, 18, 14, 00, 0)),    // FOMC
                 new(new DateTime(2026, 3, 19, 12, 30, 0)),
-                new(new DateTime(2026, 3, 23, 11, 06, 0)),
                 new(new DateTime(2026, 3, 26, 12, 30, 0)),
 
                 // April 2026

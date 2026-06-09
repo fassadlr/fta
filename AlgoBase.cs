@@ -52,6 +52,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         internal readonly List<string> TradeLogs = [];
 
+        internal bool TradingHalted { get; set; }
+
         internal int AdjustSessionEnd()
         {
             var adjustSessionEnd = AdjustedSessionEnd;
@@ -212,6 +214,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             }
 
             return false;
+        }
+
+        public void PrintInfo(string toPrint)
+        {
+            Print($"{Time[0]} {toPrint}");
         }
 
         public void PrintDebug(string toPrint)

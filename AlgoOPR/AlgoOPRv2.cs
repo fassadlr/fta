@@ -64,7 +64,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoOPR
                 RiskRewardMin = 0.5;
                 MaxLossesPerDay = 3;
 
-                IsExitOnSessionCloseStrategy = false;
+                IsExitOnSessionCloseStrategy = true;
             }
             else if (State == State.Configure)
             {
@@ -129,6 +129,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoOPR
             if (NewYorkTime().TimeOfDay == new TimeSpan(8, 0, 0) && NewYorkTime().Date == Time[0].Date)
             {
                 var news = GetNewsEventForToday();
+                if (news == null)
+                    return;
+
                 if (news.AllDay || news.BankHoliday)
                 {
                     PrintDebug($"[SKIPPING_SESSION] AllDay: {news.AllDay}, BankHoliday: {news.BankHoliday}");
