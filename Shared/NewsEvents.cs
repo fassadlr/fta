@@ -55,7 +55,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
             var events = new List<NewsEvent>() {
 
                 // May 2024
-                new(new DateTime(2024, 04, 01, 00, 00, 0)), // Easter Monday
+                NewsEvent.CreateAllDay(new DateTime(2024, 04, 01)), // Easter Monday
                 NewsEvent.CreateNFPEvent(new DateTime(2024, 04, 05, 08, 30, 00)),    // NFP
                 NewsEvent.CreateCPIEvent(new DateTime(2024, 04, 10, 08, 30, 00)),    // CPI
 
@@ -80,12 +80,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 NewsEvent.CreateFOMCEvent(new DateTime(2024, 09, 18, 19, 00, 00)),   // FOMC
 
                 // October 2024
-                NewsEvent.CreateNFPEvent(new DateTime(2024, 10, 04,08, 30, 00)),    // NFP
+                NewsEvent.CreateNFPEvent(new DateTime(2024, 10, 04, 08, 30, 00)),    // NFP
                 NewsEvent.CreateCPIEvent(new DateTime(2024, 10, 10, 08, 30, 00)),    // CPI
+
                 // November 2024
                 NewsEvent.CreateNFPEvent(new DateTime(2024, 11, 01, 08, 30, 00)),    // NFP
                 NewsEvent.CreateFOMCEvent(new DateTime(2024, 11, 07, 19, 00, 00)),   // FOMC
                 NewsEvent.CreateCPIEvent(new DateTime(2024, 11, 13, 08, 30, 00)),    // CPI
+
                 // December 2024
                 NewsEvent.CreateNFPEvent(new DateTime(2024, 12, 06, 08, 30, 00)),    // NFP
                 NewsEvent.CreateCPIEvent(new DateTime(2024, 12, 11, 08, 30, 00)),    // CPI
@@ -119,7 +121,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 NewsEvent.CreateNFPEvent(new DateTime(2025, 03, 07, 08, 30, 00)),    // NFP
                 NewsEvent.CreateCPIEvent(new DateTime(2025, 03, 12, 08, 30, 00)),    // CPI
                 new(new DateTime(2025, 03, 17, 12, 30, 0)),
-                NewsEvent.CreateFOMCEvent(new DateTime(2025, 03, 19, 19, 00, 0)),   // FOMC
+                NewsEvent.CreateFOMCEvent(new DateTime(2025, 03, 19, 14, 00, 0)),   // FOMC
                 new(new DateTime(2025, 03, 20, 12, 30, 0)),
                 new(new DateTime(2025, 03, 27, 12, 30, 0)),
                 new(new DateTime(2025, 03, 28, 12, 30, 0)),
@@ -132,15 +134,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 new(new DateTime(2025, 04, 11, 13, 30, 0)),
                 new(new DateTime(2025, 04, 16, 13, 30, 0)),
                 new(new DateTime(2025, 04, 17, 13, 30, 0)),
-                new(new DateTime(2025, 04, 18, 00, 00, 0)),     // EASTER
-                new(new DateTime(2025, 04, 21, 00, 00, 0)),     // EASTER
+                NewsEvent.CreateAllDay(new DateTime(2025, 04, 18)),                 // EASTER
+                NewsEvent.CreateAllDay(new DateTime(2025, 04, 21)),                 // EASTER
                 new(new DateTime(2025, 04, 24, 13, 30, 0)),
                 new(new DateTime(2025, 04, 30, 13, 30, 0)),
 
                 // May 2025
                 new(new DateTime(2025, 05, 01, 13, 30, 0)),
                 NewsEvent.CreateNFPEvent(new DateTime(2025, 05, 02, 08, 30, 00)),   // NFP 
-                NewsEvent.CreateFOMCEvent(new DateTime(2025, 05, 07, 19, 00, 0)),   // FOMC
+                NewsEvent.CreateFOMCEvent(new DateTime(2025, 05, 07, 14, 00, 0)),   // FOMC
                 new(new DateTime(2025, 05, 08, 13, 30, 0)),
                 NewsEvent.CreateCPIEvent(new DateTime(2025, 05, 13, 08, 30, 00)),    // CPI
                 new(new DateTime(2025, 05, 22, 13, 30, 0)),
@@ -155,7 +157,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 new(new DateTime(2025, 06, 12, 13, 30, 0)),
                 new(new DateTime(2025, 06, 17, 13, 30, 0)),
                 new(new DateTime(2025, 06, 18, 13, 30, 0)),
-                NewsEvent.CreateFOMCEvent(new DateTime(2025, 06, 18, 19, 00, 0)),   // FOMC
+                NewsEvent.CreateFOMCEvent(new DateTime(2025, 06, 18, 14, 00, 0)),   // FOMC
                 new(new DateTime(2025, 06, 26, 13, 30, 0)),
                 new(new DateTime(2025, 06, 27, 13, 30, 0)),
                                                                     
@@ -169,7 +171,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 new(new DateTime(2025, 07, 24, 13, 30, 0)),
                 new(new DateTime(2025, 07, 30, 13, 15, 0)),
                 new(new DateTime(2025, 07, 31, 13, 30, 0)),
-                NewsEvent.CreateFOMCEvent(new DateTime(2025, 07, 30, 19, 00, 0)),   // FOMC
+                NewsEvent.CreateFOMCEvent(new DateTime(2025, 07, 30, 14, 00, 0)),   // FOMC
 
                 // August 2025
                 NewsEvent.CreateNFPEvent(new DateTime(2025, 08, 01, 08, 30, 00)),    // NFP
@@ -184,17 +186,17 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 // September 2025
                 NewsEvent.CreateNFPEvent(new DateTime(2025, 09, 05, 08, 30, 00)),    // NFP
                 NewsEvent.CreateCPIEvent(new DateTime(2025, 09, 11, 08, 30, 00)),    // CPI
-                NewsEvent.CreateFOMCEvent(new DateTime(2025, 09, 17, 19, 00, 0)),   // FOMC
+                NewsEvent.CreateFOMCEvent(new DateTime(2025, 09, 17, 14, 00, 0)),   // FOMC
                                                                                     
                 // October 2025
                 NewsEvent.CreateCPIEvent(new DateTime(2025, 10, 24, 08, 30, 00)),    // CPI
-                NewsEvent.CreateFOMCEvent(new DateTime(2025, 10, 29, 19, 00, 0)),   // FOMC
+                NewsEvent.CreateFOMCEvent(new DateTime(2025, 10, 29, 14, 00, 0)),   // FOMC
                                                                                     
                 // November 2025
                 NewsEvent.CreateNFPEvent(new DateTime(2025, 11, 20, 08, 30, 00)),    // NFP
 
                 // December 2025
-                NewsEvent.CreateFOMCEvent(new DateTime(2025, 12, 10, 19, 00, 0)),   // FOMC
+                NewsEvent.CreateFOMCEvent(new DateTime(2025, 12, 10, 14, 00, 0)),   // FOMC
                 NewsEvent.CreateNFPEvent(new DateTime(2025, 12, 16, 08, 30, 00)),   // NFP
                 NewsEvent.CreateCPIEvent(new DateTime(2025, 12, 18, 08, 30, 00)),   // CPI
 
@@ -206,7 +208,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 new(new DateTime(2026, 1, 14, 13, 30, 0)),
                 new(new DateTime(2026, 1, 15, 13, 30, 0)),
                 new(new DateTime(2026, 1, 22, 13, 30, 0)),
-                NewsEvent.CreateFOMCEvent(new DateTime(2026, 01, 28, 19, 00, 0)),   // FOMC
+                NewsEvent.CreateFOMCEvent(new DateTime(2026, 01, 28, 14, 00, 0)),   // FOMC
                 new(new DateTime(2026, 1, 29, 13, 30, 0)),
                 new(new DateTime(2026, 1, 30, 13, 30, 0)),
 
@@ -230,7 +232,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 NewsEvent.CreateCPIEvent(new DateTime(2026, 3, 11, 08, 30, 00)),    // CPI
                 new(new DateTime(2026, 3, 12, 12, 30, 0)),
                 new(new DateTime(2026, 3, 13, 12, 30, 0)),
-                NewsEvent.CreateFOMCEvent(new DateTime(2026, 3, 18, 19, 00, 0)),    // FOMC
+                NewsEvent.CreateFOMCEvent(new DateTime(2026, 3, 18, 14, 00, 0)),    // FOMC
                 new(new DateTime(2026, 3, 19, 12, 30, 0)),
                 new(new DateTime(2026, 3, 23, 11, 06, 0)),
                 new(new DateTime(2026, 3, 26, 12, 30, 0)),
@@ -241,7 +243,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 NewsEvent.CreateAllDay(new DateTime(2026, 4, 03)),                  // Easter Friday and Monday
                 NewsEvent.CreateAllDay(new DateTime(2026, 4, 06)),                  // Easter Friday and Monday
                 NewsEvent.CreateCPIEvent(new DateTime(2026, 04, 10, 08, 30, 00)),   // CPI
-                NewsEvent.CreateFOMCEvent(new DateTime(2026, 04, 29, 19, 00, 0)),   // FOMC
+                NewsEvent.CreateFOMCEvent(new DateTime(2026, 04, 29, 14, 00, 0)),   // FOMC
 
                 // May 2026
                 NewsEvent.CreateNFPEvent(new DateTime(2026, 05, 08, 08, 30, 00)),   // NFP
@@ -251,7 +253,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 // Jun 2026
                 NewsEvent.CreateNFPEvent(new DateTime(2026, 06, 05, 08, 30, 00)),   // NFP
                 NewsEvent.CreateCPIEvent(new DateTime(2026, 06, 10, 08, 30, 00)),   // CPI
-                NewsEvent.CreateFOMCEvent(new DateTime(2026, 06, 17, 19, 00, 0)),   // FOMC
+                NewsEvent.CreateFOMCEvent(new DateTime(2026, 06, 17, 14, 00, 0)),   // FOMC
             };
 
             // Add xmas period 2024
@@ -263,7 +265,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
             // Skip start of January 2025
             for (int i = 1; i <= 5; i++)
             {
-                events.Add(NewsEvent.CreateAllDay(new DateTime(2026, 01, i, 00, 00, 0)));
+                events.Add(NewsEvent.CreateAllDay(new DateTime(2026, 01, i)));
             }
 
             // Add xmas period 2025
@@ -275,7 +277,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
             // Skip start of January 2026
             for (int i = 1; i <= 4; i++)
             {
-                events.Add(NewsEvent.CreateAllDay(new DateTime(2026, 01, i, 00, 00, 0)));
+                events.Add(NewsEvent.CreateAllDay(new DateTime(2026, 01, i)));
             }
 
             return events;

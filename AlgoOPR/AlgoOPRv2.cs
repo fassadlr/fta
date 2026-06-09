@@ -71,6 +71,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoOPR
                 TokyoZone = TimeZoneInfo.FindSystemTimeZoneById("Tokyo Standard Time");
                 LondonZone = TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time");
                 NewYorkZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+
+                AdjustedSessionStart = NewYorkStartHour;
             }
             else if (State == State.DataLoaded)
             {
@@ -122,9 +124,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoOPR
                 PrintDebug($"[RESET_SESSION]");
             }
 
-            AdjustedSessionStart = NewYorkStartHour;
-
-            if (NewYorkTime().TimeOfDay == new TimeSpan(8, 30, 0) && NewYorkTime().Date == Time[0].Date)
+            // At 8AM see if there is news for the day at 8:30
+            // If so adjust the start time.
+            if (NewYorkTime().TimeOfDay == new TimeSpan(8, 0, 0) && NewYorkTime().Date == Time[0].Date)
             {
                 var news = GetNewsEventForToday();
                 if (news.AllDay || news.BankHoliday)
