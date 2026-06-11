@@ -53,7 +53,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "PO3 Algo v7.3";
+                Name = "PO3 Algo v7.4";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -235,20 +235,20 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             */
 
             // Make sure that range coverings are cleared at the london open.
-            if (LondonTime().TimeOfDay == new TimeSpan(ClearRangesHour, 0, 0))
-            {
-                Ranges.ForEach(r =>
-                {
-                    PrintDebug($"[RANGE_COVERED_CLEAR] {r}");
-                    r.ClearCovered();
-                });
-            }
+            //if (LondonTime().TimeOfDay == new TimeSpan(ClearRangesHour, 0, 0))
+            //{
+            //    Ranges.ForEach(r =>
+            //    {
+            //        PrintDebug($"[RANGE_COVERED_CLEAR] {r}");
+            //        r.ClearCovered();
+            //    });
+            //}
 
             if (DetectAndCheckInvalidRange())
                 return;
 
             // Filter time of day and cancel if we are flat.
-            var validSkipHour = LondonTime().Hour == 4 || LondonTime().Hour == 5 || LondonTime().Hour == 7 || LondonTime().Hour == 10;
+            var validSkipHour = LondonTime().Hour == 4 || LondonTime().Hour == 5 || LondonTime().Hour == 6 || LondonTime().Hour == 7 || LondonTime().Hour == 10;
             if (validSkipHour)
             {
                 CancelLimitOrder();
@@ -329,11 +329,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (IsLive && !isConnected)
                 return;
 
-            if (atrCurrent > 50)
-            {
-                PrintDebug($"[EXCESSIVE_ATR] skipping trade, ATR {atrCurrent}");
-                return;
-            }
+            //if (atrCurrent > 50)
+            //{
+            //    PrintDebug($"[EXCESSIVE_ATR] skipping trade, ATR {atrCurrent}");
+            //    return;
+            //}
 
             if (atrCurrent == 0)
             {
@@ -425,14 +425,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             // The range that was potentially completed will be the range where the stop is in.
-            var entryRange = Ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.StopLoss));
-            if (entryRange != null &&
-                entryRange.CoveredPercentage >= 95 &&
-                LondonTime().Hour >= 8 && LondonTime().Hour < RangeCoveredEndHour)
-            {
-                PrintDebug($"[RANGE_COVERED_SKIPPING] {CurrentTrade.OrderType} {CurrentTrade.Bias}, entry {CurrentTrade.Entry}, range {entryRange}");
-                return;
-            }
+            //var entryRange = Ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.StopLoss));
+            //if (entryRange != null &&
+            //    entryRange.CoveredPercentage >= 95 &&
+            //    LondonTime().Hour >= 8 && LondonTime().Hour < RangeCoveredEndHour)
+            //{
+            //    PrintDebug($"[RANGE_COVERED_SKIPPING] {CurrentTrade.OrderType} {CurrentTrade.Bias}, entry {CurrentTrade.Entry}, range {entryRange}");
+            //    return;
+            //}
 
             /*---------------------------------------------*/
 
