@@ -2,14 +2,14 @@
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
 {
-    internal class LongContinuation : StrategyCondition<ORS_RunnerConfiguration>
+    internal class LongContinuation : StrategyCondition<RunnerConfiguration_ORS>
     {
         internal LongContinuation(AlgoBase owner, FractalManager fractalManager) : base(owner, fractalManager)
         {
             ValidFromTime = 144500;
         }
 
-        internal override bool IsSatisfied(ORS_RunnerConfiguration config)
+        internal override bool IsSatisfied(RunnerConfiguration_ORS config)
         {
             var rangeCondition = config.RangeInitiator == TradeRangeInitiator.RangeHighEngaged;
             if (!rangeCondition)
@@ -36,7 +36,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             return true;
         }
 
-        internal override TradeExecutionDetails Execute(ORS_RunnerConfiguration settings)
+        internal override TradeDetails Execute(RunnerConfiguration_ORS settings)
         {
             var stopLoss = Owner.Low[0] - settings.StopGrace;
             var stopDistance = (Owner.Close[0] - Owner.Low[0]) + settings.StopGrace;
@@ -44,7 +44,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             if (positionSize < 0.75)
             {
                 Owner.PrintDebug($"[POSITION_SUBOPTIMAL_LONG] Position {positionSize}, Stop {stopLoss}");
-                return TradeExecutionDetails.Failed();
+                return TradeDetails.Failed();
             }
 
             var profitTarget = Owner.Close[0] + (stopDistance * settings.TPMultiplier);

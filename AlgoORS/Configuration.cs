@@ -11,7 +11,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         ContinueBelowLow
     }
 
-    public class ORS_RunnerConfiguration
+    public class RunnerConfiguration_ORS
     {
         public double EntryPercentage { get; set; }
         public double MaxRiskReward { get; set; }

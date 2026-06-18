@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
+using NinjaTrader.Cbi;
+using NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA
@@ -23,8 +25,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         [NinjaScriptProperty]
         [Display(Name = "Export Trade Logs", Order = 3, GroupName = "Parameters")]
         public bool ExportTradeLogs { get; set; }
-
-        internal TradeDetails CurrentTrade;
 
         internal double LastFractalHigh = 0;
         internal DateTime LastFractalHighTime;
@@ -53,6 +53,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         internal readonly List<string> TradeLogs = [];
 
         internal bool TradingHalted { get; set; }
+
+        internal TradeDetails CurrentTrade { get; set; }
 
         internal int AdjustSessionEnd()
         {
@@ -270,6 +272,74 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         public DateTime TokyoTime()
         {
             return TimeZoneInfo.ConvertTime(Time[0], TokyoZone);
+        }
+
+        public void EnterLongTrade(TradeDetails tradeDetails)
+        {
+            Order limitOrder = null;
+
+            if (tradeDetails.IsLimit)
+                limitOrder = EnterLongLimit(0, true, tradeDetails.PositionSize, tradeDetails.Entry, "long");
+            else
+                EnterLong(tradeDetails.PositionSize, "long");
+
+            SetStopLoss("long", CalculationMode.Price, tradeDetails.StopLoss, true);
+            SetProfitTarget("long", CalculationMode.Price, tradeDetails.TakeProfit, true);
+
+            PrintDebug($"[{tradeDetails.Log}] Entry {tradeDetails.Entry} Size {tradeDetails.PositionSize} RR {tradeDetails.RiskReward} Stop Loss {tradeDetails.StopLoss} Profit Target {tradeDetails.TakeProfit}");
+
+            tradeDetails.Entry = tradeDetails.IsLimit ? tradeDetails.Entry : Position.AveragePrice;
+            tradeDetails.EntryTime = Time[0];
+            tradeDetails.PendingOrder = limitOrder;
+
+            CurrentTrade = tradeDetails;
+        }
+
+        public void EnterShortTrade(TradeDetails tradeDetails)
+        {
+            Order limitOrder = null;
+
+            if (tradeDetails.IsLimit)
+                limitOrder = EnterShortLimit(0, true, tradeDetails.PositionSize, tradeDetails.Entry, "short");
+            else
+                EnterShort(tradeDetails.PositionSize, "short");
+
+            SetStopLoss("short", CalculationMode.Price, tradeDetails.StopLoss, true);
+            SetProfitTarget("short", CalculationMode.Price, tradeDetails.TakeProfit, true);
+
+            PrintDebug($"[{tradeDetails.Log}] Size {tradeDetails.PositionSize} RR {tradeDetails.RiskReward} Stop Loss {tradeDetails.StopLoss} Profit Target {tradeDetails.TakeProfit}");
+
+            tradeDetails.Entry = tradeDetails.IsLimit ? tradeDetails.Entry : Position.AveragePrice;
+            tradeDetails.EntryTime = Time[0];
+            tradeDetails.PendingOrder = limitOrder;
+
+            CurrentTrade = tradeDetails;
+        }
+
+        internal bool ImbalanceFormed(TradeBias tradeBias, DealingRange range)
+        {
+            if (tradeBias == TradeBias.Long)
+            {
+                if (Low[0] > High[2] && // IMB
+                    Low[0] - High[2] > 1 && // IMB gap distance
+                    High[2] > range.Low  // IMB must be inside range
+                   )
+                {
+                    PrintDebug($"[IMB_FORMED] {tradeBias}: {High[2]} {Low[0]}");
+                    return true;
+                }
+            }
+
+            if (tradeBias == TradeBias.Short)
+            {
+                if (High[0] < Low[2] && High[0] - Low[2] > 1)
+                {
+                    PrintDebug($"[IMB_FORMED] {tradeBias}: {High[0]} {Low[2]}");
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 

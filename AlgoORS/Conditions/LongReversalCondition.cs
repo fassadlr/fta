@@ -3,14 +3,14 @@ using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
 {
-    internal sealed class LongReversalCondition : StrategyCondition<ORS_RunnerConfiguration>
+    internal sealed class LongReversalCondition : StrategyCondition<RunnerConfiguration_ORS>
     {
         internal LongReversalCondition(AlgoBase owner, FractalManager fractalManager) : base(owner, fractalManager)
         {
             ValidFromTime = 144500;
         }
 
-        internal override bool IsSatisfied(ORS_RunnerConfiguration config)
+        internal override bool IsSatisfied(RunnerConfiguration_ORS config)
         {
             if (config.RangeInitiator == TradeRangeInitiator.None || config.RangeInitiator == TradeRangeInitiator.RangeHighEngaged)
                 return false;
@@ -56,7 +56,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             return true;
         }
 
-        internal override TradeExecutionDetails Execute(ORS_RunnerConfiguration settings)
+        internal override TradeDetails Execute(RunnerConfiguration_ORS settings)
         {
             var stopLoss = FractalManager.RecentLow();
             var stopDistance = Owner.Close[0] - stopLoss.Price;
@@ -74,14 +74,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             if (positionSize < 0.75)
             {
                 Owner.PrintDebug($"[POSITION_SUBOPTIMAL_LONG] Position {positionSize}, Stop {stopLoss}");
-                return TradeExecutionDetails.Failed();
+                return TradeDetails.Failed();
             }
 
             var riskReward = Owner.CalculateRiskReward(stopDistance, settings.RangeHigh - Owner.Close[0]);
-            if (riskReward < ORS_RunnerConfiguration.RiskRewardMinimum)
+            if (riskReward < RunnerConfiguration_ORS.RiskRewardMinimum)
             {
                 Owner.PrintDebug($"[RR_SUBOPTIMAL_LONG] RR {riskReward}");
-                return TradeExecutionDetails.Failed();
+                return TradeDetails.Failed();
             }
 
             if (riskReward >= settings.MaxRiskReward)

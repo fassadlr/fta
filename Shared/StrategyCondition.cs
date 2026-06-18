@@ -11,7 +11,7 @@
         internal bool ExecuteOnlyMe { get; set; }
 
         internal abstract bool IsSatisfied(TConfig config);
-        internal abstract TradeExecutionDetails Execute(TConfig config);
+        internal abstract TradeDetails Execute(TConfig config);
 
         internal bool CandleBodyRangeInPoints(int minPoints)
         {

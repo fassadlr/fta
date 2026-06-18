@@ -5,15 +5,15 @@ using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 {
-    public class ORS_StrategyRunner
+    public class StrategyRunner_ORS
     {
-        public ORS_RunnerConfiguration Configuration { get; private set; }
+        public RunnerConfiguration_ORS Configuration { get; private set; }
 
-        private List<StrategyCondition<ORS_RunnerConfiguration>> conditions;
+        private List<StrategyCondition<RunnerConfiguration_ORS>> conditions;
 
-        public static ORS_StrategyRunner Configure(AlgoBase strategyBase, FractalManager fractalManager, ORS_RunnerConfiguration config)
+        public static StrategyRunner_ORS Configure(AlgoBase strategyBase, FractalManager fractalManager, RunnerConfiguration_ORS config)
         {
-            var runner = new ORS_StrategyRunner()
+            var runner = new StrategyRunner_ORS()
             {
                 Configuration = config,
 
@@ -42,7 +42,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             Configuration.RangeLow = rangeLow;
         }
 
-        public TradeExecutionDetails Run()
+        public TradeDetails Run()
         {
             var onlyMe = conditions.FirstOrDefault(c => c.ExecuteOnlyMe);
             if (onlyMe != null && onlyMe.IsSatisfied(Configuration))

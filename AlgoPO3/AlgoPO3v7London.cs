@@ -28,7 +28,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         [Display(Name = "New York End Time", Order = 24, GroupName = "Parameters")]
         public int NewYorkEndTime { get; set; }
 
-        private List<DealingRange> Ranges { get; set; }
+        private List<DealingRange> ranges;
 
         private DealingRange CurrentRange { get; set; }
         private DealingRange PreviousRange { get; set; }
@@ -48,6 +48,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private bool isConnected;
 
         private FractalManager fractalManager;
+
+        private StrategyRunner_PO3 runner;
 
         protected override void OnStateChange()
         {
@@ -80,7 +82,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 AddDataSeries("MNQ 06-26", BarsPeriodType.Minute, 5);
 
-                Ranges = [];
+                ranges = [];
 
                 Events = NewsEvents.Events();
 
@@ -164,6 +166,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
             }
 
+            runner ??= StrategyRunner_PO3.Configure(this, fractalManager, new RunnerConfiguration_PO3()
+            {
+                Ranges = ranges,
+                Risk = 300,// TODO: fixed or not?
+                StopGrace = StopGrace,
+            });
+
             // Always process fractal and BOS detection.
             if (BarsInProgress == 1)
             {
@@ -199,7 +208,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             // Determine if we are still in the same dealing range.
-            var found = Ranges.FirstOrDefault(r => r.IsInRange(Close[0])) ?? CreateDealingRange();
+            var found = ranges.FirstOrDefault(r => r.IsInRange(Close[0])) ?? CreateDealingRange();
 
             // Always process range breaks
             if (found != CurrentRange)
@@ -258,35 +267,35 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             // Cancel limit orders close to end of sessions blocks.
             // TODO: We need to retest these once done.
-            var validBlockEndHour = LondonTime().Hour == 9 || LondonTime().Hour == 12;
-            if (validBlockEndHour && Time[0].Minute >= 40)
-            {
-                CancelLimitOrder();
-                return;
-            }
+            //var validBlockEndHour = LondonTime().Hour == 9 || LondonTime().Hour == 12;
+            //if (validBlockEndHour && Time[0].Minute >= 40)
+            //{
+            //    CancelLimitOrder();
+            //    return;
+            //}
 
-            if (!rangeBreakDetected)
-                return;
+            //if (!rangeBreakDetected)
+            //    return;
 
             // If we set a limit order and price gets to TP we need to clear the limit order
             // Always return as we are waiting for the PendingOrder to fill or be cancelled.
-            if (PendingOrder != null)
+            if (CurrentTrade?.PendingOrder != null)
             {
                 var shouldCancel = false;
-                if (CurrentTrade.Bias != tradeBias)
-                {
-                    shouldCancel = true;
-                    PrintDebug($"[LIMIT_ORDER_CANCEL] Trade bias changed from {CurrentTrade.Bias} to {tradeBias}.");
-                }
-                else
-                {
-                    if ((CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.TradeMissedThreshold) ||
-                       (CurrentTrade.Bias == TradeBias.Short && Low[0] <= CurrentTrade.TradeMissedThreshold))
-                    {
-                        PrintDebug($"[LIMIT_ORDER_CANCEL] {CurrentTrade.Bias} price went to TP threshold {CurrentTrade.TradeMissedThreshold}.");
-                        shouldCancel = true;
-                    }
-                }
+                //if (CurrentTrade.Bias != tradeBias)
+                //{
+                //    shouldCancel = true;
+                //    PrintDebug($"[LIMIT_ORDER_CANCEL] Trade bias changed from {CurrentTrade.Bias} to {tradeBias}.");
+                //}
+                //else
+                //{
+                //    if ((CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.TradeMissedThreshold) ||
+                //       (CurrentTrade.Bias == TradeBias.Short && Low[0] <= CurrentTrade.TradeMissedThreshold))
+                //    {
+                //        PrintDebug($"[LIMIT_ORDER_CANCEL] {CurrentTrade.Bias} price went to TP threshold {CurrentTrade.TradeMissedThreshold}.");
+                //        shouldCancel = true;
+                //    }
+                //}
 
                 if (shouldCancel)
                 {
@@ -297,38 +306,50 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
             }
 
-            if (BullishBOSDetected && CurrentRange.Low == PreviousRange.High)
-            {
-                rangeBias = RangeBias.Bullish;
-                PrintDebug($"Range bias {rangeBias}: Trade bias {tradeBias}");
-            }
+            //if (BullishBOSDetected && CurrentRange.Low == PreviousRange.High)
+            //{
+            //    rangeBias = RangeBias.Bullish;
+            //    PrintDebug($"Range bias {rangeBias}: Trade bias {tradeBias}");
+            //}
 
-            if (BullishBOSDetected && CurrentRange.High == PreviousRange.Low)
-            {
-                rangeBias = RangeBias.Bearish;
-                PrintDebug($"Range bias {rangeBias}: Trade bias {tradeBias}");
-            }
+            //if (BullishBOSDetected && CurrentRange.High == PreviousRange.Low)
+            //{
+            //    rangeBias = RangeBias.Bearish;
+            //    PrintDebug($"Range bias {rangeBias}: Trade bias {tradeBias}");
+            //}
 
-            if (BearishBOSDetected && CurrentRange.High == PreviousRange.Low)
-            {
-                rangeBias = RangeBias.Bearish;
-                PrintDebug($"Range bias {rangeBias}: Trade bias {tradeBias}");
-            }
+            //if (BearishBOSDetected && CurrentRange.High == PreviousRange.Low)
+            //{
+            //    rangeBias = RangeBias.Bearish;
+            //    PrintDebug($"Range bias {rangeBias}: Trade bias {tradeBias}");
+            //}
 
-            if (BearishBOSDetected && CurrentRange.Low == PreviousRange.High)
-            {
-                rangeBias = RangeBias.Bullish;
-                PrintDebug($"Range bias {rangeBias}: Trade bias {tradeBias}");
-            }
+            //if (BearishBOSDetected && CurrentRange.Low == PreviousRange.High)
+            //{
+            //    rangeBias = RangeBias.Bullish;
+            //    PrintDebug($"Range bias {rangeBias}: Trade bias {tradeBias}");
+            //}
 
-            if (rangeBias == RangeBias.Neutral)
-                return;
+            //if (rangeBias == RangeBias.Neutral)
+            //    return;
 
             if (IsLive && State != State.Realtime)
                 return;
 
             if (IsLive && !isConnected)
                 return;
+
+            /* Execute Strategy Runner */
+            var tradeDetails = runner.Run();
+
+            if (tradeDetails == null || tradeDetails.TradeDetailsSubOptimal)
+                return;
+
+            if (tradeDetails.Bias == TradeBias.Short)
+                EnterShortTrade(tradeDetails);
+
+            if (tradeDetails.Bias == TradeBias.Long)
+                EnterLongTrade(tradeDetails);
 
             //if (atrCurrent > 50)
             //{
@@ -343,84 +364,84 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
             }
 
-            if (rangeBias == RangeBias.Bearish)
-            {
-                if (tradeBias == TradeBias.Long)
-                {
-                    CurrentTrade = new TradeDetails()
-                    {
-                        Bias = TradeBias.Long,
-                        Atr = atrCurrent,
-                        Entry = CurrentRange.OBCE2 + TickSize,
-                        StopLoss = CurrentRange.BR4 - StopGrace,
-                        TakeProfit = PreviousRange.MBCE1,
-                        TradeMissedThreshold = PreviousRange.BR3,
-                        BreakEvenThreshold = PreviousRange.BR2,
-                    };
-                }
+            //if (rangeBias == RangeBias.Bearish)
+            //{
+            //    if (tradeBias == TradeBias.Long)
+            //    {
+            //        CurrentTrade = new TradeDetails()
+            //        {
+            //            Bias = TradeBias.Long,
+            //            Atr = atrCurrent,
+            //            Entry = CurrentRange.OBCE2 + TickSize,
+            //            StopLoss = CurrentRange.BR4 - StopGrace,
+            //            TakeProfit = PreviousRange.MBCE1,
+            //            TradeMissedThreshold = PreviousRange.BR3,
+            //            BreakEvenThreshold = PreviousRange.BR2,
+            //        };
+            //    }
 
-                if (tradeBias == TradeBias.Short)
-                {
-                    CurrentTrade = new TradeDetails()
-                    {
-                        Bias = TradeBias.Short,
-                        Atr = atrCurrent,
-                        Entry = CurrentRange.ExtensionHighCE - TickSize,
-                        StopLoss = PreviousRange.BR1 + StopGrace,
-                        TakeProfit = CurrentRange.MBCE2,
-                        TradeMissedThreshold = CurrentRange.BR2,
-                        BreakEvenThreshold = CurrentRange.BR3,
-                    };
-                }
-            }
+            //    if (tradeBias == TradeBias.Short)
+            //    {
+            //        CurrentTrade = new TradeDetails()
+            //        {
+            //            Bias = TradeBias.Short,
+            //            Atr = atrCurrent,
+            //            Entry = CurrentRange.ExtensionHighCE - TickSize,
+            //            StopLoss = PreviousRange.BR1 + StopGrace,
+            //            TakeProfit = CurrentRange.MBCE2,
+            //            TradeMissedThreshold = CurrentRange.BR2,
+            //            BreakEvenThreshold = CurrentRange.BR3,
+            //        };
+            //    }
+            //}
 
-            if (rangeBias == RangeBias.Bullish)
-            {
-                if (tradeBias == TradeBias.Long)
-                {
-                    CurrentTrade = new TradeDetails()
-                    {
-                        Bias = TradeBias.Long,
-                        Atr = atrCurrent,
-                        Entry = CurrentRange.ExtensionLowCE + TickSize,
-                        StopLoss = PreviousRange.BR4 - StopGrace,
-                        TakeProfit = CurrentRange.MBCE1,
-                        TradeMissedThreshold = CurrentRange.BR3,
-                        BreakEvenThreshold = CurrentRange.BR2,
-                    };
-                }
+            //if (rangeBias == RangeBias.Bullish)
+            //{
+            //    if (tradeBias == TradeBias.Long)
+            //    {
+            //        CurrentTrade = new TradeDetails()
+            //        {
+            //            Bias = TradeBias.Long,
+            //            Atr = atrCurrent,
+            //            Entry = CurrentRange.ExtensionLowCE + TickSize,
+            //            StopLoss = PreviousRange.BR4 - StopGrace,
+            //            TakeProfit = CurrentRange.MBCE1,
+            //            TradeMissedThreshold = CurrentRange.BR3,
+            //            BreakEvenThreshold = CurrentRange.BR2,
+            //        };
+            //    }
 
-                if (tradeBias == TradeBias.Short)
-                {
-                    CurrentTrade = new TradeDetails()
-                    {
-                        Bias = TradeBias.Short,
-                        Atr = atrCurrent,
-                        Entry = CurrentRange.OBCE1 - TickSize,
-                        StopLoss = CurrentRange.BR1 + StopGrace,
-                        TakeProfit = PreviousRange.MBCE2,
-                        TradeMissedThreshold = PreviousRange.BR2,
-                        BreakEvenThreshold = PreviousRange.BR3,
-                    };
-                }
-            }
+            //    if (tradeBias == TradeBias.Short)
+            //    {
+            //        CurrentTrade = new TradeDetails()
+            //        {
+            //            Bias = TradeBias.Short,
+            //            Atr = atrCurrent,
+            //            Entry = CurrentRange.OBCE1 - TickSize,
+            //            StopLoss = CurrentRange.BR1 + StopGrace,
+            //            TakeProfit = PreviousRange.MBCE2,
+            //            TradeMissedThreshold = PreviousRange.BR2,
+            //            BreakEvenThreshold = PreviousRange.BR3,
+            //        };
+            //    }
+            //}
 
-            CurrentTrade.Entry = Math.Round(CurrentTrade.Entry / 0.25) * 0.25;
+            //CurrentTrade.Entry = Math.Round(CurrentTrade.Entry / 0.25) * 0.25;
 
             /***** TRADE INSPECTION BEFORE PLACEMENT *****/
 
             // If the entry is below/above the trade missed threshold then skip.
-            if (CurrentTrade.Bias == TradeBias.Short && Close[0] < CurrentTrade.TradeMissedThreshold)
-            {
-                PrintDebug($"[TRADE_SKIPPED] {CurrentTrade.Bias}, entry {CurrentTrade.Entry} below threshold {CurrentTrade.TradeMissedThreshold}");
-                return;
-            }
+            //if (CurrentTrade.Bias == TradeBias.Short && Close[0] < CurrentTrade.TradeMissedThreshold)
+            //{
+            //    PrintDebug($"[TRADE_SKIPPED] {CurrentTrade.Bias}, entry {CurrentTrade.Entry} below threshold {CurrentTrade.TradeMissedThreshold}");
+            //    return;
+            //}
 
-            if (CurrentTrade.Bias == TradeBias.Long && Close[0] > CurrentTrade.TradeMissedThreshold)
-            {
-                PrintDebug($"[TRADE_SKIPPED] {CurrentTrade.Bias}, entry {CurrentTrade.Entry} above threshold {CurrentTrade.TradeMissedThreshold}");
-                return;
-            }
+            //if (CurrentTrade.Bias == TradeBias.Long && Close[0] > CurrentTrade.TradeMissedThreshold)
+            //{
+            //    PrintDebug($"[TRADE_SKIPPED] {CurrentTrade.Bias}, entry {CurrentTrade.Entry} above threshold {CurrentTrade.TradeMissedThreshold}");
+            //    return;
+            //}
 
             // The range that was potentially completed will be the range where the stop is in.
             //var entryRange = Ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.StopLoss));
@@ -436,79 +457,79 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             CalculateVWAPDistance();
 
-            if (CurrentTrade.Bias == TradeBias.Long)
-            {
-                if (atrCurrent >= 19)
-                {
-                    CurrentTrade.StopLoss = CurrentTrade.Entry - Math.Round(atrCurrent);
-                    var atrAdjustment = atrCurrent - 19;
+            //    if (CurrentTrade.Bias == TradeBias.Long)
+            //    {
+            //        if (atrCurrent >= 19)
+            //        {
+            //            CurrentTrade.StopLoss = CurrentTrade.Entry - Math.Round(atrCurrent);
+            //            var atrAdjustment = atrCurrent - 19;
 
-                    if (atrCurrent < 30)
-                        CurrentTrade.Entry = CurrentTrade.Entry - (atrAdjustment * 0.15);
-                }
+            //            if (atrCurrent < 30)
+            //                CurrentTrade.Entry = CurrentTrade.Entry - (atrAdjustment * 0.15);
+            //        }
 
-                if (Close[0] > CurrentTrade.Entry)
-                {
-                    PrintDebug($"[PLACE_TRADE_LIMIT] {CurrentTrade.Bias}, {CurrentTrade.Entry}, atr {atrCurrent}");
-                    CurrentTrade.OrderType = OrderType.Limit;
-                    PendingOrder = EnterLongLimit(0, true, CalculatePositionSize(), CurrentTrade.Entry, "long entry");
-                }
-                else
-                {
-                    if (CurrentTrade.VWAPDistance < 20)
-                    {
-                        PrintDebug($"[LONG_STOP_ORDER_SKIPPED_VWAP] at {CurrentTrade.Entry}, distance from VWAP {CurrentTrade.VWAPDistance}");
-                        return;
-                    }
+            //        if (Close[0] > CurrentTrade.Entry)
+            //        {
+            //            PrintDebug($"[PLACE_TRADE_LIMIT] {CurrentTrade.Bias}, {CurrentTrade.Entry}, atr {atrCurrent}");
+            //            CurrentTrade.OrderType = OrderType.Limit;
+            //            PendingOrder = EnterLongLimit(0, true, CalculatePositionSize(), CurrentTrade.Entry, "long entry");
+            //        }
+            //        else
+            //        {
+            //            if (CurrentTrade.VWAPDistance < 20)
+            //            {
+            //                PrintDebug($"[LONG_STOP_ORDER_SKIPPED_VWAP] at {CurrentTrade.Entry}, distance from VWAP {CurrentTrade.VWAPDistance}");
+            //                return;
+            //            }
 
-                    PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias} at {CurrentTrade.Entry}, {Close[0]}, atr {atrCurrent}");
-                    CurrentTrade.OrderType = OrderType.StopMarket;
-                    PendingOrder = EnterLongStopMarket(0, true, CalculatePositionSize(), CurrentTrade.Entry, "long entry");
-                }
+            //            PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias} at {CurrentTrade.Entry}, {Close[0]}, atr {atrCurrent}");
+            //            CurrentTrade.OrderType = OrderType.StopMarket;
+            //            PendingOrder = EnterLongStopMarket(0, true, CalculatePositionSize(), CurrentTrade.Entry, "long entry");
+            //        }
 
-                SetStopLoss("long entry", CalculationMode.Price, CurrentTrade.StopLoss, true);
-                PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
-                SetProfitTarget("long entry", CalculationMode.Price, CurrentTrade.TakeProfit);
+            //        SetStopLoss("long entry", CalculationMode.Price, CurrentTrade.StopLoss, true);
+            //        PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
+            //        SetProfitTarget("long entry", CalculationMode.Price, CurrentTrade.TakeProfit);
 
-                return;
-            }
+            //        return;
+            //    }
 
-            if (CurrentTrade.Bias == TradeBias.Short)
-            {
-                if (atrCurrent >= 19)
-                {
-                    CurrentTrade.StopLoss = CurrentTrade.Entry + Math.Round(atrCurrent);
-                    var atrAdjustment = atrCurrent - 19;
+            //    if (CurrentTrade.Bias == TradeBias.Short)
+            //    {
+            //        if (atrCurrent >= 19)
+            //        {
+            //            CurrentTrade.StopLoss = CurrentTrade.Entry + Math.Round(atrCurrent);
+            //            var atrAdjustment = atrCurrent - 19;
 
-                    if (atrCurrent < 30)
-                        CurrentTrade.Entry = CurrentTrade.Entry + (atrAdjustment * 0.15);
-                }
+            //            if (atrCurrent < 30)
+            //                CurrentTrade.Entry = CurrentTrade.Entry + (atrAdjustment * 0.15);
+            //        }
 
-                if (Close[0] < CurrentTrade.Entry)
-                {
-                    PrintDebug($"[PLACE_TRADE_LIMIT] {CurrentTrade.Bias}, {CurrentTrade.Entry}, atr {atrCurrent}");
-                    CurrentTrade.OrderType = OrderType.Limit;
-                    PendingOrder = EnterShortLimit(0, true, CalculatePositionSize(), CurrentTrade.Entry, "short entry");
-                }
-                else
-                {
-                    if (CurrentTrade.VWAPDistance < 20)
-                    {
-                        PrintDebug($"[SHORT_STOP_ORDER_SKIPPED_VWAP] at {CurrentTrade.Entry}, distance from VWAP {CurrentTrade.VWAPDistance}");
-                        return;
-                    }
+            //        if (Close[0] < CurrentTrade.Entry)
+            //        {
+            //            PrintDebug($"[PLACE_TRADE_LIMIT] {CurrentTrade.Bias}, {CurrentTrade.Entry}, atr {atrCurrent}");
+            //            CurrentTrade.OrderType = OrderType.Limit;
+            //            PendingOrder = EnterShortLimit(0, true, CalculatePositionSize(), CurrentTrade.Entry, "short entry");
+            //        }
+            //        else
+            //        {
+            //            if (CurrentTrade.VWAPDistance < 20)
+            //            {
+            //                PrintDebug($"[SHORT_STOP_ORDER_SKIPPED_VWAP] at {CurrentTrade.Entry}, distance from VWAP {CurrentTrade.VWAPDistance}");
+            //                return;
+            //            }
 
-                    PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias} at {CurrentTrade.Entry}, {Close[0]}, atr {atrCurrent}");
-                    CurrentTrade.OrderType = OrderType.StopMarket;
-                    PendingOrder = EnterShortStopMarket(0, true, CalculatePositionSize(), CurrentTrade.Entry, "short entry");
-                }
+            //            PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias} at {CurrentTrade.Entry}, {Close[0]}, atr {atrCurrent}");
+            //            CurrentTrade.OrderType = OrderType.StopMarket;
+            //            PendingOrder = EnterShortStopMarket(0, true, CalculatePositionSize(), CurrentTrade.Entry, "short entry");
+            //        }
 
-                SetStopLoss("short entry", CalculationMode.Price, CurrentTrade.StopLoss, true);
-                PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
-                SetProfitTarget("short entry", CalculationMode.Price, CurrentTrade.TakeProfit);
+            //        SetStopLoss("short entry", CalculationMode.Price, CurrentTrade.StopLoss, true);
+            //        PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
+            //        SetProfitTarget("short entry", CalculationMode.Price, CurrentTrade.TakeProfit);
 
-                return;
-            }
+            //        return;
+            //    }
         }
 
         protected override void OnConnectionStatusUpdate(ConnectionStatusEventArgs e)
@@ -563,7 +584,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             rangeBreakDetected = false;
 
-            PendingOrder = null;
+            CurrentTrade.PendingOrder = null;
         }
 
         private void DetectBOS()
@@ -601,7 +622,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             PrintDebug("[SESSION_START] resetting state");
 
-            Ranges.Clear();
+            ranges.Clear();
 
             CancelLimitOrder();
 
@@ -629,59 +650,59 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private void BreakEvenOrCloseTrade()
         {
-            if (NewYorkTime().Hour == 14 && Time[0].Minute == 29)
-            {
-                PrintDebug($"[CLOSE_TRADE] market open, PnL {Position.GetUnrealizedProfitLoss(PerformanceUnit.Currency, Close[0])}");
+            //if (NewYorkTime().Hour == 14 && Time[0].Minute == 29)
+            //{
+            //    PrintDebug($"[CLOSE_TRADE] market open, PnL {Position.GetUnrealizedProfitLoss(PerformanceUnit.Currency, Close[0])}");
 
-                if (Position.MarketPosition == MarketPosition.Short)
-                    ExitShort("short entry");
+            //    if (Position.MarketPosition == MarketPosition.Short)
+            //        ExitShort("short entry");
 
-                if (Position.MarketPosition == MarketPosition.Long)
-                    ExitLong("long entry");
-            }
-            else
-            {
-                if (CurrentTrade.StopLoss == Position.AveragePrice)
-                    return;
+            //    if (Position.MarketPosition == MarketPosition.Long)
+            //        ExitLong("long entry");
+            //}
+            //else
+            //{
+            //    if (CurrentTrade.StopLoss == Position.AveragePrice)
+            //        return;
 
-                var breakEvenDirection = "";
+            //    var breakEvenDirection = "";
 
-                if (CurrentTrade.Bias != tradeBias)
-                {
-                    if (CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.BreakEvenThreshold)
-                    {
-                        PrintDebug($"[BREAK_EVEN_BIAS] changed from {CurrentTrade.Bias} to {tradeBias}, {Position.AveragePrice}");
-                        breakEvenDirection = "long entry";
-                    }
+            //    if (CurrentTrade.Bias != tradeBias)
+            //    {
+            //        if (CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.BreakEvenThreshold)
+            //        {
+            //            PrintDebug($"[BREAK_EVEN_BIAS] changed from {CurrentTrade.Bias} to {tradeBias}, {Position.AveragePrice}");
+            //            breakEvenDirection = "long entry";
+            //        }
 
-                    if (CurrentTrade.Bias == TradeBias.Short && Low[0] <= CurrentTrade.BreakEvenThreshold)
-                    {
-                        breakEvenDirection = "short entry";
-                        PrintDebug($"[BREAK_EVEN_BIAS] changed from {CurrentTrade.Bias} to {tradeBias}, {Position.AveragePrice}");
-                    }
-                }
-                else
-                {
-                    if (CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.BreakEvenThreshold)
-                    {
-                        breakEvenDirection = "long entry";
-                        PrintDebug($"[BREAK_EVEN_TP] threshold reached");
-                    }
+            //        if (CurrentTrade.Bias == TradeBias.Short && Low[0] <= CurrentTrade.BreakEvenThreshold)
+            //        {
+            //            breakEvenDirection = "short entry";
+            //            PrintDebug($"[BREAK_EVEN_BIAS] changed from {CurrentTrade.Bias} to {tradeBias}, {Position.AveragePrice}");
+            //        }
+            //    }
+            //    else
+            //    {
+            //        if (CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.BreakEvenThreshold)
+            //        {
+            //            breakEvenDirection = "long entry";
+            //            PrintDebug($"[BREAK_EVEN_TP] threshold reached");
+            //        }
 
-                    if (CurrentTrade.Bias == TradeBias.Short && Low[0] <= CurrentTrade.BreakEvenThreshold)
-                    {
-                        breakEvenDirection = "short entry";
-                        PrintDebug($"[BREAK_EVEN_TP] threshold reached");
-                    }
-                }
+            //        if (CurrentTrade.Bias == TradeBias.Short && Low[0] <= CurrentTrade.BreakEvenThreshold)
+            //        {
+            //            breakEvenDirection = "short entry";
+            //            PrintDebug($"[BREAK_EVEN_TP] threshold reached");
+            //        }
+            //    }
 
-                if (!string.IsNullOrEmpty(breakEvenDirection))
-                {
-                    SetStopLoss(breakEvenDirection, CalculationMode.Price, Position.AveragePrice, true);
-                    CurrentTrade.StopLoss = Position.AveragePrice;
-                    PrintDebug($"[BREAK_EVEN] set {Position.AveragePrice}");
-                }
-            }
+            //    if (!string.IsNullOrEmpty(breakEvenDirection))
+            //    {
+            //        SetStopLoss(breakEvenDirection, CalculationMode.Price, Position.AveragePrice, true);
+            //        CurrentTrade.StopLoss = Position.AveragePrice;
+            //        PrintDebug($"[BREAK_EVEN] set {Position.AveragePrice}");
+            //    }
+            //}
         }
 
         private int CalculatePositionSize()
@@ -719,33 +740,33 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private void ProcessSharedBorderRange(bool isLoss)
         {
-            var current = Ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.StopLoss));
-            var previous = Ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.TakeProfit));
+            //var current = ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.StopLoss));
+            //var previous = ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.TakeProfit));
 
-            // It is possible that we jumped ranges and as such this cannot be processed further.
-            if (current == null || previous == null)
-                return;
+            //// It is possible that we jumped ranges and as such this cannot be processed further.
+            //if (current == null || previous == null)
+            //    return;
 
-            if (isLoss == false)
-            {
-                current = Ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.TakeProfit));
-                previous = Ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.StopLoss));
-            }
+            //if (isLoss == false)
+            //{
+            //    current = ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.TakeProfit));
+            //    previous = ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.StopLoss));
+            //}
 
-            var currentSharedBorderRange = GetSharedBorderRange(current, isLoss, rangeBias, CurrentTrade.Bias);
-            if (SharedBorderTrade != null && SharedBorderTrade.Border == currentSharedBorderRange)
-            {
-                SharedBorderTrade.Trades++;
+            //var currentSharedBorderRange = GetSharedBorderRange(current, isLoss, rangeBias, CurrentTrade.Bias);
+            //if (SharedBorderTrade != null && SharedBorderTrade.Border == currentSharedBorderRange)
+            //{
+            //    SharedBorderTrade.Trades++;
 
-                PrintDebug($"[RANGE_INVALID] Shared border range {SharedBorderTrade.Border} trades incremented to {SharedBorderTrade.Trades}");
-                if (SharedBorderTrade.Trades >= 2)
-                    CreateInvalidRange(current, previous, isLoss, CurrentTrade.Bias);
-            }
-            else
-            {
-                SharedBorderTrade = new SharedBorderTrade() { Trades = 1, Border = currentSharedBorderRange };
-                PrintDebug($"[RANGE_INVALID] Shared border range set to {SharedBorderTrade.Border}");
-            }
+            //    PrintDebug($"[RANGE_INVALID] Shared border range {SharedBorderTrade.Border} trades incremented to {SharedBorderTrade.Trades}");
+            //    if (SharedBorderTrade.Trades >= 2)
+            //        CreateInvalidRange(current, previous, isLoss, CurrentTrade.Bias);
+            //}
+            //else
+            //{
+            //    SharedBorderTrade = new SharedBorderTrade() { Trades = 1, Border = currentSharedBorderRange };
+            //    PrintDebug($"[RANGE_INVALID] Shared border range set to {SharedBorderTrade.Border}");
+            //}
         }
 
         private static double GetSharedBorderRange(DealingRange applicable, bool isLoss, RangeBias rangeBias, TradeBias tradeBias)
@@ -788,7 +809,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private DealingRange CreateDealingRange()
         {
             var newDealingRange = new DealingRange(PO3, Close[0]);
-            Ranges.Add(newDealingRange);
+            ranges.Add(newDealingRange);
             PrintDebug($"Creating new range: {newDealingRange}");
             return newDealingRange;
         }

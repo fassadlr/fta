@@ -68,7 +68,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         private TradeBias tradeBias;
         private bool breakEvenSet;
 
-        private TradeExecutionDetails currentTrade;
+        private TradeDetails currentTrade;
 
         private Order currentLimitOrder;
 
@@ -410,7 +410,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             SetStopLoss("short", CalculationMode.Price, stopLoss, true);
             SetProfitTarget("short", CalculationMode.Price, takeProfit, true);
 
-            currentTrade = new TradeExecutionDetails
+            currentTrade = new TradeDetails
             {
                 Bias = TradeBias.Short,
                 Entry = Position.AveragePrice,
@@ -434,7 +434,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             SetStopLoss("long", CalculationMode.Price, stopLoss, true);
             SetProfitTarget("long", CalculationMode.Price, takeProfit, true);
 
-            currentTrade = new TradeExecutionDetails
+            currentTrade = new TradeDetails
             {
                 Bias = TradeBias.Long,
                 Entry = Position.AveragePrice,

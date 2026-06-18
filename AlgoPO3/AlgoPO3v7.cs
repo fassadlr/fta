@@ -269,7 +269,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             // If we set a limit order and price gets to TP we need to clear the limit order
             // Always return as we are waiting for the PendingOrder to fill or be cancelled.
-            if (PendingOrder != null)
+            if (CurrentTrade?.PendingOrder != null)
             {
                 var shouldCancel = false;
                 if (CurrentTrade.Bias != tradeBias)
@@ -351,7 +351,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         Atr = atrCurrent,
                         Entry = CurrentRange.OBCE2 + TickSize,
                         StopLoss = CurrentRange.BR4,
-                        //StopLoss = CurrentRange.BR4 + Math.Round((CurrentRange.FV3 - CurrentRange.BR4) * 0.33, 2),
                         TakeProfit = PreviousRange.MBCE1,
                         TradeMissedThreshold = PreviousRange.BR3,
                         BreakEvenThreshold = PreviousRange.BR2,
@@ -366,7 +365,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         Atr = atrCurrent,
                         Entry = CurrentRange.ExtensionHighCE - TickSize,
                         StopLoss = PreviousRange.BR1,
-                        //StopLoss = PreviousRange.BR1 - Math.Round((PreviousRange.BR1 - PreviousRange.FV2) * 0.33, 2),
                         TakeProfit = CurrentRange.MBCE2,
                         TradeMissedThreshold = CurrentRange.BR2,
                         BreakEvenThreshold = CurrentRange.BR3,
@@ -384,7 +382,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         Atr = atrCurrent,
                         Entry = CurrentRange.ExtensionLowCE + TickSize,
                         StopLoss = PreviousRange.BR4,
-                        //StopLoss = PreviousRange.BR4 + Math.Round((PreviousRange.FV3 - PreviousRange.BR4) * 0.33, 2),
                         TakeProfit = CurrentRange.MBCE1,
                         TradeMissedThreshold = CurrentRange.BR3,
                         BreakEvenThreshold = CurrentRange.BR2,
@@ -399,7 +396,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         Atr = atrCurrent,
                         Entry = CurrentRange.OBCE1 - TickSize,
                         StopLoss = CurrentRange.BR1,
-                        //StopLoss = CurrentRange.BR1 - Math.Round((CurrentRange.BR1 - CurrentRange.FV2) * 0.33, 2),
                         TakeProfit = PreviousRange.MBCE2,
                         TradeMissedThreshold = PreviousRange.BR2,
                         BreakEvenThreshold = PreviousRange.BR3,
@@ -453,7 +449,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 {
                     PrintDebug($"[PLACE_TRADE_LIMIT] {CurrentTrade.Bias}, {CurrentTrade.Entry}, atr {atrCurrent}");
                     CurrentTrade.OrderType = OrderType.Limit;
-                    PendingOrder = EnterLongLimit(0, true, CalculatePositionSize(), CurrentTrade.Entry, "long entry");
+                    CurrentTrade.PendingOrder = EnterLongLimit(0, true, CalculatePositionSize(), CurrentTrade.Entry, "long entry");
                 }
                 else
                 {
@@ -465,7 +461,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                     PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias} at {CurrentTrade.Entry}, {Close[0]}, atr {atrCurrent}");
                     CurrentTrade.OrderType = OrderType.StopMarket;
-                    PendingOrder = EnterLongStopMarket(0, true, CalculatePositionSize(), CurrentTrade.Entry, "long entry");
+                    CurrentTrade.PendingOrder = EnterLongStopMarket(0, true, CalculatePositionSize(), CurrentTrade.Entry, "long entry");
                 }
 
                 SetStopLoss("long entry", CalculationMode.Price, CurrentTrade.StopLoss, true);
@@ -490,7 +486,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 {
                     PrintDebug($"[PLACE_TRADE_LIMIT] {CurrentTrade.Bias}, {CurrentTrade.Entry}, atr {atrCurrent}");
                     CurrentTrade.OrderType = OrderType.Limit;
-                    PendingOrder = EnterShortLimit(0, true, CalculatePositionSize(), CurrentTrade.Entry, "short entry");
+                    CurrentTrade.PendingOrder = EnterShortLimit(0, true, CalculatePositionSize(), CurrentTrade.Entry, "short entry");
                 }
                 else
                 {
@@ -502,7 +498,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                     PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias} at {CurrentTrade.Entry}, {Close[0]}, atr {atrCurrent}");
                     CurrentTrade.OrderType = OrderType.StopMarket;
-                    PendingOrder = EnterShortStopMarket(0, true, CalculatePositionSize(), CurrentTrade.Entry, "short entry");
+                    CurrentTrade.PendingOrder = EnterShortStopMarket(0, true, CalculatePositionSize(), CurrentTrade.Entry, "short entry");
                 }
 
                 SetStopLoss("short entry", CalculationMode.Price, CurrentTrade.StopLoss, true);
@@ -565,7 +561,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             rangeBreakDetected = false;
 
-            PendingOrder = null;
+            CurrentTrade.PendingOrder = null;
         }
 
         private void DetectBOS()

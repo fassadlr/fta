@@ -1,36 +1,39 @@
 using System.Collections.Generic;
 using System.Linq;
+using NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 {
-    public class PO3_RunnerConfiguration
+    public class RunnerConfiguration_PO3
     {
+        public List<DealingRange> Ranges { get; internal set; }
+        public int Risk { get; internal set; }
         public double StopGrace { get; internal set; }
     }
 
-    public class PO3_StrategyRunner
+    public class StrategyRunner_PO3
     {
-        public PO3_RunnerConfiguration Configuration { get; private set; }
+        public RunnerConfiguration_PO3 Configuration { get; private set; }
 
-        private List<StrategyCondition<PO3_RunnerConfiguration>> conditions;
+        private List<StrategyCondition<RunnerConfiguration_PO3>> conditions;
 
-        public static PO3_StrategyRunner Configure(AlgoBase strategyBase, FractalManager fractalManager, PO3_RunnerConfiguration config)
+        public static StrategyRunner_PO3 Configure(AlgoBase owner, FractalManager fractalManager, RunnerConfiguration_PO3 config)
         {
-            var runner = new PO3_StrategyRunner()
+            var runner = new StrategyRunner_PO3()
             {
                 Configuration = config,
 
                 conditions =
                 [
-
+                    new LongContinuation(owner, fractalManager),
                 ],
             };
 
             return runner;
         }
 
-        public TradeExecutionDetails Run()
+        public TradeDetails Run()
         {
             var onlyMe = conditions.FirstOrDefault(c => c.ExecuteOnlyMe);
             if (onlyMe != null && onlyMe.IsSatisfied(Configuration))

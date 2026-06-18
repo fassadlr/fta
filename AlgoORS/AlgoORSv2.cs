@@ -52,8 +52,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         [Display(Name = "Risk", Order = 14, GroupName = "Parameters")]
         public int Risk { get; set; }
 
-        internal TradeExecutionDetails CurrentTrade { get; set; }
-
         private bool tradingComplete;
 
         private DailyRangeTracker dailyRangeTracker = new();
@@ -75,7 +73,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
         //private Order currentLimitOrder;
 
-        private ORS_StrategyRunner runner;
+        private StrategyRunner_ORS runner;
 
         private int adjustedMarketOpen = 0;
         private int adjustedSessionStart = 0;
@@ -133,7 +131,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 return;
             }
 
-            runner ??= ORS_StrategyRunner.Configure(this, fractalManager, new ORS_RunnerConfiguration()
+            runner ??= StrategyRunner_ORS.Configure(this, fractalManager, new RunnerConfiguration_ORS()
             {
                 CandleBodyPercentage = ContinuationCandleBodyPercentage,
                 EntryPercentage = ReversalPullbackEntryPercentage,
@@ -244,9 +242,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             // We can still look at the previous candles at the open of the 16:00 candle
             if (ToTime(Time[0]) > adjustedSessionEnd || tradingComplete)
             {
-                if (CurrentTrade?.LimitOrder != null)
+                if (CurrentTrade?.PendingOrder != null)
                 {
-                    CancelOrder(CurrentTrade.LimitOrder);
+                    CancelOrder(CurrentTrade.PendingOrder);
                     CurrentTrade = null;
                 }
 
@@ -288,7 +286,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             }
 
             // A pending order is in play.
-            if (CurrentTrade?.LimitOrder != null)
+            if (CurrentTrade?.PendingOrder != null)
                 return;
 
             var tradeDetails = runner.Run();
@@ -325,48 +323,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             }
 
             CurrentTrade = null;
-        }
-
-        internal void EnterLongTrade(TradeExecutionDetails tradeDetails)
-        {
-            Order limitOrder = null;
-
-            if (tradeDetails.IsLimit)
-                limitOrder = EnterLongLimit(0, true, tradeDetails.PositionSize, tradeDetails.Entry, "long");
-            else
-                EnterLong(tradeDetails.PositionSize, "long");
-
-            SetStopLoss("long", CalculationMode.Price, tradeDetails.StopLoss, true);
-            SetProfitTarget("long", CalculationMode.Price, tradeDetails.TakeProfit, true);
-
-            PrintDebug($"[{tradeDetails.Log}] Size {tradeDetails.PositionSize} RR {tradeDetails.RiskReward} Stop Loss {tradeDetails.StopLoss} Profit Target {tradeDetails.TakeProfit}");
-
-            tradeDetails.Entry = tradeDetails.IsLimit ? tradeDetails.Entry : Position.AveragePrice;
-            tradeDetails.EntryTime = Time[0];
-            tradeDetails.LimitOrder = limitOrder;
-
-            CurrentTrade = tradeDetails;
-        }
-
-        internal void EnterShortTrade(TradeExecutionDetails tradeDetails)
-        {
-            Order limitOrder = null;
-
-            if (tradeDetails.IsLimit)
-                limitOrder = EnterShortLimit(0, true, tradeDetails.PositionSize, tradeDetails.Entry, "short");
-            else
-                EnterShort(tradeDetails.PositionSize, "short");
-
-            SetStopLoss("short", CalculationMode.Price, tradeDetails.StopLoss, true);
-            SetProfitTarget("short", CalculationMode.Price, tradeDetails.TakeProfit, true);
-
-            PrintDebug($"[{tradeDetails.Log}] Size {tradeDetails.PositionSize} RR {tradeDetails.RiskReward} Stop Loss {tradeDetails.StopLoss} Profit Target {tradeDetails.TakeProfit}");
-
-            tradeDetails.Entry = tradeDetails.IsLimit ? tradeDetails.Entry : Position.AveragePrice;
-            tradeDetails.EntryTime = Time[0];
-            tradeDetails.LimitOrder = limitOrder;
-
-            CurrentTrade = tradeDetails;
         }
 
         private void InitializeTradeRange()

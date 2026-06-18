@@ -264,7 +264,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
             // Skip start of January 2025
             for (int i = 1; i <= 5; i++)
             {
-                events.Add(NewsEvent.CreateAllDay(new DateTime(2026, 01, i)));
+                events.Add(NewsEvent.CreateAllDay(new DateTime(2025, 01, i)));
             }
 
             // Add xmas period 2025

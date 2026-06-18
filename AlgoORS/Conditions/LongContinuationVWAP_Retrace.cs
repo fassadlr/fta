@@ -3,7 +3,7 @@ using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
 {
-    internal class LongContinuationVWAP_Retrace : StrategyCondition<ORS_RunnerConfiguration>
+    internal class LongContinuationVWAP_Retrace : StrategyCondition<RunnerConfiguration_ORS>
     {
         private double highestSinceOpen = 0;
         private bool openingCandlesCondition;
@@ -14,7 +14,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             ValidFromTime = 144500;
         }
 
-        internal override bool IsSatisfied(ORS_RunnerConfiguration config)
+        internal override bool IsSatisfied(RunnerConfiguration_ORS config)
         {
             if (Disabled) return false;
 
@@ -65,7 +65,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             ExecuteOnlyMe = true;
 
             var vwapDistance = Math.Round(Owner.Close[0] - config.VWAP[0], 2); // TODO should this be close or high?
-            var vwapDistanceCondition = vwapDistance <= ORS_RunnerConfiguration.VWAPDistanceThreshold;
+            var vwapDistanceCondition = vwapDistance <= RunnerConfiguration_ORS.VWAPDistanceThreshold;
             if (!vwapDistanceCondition)
             {
                 Owner.PrintDebug($"[LONG_CONTINUATION_VWAP_RETRACE_INVALID] vwapDistanceCondition {vwapDistance}");
@@ -77,7 +77,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             }
 
             var vwapRetracement = Math.Round((highestSinceOpen - Owner.Low[0]) / (highestSinceOpen - config.VWAP[0]), 2);
-            var vwapRetracementCondition = vwapRetracement >= ORS_RunnerConfiguration.VWAPRetracementThreshold;
+            var vwapRetracementCondition = vwapRetracement >= RunnerConfiguration_ORS.VWAPRetracementThreshold;
             if (!vwapRetracementCondition)
             {
                 Owner.PrintDebug($"[LONG_CONTINUATION_VWAP_RETRACE_INVALID] vwapRetracementCondition - highestSinceOpen: {highestSinceOpen}");
@@ -90,7 +90,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             return true;
         }
 
-        internal override TradeExecutionDetails Execute(ORS_RunnerConfiguration config)
+        internal override TradeDetails Execute(RunnerConfiguration_ORS config)
         {
             var stopLoss = Owner.Low[0] - config.StopGrace;
             var stopDistance = (Owner.Close[0] - Owner.Low[0]) + config.StopGrace;
@@ -98,7 +98,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             if (positionSize < 0.75)
             {
                 Owner.PrintDebug($"[POSITION_SUBOPTIMAL_LONG] Position {positionSize}, Stop {stopLoss}");
-                return TradeExecutionDetails.Failed();
+                return TradeDetails.Failed();
             }
 
             var profitTarget = Owner.Close[0] + (stopDistance * config.TPMultiplier);

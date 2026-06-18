@@ -37,14 +37,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         }
     }
 
-    public class TradeExecutionDetails
+    public class TradeDetails
     {
         public TradeBias Bias { get; set; }
-        public TradeRangeInitiator RangeInitiator { get; set; }
+        public TradeRangeInitiator? RangeInitiator { get; set; }
         public TradeType Type { get; set; }
         public double Entry { get; set; } = 0;
         public DateTime EntryTime { get; set; }
-        public Order LimitOrder { get; set; }
+        public Order PendingOrder { get; set; }
         public double StopLoss { get; set; } = 0;
         public double TakeProfit { get; set; } = 0;
         public double ProfitLoss { get; set; } = 0;
@@ -56,6 +56,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         public string Log { get; internal set; }
         public double RiskReward { get; internal set; }
         public int PositionSize { get; internal set; }
+
+        public OrderType OrderType { get; set; }
+        public double VWAPDistance { get; set; } = 0;
+        public string VWAPLocation { get; internal set; }
+        public int Quantity { get; internal set; }
+        public double OpeningPriceDistance { get; internal set; }
+        public double TradeMissedThreshold { get; internal set; }
+        public double Atr { get; internal set; }
+        public double BreakEvenThreshold { get; internal set; }
 
         public override string ToString()
         {
@@ -80,9 +89,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
             return value;
         }
 
-        internal static TradeExecutionDetails Failed()
+        internal static TradeDetails Failed()
         {
-            return new TradeExecutionDetails() { TradeDetailsSubOptimal = true };
+            return new TradeDetails() { TradeDetailsSubOptimal = true };
         }
     }
 
@@ -402,22 +411,5 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         {
             return $"LOD: {LowOfDay} HOD: {HighOfDay}";
         }
-    }
-
-    public class TradeDetails
-    {
-        internal TradeBias Bias { get; set; }
-        internal double Atr { get; set; }
-        internal double Entry { get; set; } = 0;
-        internal double StopLoss { get; set; } = 0;
-        internal double StopLossDistance { get { return Bias == TradeBias.Long ? Entry - StopLoss : StopLoss - Entry; } }
-        internal double TakeProfit { get; set; } = 0;
-        internal int Quantity { get; set; } = 0;
-        internal double TradeMissedThreshold { get; set; } = 0;
-        internal double BreakEvenThreshold { get; set; } = 0;
-        internal OrderType OrderType { get; set; }
-        internal double VWAPDistance { get; set; } = 0;
-        public string VWAPLocation { get; internal set; }
-        internal double OpeningPriceDistance { get; set; } = 0;
     }
 }

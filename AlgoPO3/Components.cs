@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 {
@@ -49,5 +51,19 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
     {
         public int Trades { get; set; }
         public double Border { get; set; }
+    }
+
+    public static class RangeExtensions
+    {
+        public static DealingRange Current(this List<DealingRange> ranges, double close)
+        {
+            return ranges.FirstOrDefault(r => r.IsInRange(close));
+        }
+
+        public static DealingRange Previous(this List<DealingRange> ranges, double close, bool isLong)
+        {
+            var current = ranges.Current(close);
+            return ranges.FirstOrDefault(r => r.IsInRange(isLong ? current.ExtensionLow : current.ExtensionHigh));
+        }
     }
 }
