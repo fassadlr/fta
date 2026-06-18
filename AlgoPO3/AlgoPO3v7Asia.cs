@@ -214,7 +214,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
 
             // Cancel limit orders close to end of sessions blocks.
-            // TODO: Test this properly, it is possible that the time check is not correct if the data series is not aligned with Tokyo time.
+            // TODO: Test this properly with Python.
             if (TokyoTime().Hour == 11 && Time[0].Minute >= 30)
             {
                 CancelLimitOrder();
