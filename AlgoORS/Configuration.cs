@@ -1,5 +1,4 @@
 ﻿using NinjaTrader.NinjaScript.Indicators;
-using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 {
@@ -12,7 +11,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         ContinueBelowLow
     }
 
-    public class RunnerConfiguration
+    public class ORS_RunnerConfiguration
     {
         public double EntryPercentage { get; set; }
         public double MaxRiskReward { get; set; }
@@ -28,24 +27,5 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         public const int VWAPDistanceThreshold = 100;
         public const double VWAPRetracementThreshold = 0.25;
         public const double RiskRewardMinimum = 0.5;
-    }
-
-    internal abstract class Condition(AlgoBase owner, FractalManager fractalManager)
-    {
-        protected readonly AlgoBase Owner = owner;
-        protected readonly FractalManager FractalManager = fractalManager;
-
-        internal int ValidFromTime { get; set; } = 144500;
-
-        internal bool Disabled { get; set; }
-        internal bool ExecuteOnlyMe { get; set; }
-
-        internal abstract bool IsSatisfied(RunnerConfiguration settings);
-        internal abstract TradeExecutionDetails Execute(RunnerConfiguration settings);
-
-        internal bool CandleBodyRangeInPoints(int minPoints)
-        {
-            return Owner.Open[0] - Owner.Close[0] >= minPoints || Owner.Close[0] - Owner.Open[0] >= minPoints;
-        }
     }
 }

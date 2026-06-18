@@ -3,13 +3,14 @@ using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
 {
-    internal sealed class ShortReversalCondition : Condition
+    internal sealed class ShortReversalCondition : StrategyCondition<ORS_RunnerConfiguration>
     {
         internal ShortReversalCondition(AlgoBase owner, FractalManager fractalManager) : base(owner, fractalManager)
         {
+            ValidFromTime = 144500;
         }
 
-        internal override bool IsSatisfied(RunnerConfiguration config)
+        internal override bool IsSatisfied(ORS_RunnerConfiguration config)
         {
             if (config.RangeInitiator == TradeRangeInitiator.None || config.RangeInitiator == TradeRangeInitiator.RangeLowEngaged)
                 return false;
@@ -55,7 +56,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             return true;
         }
 
-        internal override TradeExecutionDetails Execute(RunnerConfiguration settings)
+        internal override TradeExecutionDetails Execute(ORS_RunnerConfiguration settings)
         {
             var stopLoss = FractalManager.RecentHigh();
             var stopDistance = stopLoss.Price - Owner.Close[0];
@@ -76,7 +77,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             }
 
             var riskReward = Owner.CalculateRiskReward(stopDistance, Owner.Close[0] - settings.RangeLow);
-            if (riskReward < RunnerConfiguration.RiskRewardMinimum)
+            if (riskReward < ORS_RunnerConfiguration.RiskRewardMinimum)
             {
                 Owner.PrintDebug($"[RR_SUBOPTIMAL_SHORT] RR {riskReward}");
                 return TradeExecutionDetails.Failed();

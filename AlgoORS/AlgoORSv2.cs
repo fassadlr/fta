@@ -75,7 +75,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
         //private Order currentLimitOrder;
 
-        private StrategyRunner runner;
+        private ORS_StrategyRunner runner;
 
         private int adjustedMarketOpen = 0;
         private int adjustedSessionStart = 0;
@@ -133,7 +133,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 return;
             }
 
-            runner ??= StrategyRunner.Configure(this, fractalManager, new RunnerConfiguration()
+            runner ??= ORS_StrategyRunner.Configure(this, fractalManager, new ORS_RunnerConfiguration()
             {
                 CandleBodyPercentage = ContinuationCandleBodyPercentage,
                 EntryPercentage = ReversalPullbackEntryPercentage,

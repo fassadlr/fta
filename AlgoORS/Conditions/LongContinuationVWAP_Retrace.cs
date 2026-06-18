@@ -3,7 +3,7 @@ using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
 {
-    internal class LongContinuationVWAP_Retrace : Condition
+    internal class LongContinuationVWAP_Retrace : StrategyCondition<ORS_RunnerConfiguration>
     {
         private double highestSinceOpen = 0;
         private bool openingCandlesCondition;
@@ -11,9 +11,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
         internal LongContinuationVWAP_Retrace(AlgoBase owner, FractalManager fractalManager)
             : base(owner, fractalManager)
         {
+            ValidFromTime = 144500;
         }
 
-        internal override bool IsSatisfied(RunnerConfiguration config)
+        internal override bool IsSatisfied(ORS_RunnerConfiguration config)
         {
             if (Disabled) return false;
 
@@ -64,7 +65,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             ExecuteOnlyMe = true;
 
             var vwapDistance = Math.Round(Owner.Close[0] - config.VWAP[0], 2); // TODO should this be close or high?
-            var vwapDistanceCondition = vwapDistance <= RunnerConfiguration.VWAPDistanceThreshold;
+            var vwapDistanceCondition = vwapDistance <= ORS_RunnerConfiguration.VWAPDistanceThreshold;
             if (!vwapDistanceCondition)
             {
                 Owner.PrintDebug($"[LONG_CONTINUATION_VWAP_RETRACE_INVALID] vwapDistanceCondition {vwapDistance}");
@@ -76,7 +77,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             }
 
             var vwapRetracement = Math.Round((highestSinceOpen - Owner.Low[0]) / (highestSinceOpen - config.VWAP[0]), 2);
-            var vwapRetracementCondition = vwapRetracement >= RunnerConfiguration.VWAPRetracementThreshold;
+            var vwapRetracementCondition = vwapRetracement >= ORS_RunnerConfiguration.VWAPRetracementThreshold;
             if (!vwapRetracementCondition)
             {
                 Owner.PrintDebug($"[LONG_CONTINUATION_VWAP_RETRACE_INVALID] vwapRetracementCondition - highestSinceOpen: {highestSinceOpen}");
@@ -89,7 +90,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS.Conditions
             return true;
         }
 
-        internal override TradeExecutionDetails Execute(RunnerConfiguration config)
+        internal override TradeExecutionDetails Execute(ORS_RunnerConfiguration config)
         {
             var stopLoss = Owner.Low[0] - config.StopGrace;
             var stopDistance = (Owner.Close[0] - Owner.Low[0]) + config.StopGrace;

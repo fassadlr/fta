@@ -6,6 +6,12 @@ using NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
 {
+    public enum TradeType
+    {
+        Reversal,
+        Continuation,
+    }
+
     public class TradeState
     {
         public bool MSSDetectedBullish { get; set; }

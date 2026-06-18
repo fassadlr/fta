@@ -5,21 +5,15 @@ using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 {
-    public enum TradeType
+    public class ORS_StrategyRunner
     {
-        Reversal,
-        Continuation,
-    }
+        public ORS_RunnerConfiguration Configuration { get; private set; }
 
-    public class StrategyRunner
-    {
-        public RunnerConfiguration Configuration { get; private set; }
+        private List<StrategyCondition<ORS_RunnerConfiguration>> conditions;
 
-        private List<Condition> conditions;
-
-        public static StrategyRunner Configure(AlgoBase strategyBase, FractalManager fractalManager, RunnerConfiguration config)
+        public static ORS_StrategyRunner Configure(AlgoBase strategyBase, FractalManager fractalManager, ORS_RunnerConfiguration config)
         {
-            var runner = new StrategyRunner()
+            var runner = new ORS_StrategyRunner()
             {
                 Configuration = config,
 
