@@ -34,7 +34,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
             var stopLoss = config.Ranges.Current(Owner.Close[0]).ExtensionLow;// Owner.Low[0] - config.StopGrace;
             var stopDistance = (Owner.Low[0] - stopLoss);// + config.StopGrace;
             var positionSize = Owner.CalculatePositionSize(stopDistance, config.Risk);
-            if (positionSize < 0.75)
+            if (positionSize < 1)
             {
                 Owner.PrintDebug($"[POSITION_SUBOPTIMAL_LONG] Position {positionSize}, Stop {stopLoss}");
                 return TradeDetails.Failed();

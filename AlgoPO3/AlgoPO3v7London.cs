@@ -192,7 +192,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
             }
 
-            //atrCurrent = atr[0];
             atrCurrent = dailyAtr.Atr;
 
             if (BarsInProgress != 0)
@@ -233,6 +232,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (LondonTime().TimeOfDay < new TimeSpan(8, 0, 0))
                 return;
 
+            // Reset the range break at London Open
+            if (LondonTime().TimeOfDay == new TimeSpan(8, 0, 0))
+                rangeBreakDetected = false;
+
             // If we are in a position then break even or close and stop processing.
             if (Position.MarketPosition != MarketPosition.Flat)
             {
@@ -262,6 +265,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (validSkipHour)
             {
                 CancelLimitOrder();
+                rangeBreakDetected = false;
                 return;
             }
 
@@ -274,8 +278,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             //    return;
             //}
 
-            //if (!rangeBreakDetected)
-            //    return;
+            // We have to wait for the first range break before any trades are taken.
+            if (!rangeBreakDetected)
+                return;
 
             // If we set a limit order and price gets to TP we need to clear the limit order
             // Always return as we are waiting for the PendingOrder to fill or be cancelled.
