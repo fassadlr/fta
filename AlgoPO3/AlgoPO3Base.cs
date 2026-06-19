@@ -5,35 +5,31 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
     public abstract class AlgoPO3Base : AlgoBase
     {
         [NinjaScriptProperty]
-        [Display(Name = "Position Size", Order = 10, GroupName = "Parameters")]
-        public int PositionSize { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "PO3", Description = "PO3", Order = 11, GroupName = "Parameters")]
+        [Display(Name = "PO3", Description = "PO3", Order = 10, GroupName = "Parameters")]
         public int PO3 { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Skip Months", Order = 12, GroupName = "Parameters")]
+        [Display(Name = "Skip Months", Order = 11, GroupName = "Parameters")]
         public string SkipMonths { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Edge Multiplier", Order = 13, GroupName = "Parameters")]
+        [Display(Name = "Edge Multiplier", Order = 12, GroupName = "Parameters")]
         public double EdgeHourMultiplier { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Include CPI Week", Order = 14, GroupName = "Parameters")]
+        [Display(Name = "Include CPI Week", Order = 13, GroupName = "Parameters")]
         public bool IncludeCPIWeek { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Include NFP Week", Order = 15, GroupName = "Parameters")]
+        [Display(Name = "Include NFP Week", Order = 14, GroupName = "Parameters")]
         public bool IncludeNFPWeek { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Include No Events Week", Order = 16, GroupName = "Parameters")]
+        [Display(Name = "Include No Events Week", Order = 15, GroupName = "Parameters")]
         public bool IncludeNoEventsWeek { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Include FOMC Week", Order = 17, GroupName = "Parameters")]
+        [Display(Name = "Include FOMC Week", Order = 16, GroupName = "Parameters")]
         public bool IncludeFOMCWeek { get; set; }
 
         internal int[] BlockEndHoursParsed;

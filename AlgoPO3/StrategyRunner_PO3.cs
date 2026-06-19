@@ -11,6 +11,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         public int Risk { get; internal set; }
         public double StopGrace { get; internal set; }
         public RangeBias RangeBias { get; internal set; }
+        public bool BearishBOSDetected { get; internal set; }
+        public bool BullishBOSDetected { get; internal set; }
     }
 
     public class StrategyRunner_PO3
@@ -28,6 +30,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 conditions =
                 [
                     new LongContinuation(owner, fractalManager),
+                    new ShortContinuation(owner, fractalManager),
                     new LongReversal(owner, fractalManager),
                     new ShortReversal(owner, fractalManager),
                 ],

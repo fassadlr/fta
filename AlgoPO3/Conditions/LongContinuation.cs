@@ -15,7 +15,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
 
             // Is previous range covered
             var previousRange = config.Ranges.Previous(Owner.Close[0], true);
-            Owner.PrintDebug($"{previousRange}");
             if (previousRange != null && previousRange.CoveredPercentage <= 90)
             {
                 //Owner.PrintDebug("[LONG_CONTINUATION_RANGE_NOT_COVERED]");
@@ -35,8 +34,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
 
         internal override TradeDetails Execute(RunnerConfiguration_PO3 config)
         {
-            var stopLoss = config.Ranges.Current(Owner.Close[0]).ExtensionLow;// Owner.Low[0] - config.StopGrace;
-            var stopDistance = (Owner.Low[0] - stopLoss);// + config.StopGrace;
+            var stopLoss = config.Ranges.Current(Owner.Close[0]).ExtensionLow;
+
+            // TODO: use fractal stop?
+
+            var stopDistance = Owner.Low[0] - stopLoss;
             var positionSize = Owner.CalculatePositionSize(stopDistance, config.Risk);
             if (positionSize < 1)
             {
@@ -57,6 +59,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
                 StopLoss = stopLoss,
                 TakeProfit = profitTarget,
                 TradeMissedThreshold = profitTarget,
+                BreakEvenThreshold = config.Ranges.Current(Owner.Close[0]).MB1,
                 Type = TradeType.Continuation,
             };
         }

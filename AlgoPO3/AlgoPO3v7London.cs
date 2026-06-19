@@ -13,19 +13,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
     public class AlgoPO3v7London : AlgoPO3Base
     {
         [NinjaScriptProperty]
+        [Display(Name = "Risk", Order = 20, GroupName = "Parameters")]
+        public int Risk { get; set; }
+
+        [NinjaScriptProperty]
         [Display(Name = "Stop Grace", Order = 21, GroupName = "Parameters")]
         public int StopGrace { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Clear Ranges Hour", Order = 22, GroupName = "Parameters")]
-        public int ClearRangesHour { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Range Covered End Hour", Order = 23, GroupName = "Parameters")]
-        public int RangeCoveredEndHour { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "New York End Time", Order = 24, GroupName = "Parameters")]
+        [Display(Name = "New York End Time", Order = 23, GroupName = "Parameters")]
         public int NewYorkEndTime { get; set; }
 
         private List<DealingRange> ranges;
@@ -62,7 +58,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 ConnectionLossHandling = ConnectionLossHandling.KeepRunning;
 
                 PO3 = 81;
-                PositionSize = 4;
+                Risk = 300;
                 IsOverlay = true;
 
                 EdgeHourMultiplier = 1.5;
@@ -70,12 +66,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 StopGrace = 3;
 
                 IncludeCPIWeek = true;
-                IncludeFOMCWeek = false;
+                IncludeFOMCWeek = true;
                 IncludeNFPWeek = true;
                 IncludeNoEventsWeek = true;
 
-                ClearRangesHour = 7;
-                RangeCoveredEndHour = 10;
                 NewYorkEndTime = 8;
             }
             else if (State == State.Configure)
@@ -169,17 +163,19 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             runner ??= StrategyRunner_PO3.Configure(this, fractalManager, new RunnerConfiguration_PO3()
             {
                 Ranges = ranges,
-                Risk = 300,// TODO: fixed or not?
+                Risk = Risk,
                 StopGrace = StopGrace,
             });
+
+            // Start tracking context from 6am London time. 
+            if (LondonTime().Hour < 6)
+                return;
 
             // Always process fractal and BOS detection.
             if (BarsInProgress == 1)
             {
                 dailyAtr.Calculate(High[0], Low[0], Close[0]);
-
                 fractalManager.DetectFractalThreeBarWithPlatos(5);
-                DetectBOS();
             }
 
             // If the session has ended stop processing.
@@ -198,6 +194,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
 
             fractalManager.DetectFractalThreeBarWithPlatos(1);
+            fractalManager.DetectFractalFiveBar(1);
+
+            DetectBOS();
 
             // Create the initial dealing range, this will only happen once per session.
             if (CurrentRange == null)
@@ -215,7 +214,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (PreviousRange != CurrentRange)
                 {
                     // Update Current Range's coverage as a candle could have open and closed into a new range.
-                    //CurrentRange.UpdateCoverage(Close[0]);
+                    CurrentRange.UpdateCoverage(Close[0]);
 
                     PreviousRange = CurrentRange;
 
@@ -226,6 +225,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 }
             }
 
+            // We only start tracking range coverage from 6am London time.
+            CurrentRange.UpdateCoverage(Close[0]);
+
             /* ----- STRATEGY START TIME ANCHORED TO LONDON-----*/
             if (LondonTime().TimeOfDay < new TimeSpan(8, 0, 0))
                 return;
@@ -233,9 +235,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             // Reset the range break at London Open
             if (LondonTime().TimeOfDay == new TimeSpan(8, 0, 0))
                 rangeBreakDetected = false;
-
-            // We only start covering a range from London Open
-            CurrentRange.UpdateCoverage(Close[0]);
 
             // If we are in a position then break even or close and stop processing.
             if (Position.MarketPosition != MarketPosition.Flat)
@@ -247,16 +246,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             /*
              ### From here we are flat or waiting on a pending order to execute ###
             */
-
-            // Make sure that range coverings are cleared at the london open.
-            //if (LondonTime().TimeOfDay == new TimeSpan(ClearRangesHour, 0, 0))
-            //{
-            //    Ranges.ForEach(r =>
-            //    {
-            //        PrintDebug($"[RANGE_COVERED_CLEAR] {r}");
-            //        r.ClearCovered();
-            //    });
-            //}
 
             if (DetectAndCheckInvalidRange())
                 return;
@@ -596,30 +585,30 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private void DetectBOS()
         {
             //---Bullish BOS ---
-            if (fractalManager.Fractals.TryGetValue((5, FractalType.HighThreeBar), out (double Price, DateTime Time) lastFractalHigh))
+            if (fractalManager.Fractals.TryGetValue((1, FractalType.HighFiveBar), out (double Price, DateTime Time) lastFractalHigh))
             {
                 if (Close[0] > lastFractalHigh.Price)
                 {
-                    BearishBOSDetected = false;
-                    BullishBOSDetected = true;
+                    runner.Configuration.BearishBOSDetected = false;
+                    runner.Configuration.BullishBOSDetected = true;
 
-                    tradeBias = TradeBias.Long;
+                    //tradeBias = TradeBias.Long;
 
-                    PrintDebug($"[BULLISH_BOS] trade bias {tradeBias}");
+                    PrintDebug($"[BULLISH_BOS]");
                 }
             }
 
             // --- Bearish BOS ---
-            if (fractalManager.Fractals.TryGetValue((5, FractalType.LowThreeBar), out (double Price, DateTime Time) lastFractalLow))
+            if (fractalManager.Fractals.TryGetValue((1, FractalType.LowFiveBar), out (double Price, DateTime Time) lastFractalLow))
             {
                 if (Close[0] < lastFractalLow.Price)
                 {
-                    BearishBOSDetected = true;
-                    BullishBOSDetected = false;
+                    runner.Configuration.BearishBOSDetected = true;
+                    runner.Configuration.BullishBOSDetected = false;
 
-                    tradeBias = TradeBias.Short;
+                    //tradeBias = TradeBias.Short;
 
-                    PrintDebug($"[BEARISH_BOS] trade bias {tradeBias}");
+                    PrintDebug($"[BEARISH_BOS]");
                 }
             }
         }
@@ -656,93 +645,77 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private void BreakEvenOrCloseTrade()
         {
-            //if (NewYorkTime().Hour == 14 && Time[0].Minute == 29)
-            //{
-            //    PrintDebug($"[CLOSE_TRADE] market open, PnL {Position.GetUnrealizedProfitLoss(PerformanceUnit.Currency, Close[0])}");
+            if (NewYorkTime().Hour == 14 && Time[0].Minute == 29)
+            {
+                PrintDebug($"[CLOSE_TRADE] market open, PnL {Position.GetUnrealizedProfitLoss(PerformanceUnit.Currency, Close[0])}");
 
-            //    if (Position.MarketPosition == MarketPosition.Short)
-            //        ExitShort("short entry");
+                if (Position.MarketPosition == MarketPosition.Short)
+                    ExitShort("short");
 
-            //    if (Position.MarketPosition == MarketPosition.Long)
-            //        ExitLong("long entry");
-            //}
-            //else
-            //{
-            //    if (CurrentTrade.StopLoss == Position.AveragePrice)
-            //        return;
+                if (Position.MarketPosition == MarketPosition.Long)
+                    ExitLong("long");
+            }
+            else
+            {
+                if (CurrentTrade.StopLoss == Position.AveragePrice)
+                    return;
 
-            //    var breakEvenDirection = "";
+                var breakEvenDirection = "";
 
-            //    if (CurrentTrade.Bias != tradeBias)
-            //    {
-            //        if (CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.BreakEvenThreshold)
-            //        {
-            //            PrintDebug($"[BREAK_EVEN_BIAS] changed from {CurrentTrade.Bias} to {tradeBias}, {Position.AveragePrice}");
-            //            breakEvenDirection = "long entry";
-            //        }
+                PrintDebug($"{CurrentTrade.BreakEvenThreshold} {High[0]}");
+                if (CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.BreakEvenThreshold)
+                {
+                    breakEvenDirection = "long";
+                    PrintDebug($"[BREAK_EVEN_TP] threshold reached");
+                }
 
-            //        if (CurrentTrade.Bias == TradeBias.Short && Low[0] <= CurrentTrade.BreakEvenThreshold)
-            //        {
-            //            breakEvenDirection = "short entry";
-            //            PrintDebug($"[BREAK_EVEN_BIAS] changed from {CurrentTrade.Bias} to {tradeBias}, {Position.AveragePrice}");
-            //        }
-            //    }
-            //    else
-            //    {
-            //        if (CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.BreakEvenThreshold)
-            //        {
-            //            breakEvenDirection = "long entry";
-            //            PrintDebug($"[BREAK_EVEN_TP] threshold reached");
-            //        }
+                if (CurrentTrade.Bias == TradeBias.Short && Low[0] <= CurrentTrade.BreakEvenThreshold)
+                {
+                    breakEvenDirection = "short";
+                    PrintDebug($"[BREAK_EVEN_TP] threshold reached");
+                }
 
-            //        if (CurrentTrade.Bias == TradeBias.Short && Low[0] <= CurrentTrade.BreakEvenThreshold)
-            //        {
-            //            breakEvenDirection = "short entry";
-            //            PrintDebug($"[BREAK_EVEN_TP] threshold reached");
-            //        }
-            //    }
-
-            //    if (!string.IsNullOrEmpty(breakEvenDirection))
-            //    {
-            //        SetStopLoss(breakEvenDirection, CalculationMode.Price, Position.AveragePrice, true);
-            //        CurrentTrade.StopLoss = Position.AveragePrice;
-            //        PrintDebug($"[BREAK_EVEN] set {Position.AveragePrice}");
-            //    }
-            //}
+                if (!string.IsNullOrEmpty(breakEvenDirection))
+                {
+                    SetStopLoss(breakEvenDirection, CalculationMode.Price, Position.AveragePrice, true);
+                    CurrentTrade.StopLoss = Position.AveragePrice;
+                    PrintDebug($"[BREAK_EVEN] set {Position.AveragePrice}");
+                }
+            }
         }
 
-        private int CalculatePositionSize()
-        {
-            int positionSize = PositionSize;
+        //private int CalculatePositionSize()
+        //{
+        //    int positionSize = PositionSize;
 
-            // TODO: Should everything be LONDON hours?
-            var validEdgeHour = LondonTime().Hour == 1 || LondonTime().Hour == 3 || LondonTime().Hour == 9 || LondonTime().Hour == 11;
-            if (validEdgeHour && atrCurrent <= 20)
-            {
-                positionSize = (int)(PositionSize * EdgeHourMultiplier);
-                PrintDebug($"[POSITION_ADJUSTED_EDGEHOUR] {positionSize}");
-            }
+        //    // TODO: Should everything be LONDON hours?
+        //    var validEdgeHour = LondonTime().Hour == 1 || LondonTime().Hour == 3 || LondonTime().Hour == 9 || LondonTime().Hour == 11;
+        //    if (validEdgeHour && atrCurrent <= 20)
+        //    {
+        //        positionSize = (int)(PositionSize * EdgeHourMultiplier);
+        //        PrintDebug($"[POSITION_ADJUSTED_EDGEHOUR] {positionSize}");
+        //    }
 
-            if (atrCurrent > 20 && atrCurrent <= 25)
-            {
-                positionSize = PositionSize + 1;
-                PrintDebug($"[POSITION_ADJUSTED_ATR] {positionSize}");
-            }
+        //    if (atrCurrent > 20 && atrCurrent <= 25)
+        //    {
+        //        positionSize = PositionSize + 1;
+        //        PrintDebug($"[POSITION_ADJUSTED_ATR] {positionSize}");
+        //    }
 
-            if (atrCurrent > 25 && atrCurrent <= 36)
-            {
-                positionSize = PositionSize;
-                PrintDebug($"[POSITION_ADJUSTED_ATR] {positionSize}");
-            }
+        //    if (atrCurrent > 25 && atrCurrent <= 36)
+        //    {
+        //        positionSize = PositionSize;
+        //        PrintDebug($"[POSITION_ADJUSTED_ATR] {positionSize}");
+        //    }
 
-            if (atrCurrent > 36)
-            {
-                positionSize = PositionSize - 1;
-                PrintDebug($"[POSITION_ADJUSTED_ATR] {positionSize}");
-            }
+        //    if (atrCurrent > 36)
+        //    {
+        //        positionSize = PositionSize - 1;
+        //        PrintDebug($"[POSITION_ADJUSTED_ATR] {positionSize}");
+        //    }
 
-            return positionSize;
-        }
+        //    return positionSize;
+        //}
 
         private void ProcessSharedBorderRange(bool isLoss)
         {

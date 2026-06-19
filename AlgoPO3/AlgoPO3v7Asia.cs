@@ -13,6 +13,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
     public class AlgoPO3v7Asia : AlgoPO3Base
     {
         [NinjaScriptProperty]
+        [Display(Name = "Position Size", Order = 20, GroupName = "Parameters")]
+        public int PositionSize { get; set; }
+
+        [NinjaScriptProperty]
         [Display(Name = "Stop Grace", Order = 21, GroupName = "Parameters")]
         public int StopGrace { get; set; }
 

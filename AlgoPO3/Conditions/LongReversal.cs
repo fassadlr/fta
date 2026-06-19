@@ -17,20 +17,21 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
             var previousRange = config.Ranges.Previous(Owner.Close[0], true);
             if (previousRange != null && previousRange.CoveredPercentage >= 90)
             {
-                Owner.PrintDebug("[LONG_REVERSAL_RANGE_COVERED]");
+                //Owner.PrintDebug("[LONG_REVERSAL_RANGE_COVERED]");
                 return false;
             }
 
-            // Has 1min BOS occurred
-            //if (!Owner.BOSOccurred(TradeBias.Short, config.Ranges.Current(Owner.Close[0])))
-            //{
-            //    return false;
-            //}
+            // Has 1min BOS occurred (5bar)
+            if (!config.BullishBOSDetected)
+            {
+                //Owner.PrintDebug("[LONG_REVERSAL_BOS_NOT_DETECTED]");
+                return false;
+            }
 
             // Has IMB formed
             if (!Owner.ImbalanceFormed(TradeBias.Long, config.Ranges.Current(Owner.Close[0])))
             {
-                Owner.PrintDebug("[LONG_REVERSAL_IMB_NOT_FORMED]");
+                //Owner.PrintDebug("[LONG_REVERSAL_IMB_NOT_FORMED]");
                 return false;
             }
 
@@ -41,7 +42,17 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
 
         internal override TradeDetails Execute(RunnerConfiguration_PO3 config)
         {
-            var stopLoss = config.Ranges.Current(Owner.Close[0]).ExtensionLow;// Owner.Low[0] - config.StopGrace;
+            var stopLoss = config.Ranges.Current(Owner.Close[0]).ExtensionLow;
+
+            if (FractalManager.Fractals.TryGetValue((1, FractalType.LowFiveBar), out var lowFiveBarFractal))
+            {
+                if (lowFiveBarFractal.Price < stopLoss)
+                {
+                    stopLoss = lowFiveBarFractal.Price;
+                    Owner.PrintDebug($"[LONG_REVERSAL_FRACTAL_STOP] ext low: {config.Ranges.Current(Owner.Close[0]).ExtensionLow}, fractal {lowFiveBarFractal.Price}");
+                }
+            }
+
             var stopDistance = Owner.Low[0] - stopLoss;// + config.StopGrace;
             var positionSize = Owner.CalculatePositionSize(stopDistance, config.Risk);
             if (positionSize < 1)
@@ -62,6 +73,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
                 RiskReward = 1,
                 StopLoss = stopLoss,
                 TakeProfit = profitTarget,
+                BreakEvenThreshold = config.Ranges.Current(Owner.Close[0]).MB1,
                 TradeMissedThreshold = profitTarget,
                 Type = TradeType.Reversal,
             };
