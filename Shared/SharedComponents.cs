@@ -206,7 +206,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
             if (isPeakShape && hasStrictEdge)
             {
                 Fractals[(timeFrame, FractalType.HighThreeBar)] = (h1, owner.Time[1]);
-                //PrintDebug($"[FRACTAL_5M_HIGH] {LastFractalHigh} upperBound {upperBound} h1 {h1} time {LastFractalHighTime}");
+                //owner.PrintDebug($"[FRACTAL_{timeFrame}M_HIGH] {h1} time {owner.Time[1]}");
             }
 
             // --- FRACTAL LOW LOGIC ---
@@ -223,6 +223,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
             if (isValleyShape && hasStrictEdgeLow)
             {
                 Fractals[(timeFrame, FractalType.LowThreeBar)] = (l1, owner.Time[1]);
+                //owner.PrintDebug($"[FRACTAL_{timeFrame}M_LOW] {l1} time {owner.Time[1]}");
             }
         }
 

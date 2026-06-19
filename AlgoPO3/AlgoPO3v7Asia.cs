@@ -43,7 +43,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "PO3 Algo Asia v7";
+                Name = "PO3 Algo Asia v7.1";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -61,7 +61,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
             else if (State == State.Configure)
             {
-                AddDataSeries("MNQ 06-26", BarsPeriodType.Minute, 5);
+                AddDataSeries("MNQ 09-26", BarsPeriodType.Minute, 5);
 
                 Ranges = [];
 
