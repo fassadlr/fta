@@ -322,7 +322,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             {
                 if (Low[0] > High[2] &&         // IMB
                     Low[0] - High[2] >= 1 &&    // IMB gap distance
-                    High[2] > range.Low         // IMB must be inside range
+                    High[2] > range.Low &&     // IMB must be inside range
+                    High[0] < range.Eq          // IMB must be in discount
                    )
                 {
                     PrintDebug($"[BULLISH_IMB_FORMED] {tradeBias}: {High[2]} {Low[0]}");
@@ -334,8 +335,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             {
                 if (High[0] < Low[2] &&         // IMB
                     Low[2] - High[0] >= 1 &&    // IMB gap distance
-                    Low[2] < range.High         // IMB must be inside range
-                    )
+                    Low[2] < range.High &&      // IMB must be inside range
+                    Low[0] > range.Eq           // IMB must be in discount
+                   )
                 {
                     PrintDebug($"[BEARISH_IMB_FORMED] {tradeBias}: {High[0]} {Low[2]}");
                     return true;

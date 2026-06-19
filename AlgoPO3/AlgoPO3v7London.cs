@@ -662,7 +662,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 var breakEvenDirection = "";
 
-                PrintDebug($"{CurrentTrade.BreakEvenThreshold} {High[0]}");
                 if (CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.BreakEvenThreshold)
                 {
                     breakEvenDirection = "long";
