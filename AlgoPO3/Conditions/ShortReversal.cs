@@ -62,6 +62,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
                 RiskReward = 1,
                 StopLoss = stopLoss,
                 TakeProfit = profitTarget,
+                TradeMissedThreshold = profitTarget,
                 Type = TradeType.Reversal,
             };
         }

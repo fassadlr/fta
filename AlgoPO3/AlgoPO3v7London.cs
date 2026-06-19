@@ -214,8 +214,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 if (PreviousRange != CurrentRange)
                 {
-                    // Update Current Range's coverage as a candle could ahve open and closed into a new range.
-                    CurrentRange.UpdateCoverage(Close[0]);
+                    // Update Current Range's coverage as a candle could have open and closed into a new range.
+                    //CurrentRange.UpdateCoverage(Close[0]);
 
                     PreviousRange = CurrentRange;
 
@@ -226,8 +226,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 }
             }
 
-            CurrentRange.UpdateCoverage(Close[0]);
-
             /* ----- STRATEGY START TIME ANCHORED TO LONDON-----*/
             if (LondonTime().TimeOfDay < new TimeSpan(8, 0, 0))
                 return;
@@ -235,6 +233,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             // Reset the range break at London Open
             if (LondonTime().TimeOfDay == new TimeSpan(8, 0, 0))
                 rangeBreakDetected = false;
+
+            // We only start covering a range from London Open
+            CurrentRange.UpdateCoverage(Close[0]);
 
             // If we are in a position then break even or close and stop processing.
             if (Position.MarketPosition != MarketPosition.Flat)
@@ -294,18 +295,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 //}
                 //else
                 //{
-                //    if ((CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.TradeMissedThreshold) ||
-                //       (CurrentTrade.Bias == TradeBias.Short && Low[0] <= CurrentTrade.TradeMissedThreshold))
-                //    {
-                //        PrintDebug($"[LIMIT_ORDER_CANCEL] {CurrentTrade.Bias} price went to TP threshold {CurrentTrade.TradeMissedThreshold}.");
-                //        shouldCancel = true;
-                //    }
+                if ((CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.TradeMissedThreshold) ||
+                   (CurrentTrade.Bias == TradeBias.Short && Low[0] <= CurrentTrade.TradeMissedThreshold))
+                {
+                    PrintDebug($"[LIMIT_ORDER_CANCEL] {CurrentTrade.Bias} price went to TP threshold {CurrentTrade.TradeMissedThreshold}.");
+                    shouldCancel = true;
+                }
                 //}
 
                 if (shouldCancel)
                 {
                     CancelLimitOrder();
-                    rangeBias = RangeBias.Neutral;
+                    rangeBreakDetected = false;
                 }
 
                 return;

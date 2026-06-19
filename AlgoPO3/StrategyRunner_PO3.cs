@@ -28,6 +28,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 conditions =
                 [
                     new LongContinuation(owner, fractalManager),
+                    new LongReversal(owner, fractalManager),
                     new ShortReversal(owner, fractalManager),
                 ],
             };

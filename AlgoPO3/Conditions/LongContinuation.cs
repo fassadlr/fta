@@ -15,6 +15,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
 
             // Is previous range covered
             var previousRange = config.Ranges.Previous(Owner.Close[0], true);
+            Owner.PrintDebug($"{previousRange}");
             if (previousRange != null && previousRange.CoveredPercentage <= 90)
             {
                 //Owner.PrintDebug("[LONG_CONTINUATION_RANGE_NOT_COVERED]");
@@ -55,6 +56,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
                 RiskReward = 1,
                 StopLoss = stopLoss,
                 TakeProfit = profitTarget,
+                TradeMissedThreshold = profitTarget,
                 Type = TradeType.Continuation,
             };
         }
