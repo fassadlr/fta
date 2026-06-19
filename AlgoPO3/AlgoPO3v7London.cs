@@ -80,7 +80,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
             else if (State == State.Configure)
             {
-                AddDataSeries("MNQ 06-26", BarsPeriodType.Minute, 5);
+                AddDataSeries("MNQ 09-26", BarsPeriodType.Minute, 5);
 
                 ranges = [];
 
@@ -311,17 +311,17 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
             }
 
-            //if (BullishBOSDetected && CurrentRange.Low == PreviousRange.High)
-            //{
-            //    rangeBias = RangeBias.Bullish;
-            //    PrintDebug($"Range bias {rangeBias}: Trade bias {tradeBias}");
-            //}
+            if (CurrentRange.Low == PreviousRange.High)
+            {
+                runner.Configuration.RangeBias = RangeBias.Bullish;
+                PrintDebug($"Range bias {rangeBias}: Trade bias {tradeBias}");
+            }
 
-            //if (BullishBOSDetected && CurrentRange.High == PreviousRange.Low)
-            //{
-            //    rangeBias = RangeBias.Bearish;
-            //    PrintDebug($"Range bias {rangeBias}: Trade bias {tradeBias}");
-            //}
+            if (CurrentRange.High == PreviousRange.Low)
+            {
+                runner.Configuration.RangeBias = RangeBias.Bearish;
+                PrintDebug($"Range bias {rangeBias}: Trade bias {tradeBias}");
+            }
 
             //if (BearishBOSDetected && CurrentRange.High == PreviousRange.Low)
             //{

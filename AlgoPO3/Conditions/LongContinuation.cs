@@ -10,6 +10,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
 
         internal override bool IsSatisfied(RunnerConfiguration_PO3 config)
         {
+            if (config.RangeBias != RangeBias.Bullish)
+                return false;
+
             // Is previous range covered
             var previousRange = config.Ranges.Previous(Owner.Close[0], true);
             if (previousRange != null && previousRange.CoveredPercentage <= 90)

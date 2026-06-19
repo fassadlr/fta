@@ -10,6 +10,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         public List<DealingRange> Ranges { get; internal set; }
         public int Risk { get; internal set; }
         public double StopGrace { get; internal set; }
+        public RangeBias RangeBias { get; internal set; }
     }
 
     public class StrategyRunner_PO3
