@@ -27,6 +27,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
                 return false;
             }
 
+            // Did the IMB break below the last fractal low
+            if (Owner.Close[0] > FractalManager.Fractals[(1, FractalType.LowFiveBar)].Price)
+            {
+                Owner.PrintDebug("[SHORT_CONTINUATION_IMB_CLOSE_LOWER_FAIL]");
+                return false;
+            }
+
             Owner.PrintDebug("[SHORT_CONTINUATION_SATISFIED]");
 
             return true;
@@ -34,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
 
         internal override TradeDetails Execute(RunnerConfiguration_PO3 config)
         {
-            var stopLoss = config.Ranges.Current(Owner.Close[0]).ExtensionHigh;
+            var stopLoss = config.Ranges.Current(Owner.Close[0]).ExtHigh;
 
             // TODO: use fractal stop?
 
@@ -42,11 +49,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
             var positionSize = Owner.CalculatePositionSize(stopDistance, config.Risk);
             if (positionSize < 1)
             {
-                Owner.PrintDebug($"[POSITION_SUBOPTIMAL_SHORT] Position {positionSize}, Stop {stopLoss}");
+                Owner.PrintDebug($"[POSITION_SUBOPTIMAL_SHORT_CONTINUATION] Position {positionSize}, Stop {stopLoss}");
                 return TradeDetails.Failed();
             }
 
             var profitTarget = config.Ranges.Current(Owner.Close[0]).Eq;
+
+            var riskReward = Owner.CalculateRiskReward(stopDistance, Owner.High[0] - profitTarget);
+            if (riskReward < 0.5)
+            {
+                Owner.PrintDebug($"[RR_SUBOPTIMAL_SHORT_CONTINUATION] Risk-Reward {riskReward}");
+                return TradeDetails.Failed();
+            }
 
             return new()
             {
@@ -56,6 +70,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
                 Log = "SHORT_ENTRY_CONTINUATION",
                 PositionSize = positionSize,
                 RiskReward = 1,
+                OriginalStopLoss = stopLoss,
                 StopLoss = stopLoss,
                 TakeProfit = profitTarget,
                 TradeMissedThreshold = profitTarget,

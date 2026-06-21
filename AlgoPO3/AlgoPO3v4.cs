@@ -311,7 +311,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 if (Bias == TradeBias.Short)
                 {
-                    entryPrice = CurrentRange.ExtensionHigh;
+                    entryPrice = CurrentRange.ExtHigh;
                     slPrice = PreviousRange.BR1 - Math.Round((PreviousRange.BR1 - PreviousRange.FV2) * 0.33, 2);
                     tpPrice = CurrentRange.MBCE2;
                 }
@@ -321,7 +321,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 if (Bias == TradeBias.Long)
                 {
-                    entryPrice = CurrentRange.ExtensionLow;
+                    entryPrice = CurrentRange.ExtLow;
                     slPrice = PreviousRange.BR4 + Math.Round((PreviousRange.FV3 - PreviousRange.BR4) * 0.33, 2);
                     tpPrice = CurrentRange.MBCE1;
                 }

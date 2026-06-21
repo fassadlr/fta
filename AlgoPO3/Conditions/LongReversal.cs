@@ -17,14 +17,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
             var previousRange = config.Ranges.Previous(Owner.Close[0], true);
             if (previousRange != null && previousRange.CoveredPercentage >= 90)
             {
-                //Owner.PrintDebug("[LONG_REVERSAL_RANGE_COVERED]");
+                Owner.PrintDebug("[LONG_REVERSAL_RANGE_COVERED]");
                 return false;
             }
 
             // Has 1min BOS occurred (5bar)
             if (!config.BullishBOSDetected)
             {
-                //Owner.PrintDebug("[LONG_REVERSAL_BOS_NOT_DETECTED]");
+                Owner.PrintDebug("[LONG_REVERSAL_BOS_NOT_DETECTED]");
                 return false;
             }
 
@@ -42,14 +42,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
 
         internal override TradeDetails Execute(RunnerConfiguration_PO3 config)
         {
-            var stopLoss = config.Ranges.Current(Owner.Close[0]).ExtensionLow;
+            var stopLoss = config.Ranges.Current(Owner.Close[0]).ExtLow;
 
             if (FractalManager.Fractals.TryGetValue((1, FractalType.LowFiveBar), out var lowFiveBarFractal))
             {
-                if (lowFiveBarFractal.Price < stopLoss)
+                if (lowFiveBarFractal.Price < stopLoss && lowFiveBarFractal.Price > config.Ranges.Current(lowFiveBarFractal.Price).BR4)
                 {
                     stopLoss = lowFiveBarFractal.Price;
-                    Owner.PrintDebug($"[LONG_REVERSAL_FRACTAL_STOP] ext low: {config.Ranges.Current(Owner.Close[0]).ExtensionLow}, fractal {lowFiveBarFractal.Price}");
+                    Owner.PrintDebug($"[LONG_REVERSAL_FRACTAL_STOP] ext low: {config.Ranges.Current(Owner.Close[0]).ExtLow}, fractal {lowFiveBarFractal.Price}");
                 }
             }
 
@@ -71,6 +71,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
                 Log = "LONG_ENTRY_REVERSAL",
                 PositionSize = positionSize,
                 RiskReward = 1,
+                OriginalStopLoss = stopLoss,
                 StopLoss = stopLoss,
                 TakeProfit = profitTarget,
                 BreakEvenThreshold = config.Ranges.Current(Owner.Close[0]).MB1,

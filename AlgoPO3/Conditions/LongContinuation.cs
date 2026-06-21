@@ -17,13 +17,21 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
             var previousRange = config.Ranges.Previous(Owner.Close[0], true);
             if (previousRange != null && previousRange.CoveredPercentage <= 90)
             {
-                //Owner.PrintDebug("[LONG_CONTINUATION_RANGE_NOT_COVERED]");
+                Owner.PrintDebug("[LONG_CONTINUATION_RANGE_NOT_COVERED]");
                 return false;
             }
 
             // Has IMB formed
             if (!Owner.ImbalanceFormed(TradeBias.Long, config.Ranges.Current(Owner.Close[0])))
             {
+                Owner.PrintDebug("[LONG_CONTINUATION_IMB_MISSING]");
+                return false;
+            }
+
+            // Did the IMB break above the last fractal high
+            if (Owner.Close[0] < FractalManager.Fractals[(1, FractalType.HighFiveBar)].Price)
+            {
+                Owner.PrintDebug("[LONG_CONTINUATION_IMB_CLOSE_HIGHER_FAIL]");
                 return false;
             }
 
@@ -34,7 +42,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
 
         internal override TradeDetails Execute(RunnerConfiguration_PO3 config)
         {
-            var stopLoss = config.Ranges.Current(Owner.Close[0]).ExtensionLow;
+            var stopLoss = config.Ranges.Current(Owner.Close[0]).ExtLow;
 
             // TODO: use fractal stop?
 
@@ -42,11 +50,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
             var positionSize = Owner.CalculatePositionSize(stopDistance, config.Risk);
             if (positionSize < 1)
             {
-                Owner.PrintDebug($"[POSITION_SUBOPTIMAL_LONG] Position {positionSize}, Stop {stopLoss}");
+                Owner.PrintDebug($"[POSITION_SUBOPTIMAL_LONG__CONTINUATION] Position {positionSize}, Stop {stopLoss}");
                 return TradeDetails.Failed();
             }
 
             var profitTarget = config.Ranges.Current(Owner.Close[0]).Eq;
+
+            var riskReward = Owner.CalculateRiskReward(stopDistance, profitTarget - Owner.Low[0]);
+            if (riskReward < 0.5)
+            {
+                Owner.PrintDebug($"[RR_SUBOPTIMAL_LONG_CONTINUATION] Risk-Reward {riskReward}");
+                return TradeDetails.Failed();
+            }
 
             return new()
             {
@@ -56,6 +71,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
                 Log = "LONG_ENTRY_CONTINUATION",
                 PositionSize = positionSize,
                 RiskReward = 1,
+                OriginalStopLoss = stopLoss,
                 StopLoss = stopLoss,
                 TakeProfit = profitTarget,
                 TradeMissedThreshold = profitTarget,

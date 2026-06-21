@@ -5,7 +5,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 {
     public class DealingRange
     {
-        public readonly double ExtensionLow;
+        public readonly double ExtLow;
         public readonly double ExtensionLowCE;
         public readonly double Low;
         public readonly double OBCE1;
@@ -32,7 +32,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         public double ExtensionRange { get; }
 
-        public readonly double ExtensionHigh;
+        public readonly double ExtHigh;
 
         public bool LongTradeExecuted { get; set; }
         public bool ShortTradeExecuted { get; set; }
@@ -47,7 +47,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         public DealingRange(int po3, double price)
         {
             Low = Math.Floor(price / po3) * po3;
-            ExtensionLow = Low - (po3 * 0.111);
+            ExtLow = Low - (po3 * 0.111);
             FV1 = Low + (po3 * 0.11);
             FV2 = Low + (po3 * 0.17);
             BR1 = Low + (po3 * 0.29);
@@ -62,18 +62,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             FV3 = Low + (po3 * 0.83);
             FV4 = Low + (po3 * 0.89);
             High = Low + po3;
-            ExtensionHigh = High + (po3 * 0.111);
+            ExtHigh = High + (po3 * 0.111);
 
             OBCE1 = Low + ((FV1 - Low) / 2);
-            ExtensionLowCE = ExtensionLow + ((Low - ExtensionLow) / 2);
+            ExtensionLowCE = ExtLow + ((Low - ExtLow) / 2);
             FV2Entry = Math.Round(FV2 / 0.05) * 0.05;
             MBCE1 = MB1 + ((MB2 - MB1) / 2);
             MBCE2 = MB3 + ((MB4 - MB3) / 2);
             FV3Entry = Math.Round(FV3 / 0.05) * 0.05;
             OBCE2 = FV4 + ((High - FV4) / 2);
-            ExtensionHighCE = ExtensionHigh - ((ExtensionHigh - High) / 2);
+            ExtensionHighCE = ExtHigh - ((ExtHigh - High) / 2);
 
-            ExtensionRange = Math.Round(Low - ExtensionLow);
+            ExtensionRange = Math.Round(Low - ExtLow);
 
             MinCovered = 0;
             MaxCovered = 0;

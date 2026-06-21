@@ -63,7 +63,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         public static DealingRange Previous(this List<DealingRange> ranges, double close, bool isLong)
         {
             var current = ranges.Current(close);
-            return ranges.FirstOrDefault(r => r.IsInRange(isLong ? current.ExtensionLow : current.ExtensionHigh));
+            return ranges.FirstOrDefault(r => r.IsInRange(isLong ? current.ExtLow : current.ExtHigh));
         }
     }
 }

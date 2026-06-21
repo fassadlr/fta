@@ -17,21 +17,21 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
             var previousRange = config.Ranges.Previous(Owner.Close[0], false);
             if (previousRange != null && previousRange.CoveredPercentage >= 90)
             {
-                //Owner.PrintDebug("[SHORT_REVERSAL_RANGE_COVERED]");
+                Owner.PrintDebug("[SHORT_REVERSAL_RANGE_COVERED]");
                 return false;
             }
 
             // Has 1min BOS occurred (5bar)
             if (!config.BearishBOSDetected)
             {
-                //Owner.PrintDebug("[SHORT_REVERSAL_BOS_NOT_DETECTED]");
+                Owner.PrintDebug("[SHORT_REVERSAL_BOS_NOT_DETECTED]");
                 return false;
             }
 
             // Has IMB formed
             if (!Owner.ImbalanceFormed(TradeBias.Short, config.Ranges.Current(Owner.Close[0])))
             {
-                //Owner.PrintDebug("[SHORT_REVERSAL_IMB_NOT_FORMED]");
+                Owner.PrintDebug("[SHORT_REVERSAL_IMB_NOT_FORMED]");
                 return false;
             }
 
@@ -42,14 +42,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
 
         internal override TradeDetails Execute(RunnerConfiguration_PO3 config)
         {
-            var stopLoss = config.Ranges.Current(Owner.Close[0]).ExtensionHigh;
+            var stopLoss = config.Ranges.Current(Owner.Close[0]).ExtHigh;
 
             if (FractalManager.Fractals.TryGetValue((1, FractalType.HighFiveBar), out var highFiveBarFractal))
             {
-                if (highFiveBarFractal.Price > stopLoss)
+                if (highFiveBarFractal.Price > stopLoss && highFiveBarFractal.Price < config.Ranges.Current(highFiveBarFractal.Price).BR1)
                 {
                     stopLoss = highFiveBarFractal.Price;
-                    Owner.PrintDebug($"[SHORT_REVERSAL_FRACTAL_STOP] ext high: {config.Ranges.Current(Owner.Close[0]).ExtensionHigh}, fractal {highFiveBarFractal.Price}");
+                    Owner.PrintDebug($"[SHORT_REVERSAL_FRACTAL_STOP] ext high: {config.Ranges.Current(Owner.Close[0]).ExtHigh}, fractal {highFiveBarFractal.Price}");
                 }
             }
 
@@ -71,6 +71,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
                 Log = "SHORT_ENTRY_REVERSAL",
                 PositionSize = positionSize,
                 RiskReward = 1,
+                OriginalStopLoss = stopLoss,
                 StopLoss = stopLoss,
                 TakeProfit = profitTarget,
                 TradeMissedThreshold = profitTarget,

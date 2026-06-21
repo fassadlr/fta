@@ -423,7 +423,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         return;
                     }
 
-                    entryPrice = (EntryLevel == "CE" ? CurrentRange.OBCE2 : CurrentRange.ExtensionHigh) + TickSize;
+                    entryPrice = (EntryLevel == "CE" ? CurrentRange.OBCE2 : CurrentRange.ExtHigh) + TickSize;
                     StopLossPrice = CurrentRange.BR4 + Math.Round((CurrentRange.FV3 - CurrentRange.BR4) * 0.33, 2);
                     TakeProfitPrice = PreviousRange.MBCE1;
                     TakeProfitPriceThreshold = PreviousRange.BR2;
@@ -439,7 +439,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         return;
                     }
 
-                    entryPrice = (EntryLevel == "CE" ? CurrentRange.ExtensionHighCE : CurrentRange.ExtensionHigh) - TickSize; ;
+                    entryPrice = (EntryLevel == "CE" ? CurrentRange.ExtensionHighCE : CurrentRange.ExtHigh) - TickSize; ;
                     StopLossPrice = PreviousRange.BR1 - Math.Round((PreviousRange.BR1 - PreviousRange.FV2) * 0.33, 2);
                     TakeProfitPrice = CurrentRange.MBCE2;
                     TakeProfitPriceThreshold = CurrentRange.BR3;
@@ -458,7 +458,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         return;
                     }
 
-                    entryPrice = (EntryLevel == "CE" ? CurrentRange.ExtensionLowCE : CurrentRange.ExtensionLow) + TickSize;
+                    entryPrice = (EntryLevel == "CE" ? CurrentRange.ExtensionLowCE : CurrentRange.ExtLow) + TickSize;
                     StopLossPrice = PreviousRange.BR4 + Math.Round((PreviousRange.FV3 - PreviousRange.BR4) * 0.33, 2);
                     TakeProfitPrice = CurrentRange.MBCE1;
                     TakeProfitPriceThreshold = CurrentRange.BR2;

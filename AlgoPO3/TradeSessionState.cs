@@ -188,9 +188,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 // Check through extension
                 if (!strongMove)
                 {
-                    strongClose = topThird > currentRange.ExtensionLow && open < currentRange.Low;
+                    strongClose = topThird > currentRange.ExtLow && open < currentRange.Low;
                     strongMove = strongClose && candleBodyRange > currentRange.ExtensionRange;
-                    owner.PrintDebug($"Strong ext close bullish {strongMove} - strongClose {strongClose} topThird {topThird} extR Low {currentRange.ExtensionLow} ext R {currentRange.ExtensionRange} cb {candleBodyRange}");
+                    owner.PrintDebug($"Strong ext close bullish {strongMove} - strongClose {strongClose} topThird {topThird} extR Low {currentRange.ExtLow} ext R {currentRange.ExtensionRange} cb {candleBodyRange}");
                 }
                 else
                     owner.PrintDebug($"Strong close bullish {strongMove}");
@@ -205,9 +205,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 // Check through extension (TODO this wont always trigger if we hvent actaully entered a new range
                 if (!strongMove)
                 {
-                    strongClose = bottomThird < currentRange.ExtensionHigh && open > currentRange.High;
+                    strongClose = bottomThird < currentRange.ExtHigh && open > currentRange.High;
                     strongMove = strongClose && candleBodyRange > currentRange.ExtensionRange;
-                    owner.PrintDebug($"Strong ext close bearish {strongMove} - strongClose {strongClose} bottomThird {bottomThird} ext H {currentRange.ExtensionHigh} ext R {currentRange.ExtensionRange} cb {candleBodyRange}");
+                    owner.PrintDebug($"Strong ext close bearish {strongMove} - strongClose {strongClose} bottomThird {bottomThird} ext H {currentRange.ExtHigh} ext R {currentRange.ExtensionRange} cb {candleBodyRange}");
                 }
                 else
                     owner.PrintDebug($"Strong close bearish {strongMove}");

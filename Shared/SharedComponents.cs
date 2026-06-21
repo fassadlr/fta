@@ -45,6 +45,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         public double Entry { get; set; } = 0;
         public DateTime EntryTime { get; set; }
         public Order PendingOrder { get; set; }
+        public double OriginalStopLoss { get; set; }
         public double StopLoss { get; set; } = 0;
         public double TakeProfit { get; set; } = 0;
         public double ProfitLoss { get; set; } = 0;
