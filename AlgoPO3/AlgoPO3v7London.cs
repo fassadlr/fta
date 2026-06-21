@@ -265,12 +265,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             // Cancel limit orders close to end of sessions blocks.
             // TODO: We need to retest these once done.
-            //var validBlockEndHour = LondonTime().Hour == 9 || LondonTime().Hour == 12;
-            //if (validBlockEndHour && Time[0].Minute >= 40)
-            //{
-            //    CancelLimitOrder();
-            //    return;
-            //}
+            var validBlockEndHour = LondonTime().Hour == 9 || LondonTime().Hour == 12;
+            if (validBlockEndHour && Time[0].Minute >= 59)
+            {
+                CancelLimitOrder();
+                return;
+            }
 
             // We have to wait for the first range break before any trades are taken.
             if (!rangeBreakDetected)
@@ -298,24 +298,30 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
             }
 
-            if (IsLive && State != State.Realtime)
-                return;
-
-            if (IsLive && !isConnected)
-                return;
-
             /* Execute Strategy Runner */
             ExecuteStrategies();
         }
 
         private void ExecuteStrategies()
         {
+            if (IsLive && State != State.Realtime)
+                return;
+
+            if (IsLive && !isConnected)
+                return;
+
             if (LondonTime().Hour == 10)
+                return;
+
+            if (DetectAndCheckInvalidRange())
                 return;
 
             var tradeDetails = runner.Run();
 
             if (tradeDetails == null || tradeDetails.TradeDetailsSubOptimal)
+                return;
+
+            if (CurrentTrade != null && CurrentTrade.Bias == tradeDetails.Bias && CurrentTrade.Entry == tradeDetails.Entry)
                 return;
 
             if (tradeDetails.Bias == TradeBias.Short)
@@ -341,6 +347,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
         {
+            PrintDebug($"{Position.MarketPosition}");
+
             if (marketPosition != MarketPosition.Flat)
                 return;
 
@@ -459,7 +467,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 if (!string.IsNullOrEmpty(breakEvenDirection))
                 {
-                    SetStopLoss(breakEvenDirection, CalculationMode.Price, Position.AveragePrice, true);
+                    SetStopLoss(breakEvenDirection, CalculationMode.Price, CurrentTrade.Bias == TradeBias.Long ? Position.AveragePrice + 0 : Position.AveragePrice - 0, true);
                     CurrentTrade.StopLoss = Position.AveragePrice;
                     PrintDebug($"[BREAK_EVEN] set {Position.AveragePrice}");
                 }

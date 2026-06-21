@@ -57,20 +57,27 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
             var positionSize = Owner.CalculatePositionSize(stopDistance, config.Risk);
             if (positionSize < 1)
             {
-                Owner.PrintDebug($"[POSITION_SUBOPTIMAL_LONG] Position {positionSize}, Stop {stopLoss}");
+                Owner.PrintDebug($"[POSITION_SUBOPTIMAL_LONG_REVERSAL] Position {positionSize}, Stop {stopLoss}");
                 return TradeDetails.Failed();
             }
 
             var profitTarget = config.Ranges.Current(Owner.Close[0]).Eq;
+
+            var riskReward = Owner.CalculateRiskReward(stopDistance, profitTarget - Owner.Low[0]);
+            if (riskReward < 0.5)
+            {
+                Owner.PrintDebug($"[RR_SUBOPTIMAL_LONG_REVERSAL] Risk-Reward {riskReward}");
+                return TradeDetails.Failed();
+            }
 
             return new()
             {
                 Entry = Owner.Low[0],
                 Bias = TradeBias.Long,
                 IsLimit = true,
-                Log = "LONG_ENTRY_REVERSAL",
+                Log = "LONG_REVERSAL_ENTRY",
                 PositionSize = positionSize,
-                RiskReward = 1,
+                RiskReward = riskReward,
                 OriginalStopLoss = stopLoss,
                 StopLoss = stopLoss,
                 TakeProfit = profitTarget,

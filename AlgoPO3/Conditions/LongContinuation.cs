@@ -50,7 +50,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
             var positionSize = Owner.CalculatePositionSize(stopDistance, config.Risk);
             if (positionSize < 1)
             {
-                Owner.PrintDebug($"[POSITION_SUBOPTIMAL_LONG__CONTINUATION] Position {positionSize}, Stop {stopLoss}");
+                Owner.PrintDebug($"[POSITION_SUBOPTIMAL_LONG_CONTINUATION] Position {positionSize}, Stop {stopLoss}");
                 return TradeDetails.Failed();
             }
 
@@ -68,9 +68,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3.Conditions
                 Entry = Owner.Low[0],
                 Bias = TradeBias.Long,
                 IsLimit = true,
-                Log = "LONG_ENTRY_CONTINUATION",
+                Log = "LONG_CONTINUATION_ENTRY",
                 PositionSize = positionSize,
-                RiskReward = 1,
+                RiskReward = riskReward,
                 OriginalStopLoss = stopLoss,
                 StopLoss = stopLoss,
                 TakeProfit = profitTarget,

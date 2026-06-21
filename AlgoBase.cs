@@ -320,7 +320,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         {
             if (tradeBias == TradeBias.Long)
             {
-                PrintDebug($"{Low[0]} {High[0]} {range.ExtLow} {range.Eq}");
                 if (Low[0] > High[2] &&         // IMB
                     Low[0] - High[2] >= 1 &&    // IMB gap distance
                     High[2] > range.ExtLow &&   // IMB must be inside range
