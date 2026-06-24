@@ -47,7 +47,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "PO3 Algo Asia v7.1";
+                Name = "PO3 Algo Asia v7.2";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -118,6 +118,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
             }
 
+            // Always process fractal and BOS detection.
+            if (BarsInProgress == 1)
+            {
+                dailyAtr.Calculate(High[0], Low[0], Close[0]);
+
+                fractalManager.DetectFractalThreeBarWithPlatos(5);
+
+                DetectBOS();
+            }
+
             if (TradingHalted) return;
 
             if (SkipMonths.Split(',').Contains(Time[0].Month.ToString()))
@@ -143,16 +153,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 TradingHalted = true;
                 PrintInfo($"Trading halted as last candle was {CandleBodyRange(0)} points.");
                 return;
-            }
-
-            // Always process fractal and BOS detection.
-            if (BarsInProgress == 1)
-            {
-                dailyAtr.Calculate(High[0], Low[0], Close[0]);
-
-                fractalManager.DetectFractalThreeBarWithPlatos(5);
-
-                DetectBOS();
             }
 
             if (BarsInProgress != 0)
@@ -219,7 +219,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             // Cancel limit orders close to end of sessions blocks.
             // TODO: Test this properly with Python.
-            if (TokyoTime().Hour == 11 && Time[0].Minute >= 30)
+            if (TokyoTime().Hour == 11 && Time[0].Minute >= 45)
             {
                 CancelLimitOrder();
                 return;
