@@ -212,6 +212,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 NewsEvent.CreateCPIEvent(new DateTime(2026, 1, 13, 08, 30, 00)),    // CPI
                 new(new DateTime(2026, 1, 14, 13, 30, 0)),
                 new(new DateTime(2026, 1, 15, 13, 30, 0)),
+                NewsEvent.CreateUSBankHoliday(new DateTime(2026, 01, 19)),          // US BANK Holiday
                 new(new DateTime(2026, 1, 22, 13, 30, 0)),
                 NewsEvent.CreateFOMCEvent(new DateTime(2026, 01, 28, 14, 00, 0)),   // FOMC
                 new(new DateTime(2026, 1, 29, 13, 30, 0)),
@@ -224,6 +225,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 NewsEvent.CreateNFPEvent(new DateTime(2026, 2, 11, 08, 30, 00)),    // NFP
                 new(new DateTime(2026, 2, 12, 13, 30, 0)),
                 NewsEvent.CreateCPIEvent(new DateTime(2026, 2, 13, 08, 30, 00)),    // CPI
+                NewsEvent.CreateUSBankHoliday(new DateTime(2026, 02, 16)),          // US BANK Holiday
                 new(new DateTime(2026, 2, 19, 13, 30, 0)),
                 new(new DateTime(2026, 2, 20, 13, 30, 0)),
                 new(new DateTime(2026, 2, 26, 13, 30, 0)),
@@ -258,6 +260,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 NewsEvent.CreateNFPEvent(new DateTime(2026, 06, 05, 08, 30, 00)),   // NFP
                 NewsEvent.CreateCPIEvent(new DateTime(2026, 06, 10, 08, 30, 00)),   // CPI
                 NewsEvent.CreateFOMCEvent(new DateTime(2026, 06, 17, 14, 00, 0)),   // FOMC
+                NewsEvent.CreateUSBankHoliday(new DateTime(2026, 06, 19)),          // US BANK Holiday
             };
 
             // Add xmas period 2024

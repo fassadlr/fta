@@ -75,10 +75,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
         private StrategyRunner_ORS runner;
 
-        private int adjustedMarketOpen = 0;
-        private int adjustedSessionStart = 0;
-        private int adjustedSessionEnd = 0;
-
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
@@ -108,6 +104,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 // Main chart should be 1-minute
                 AddDataSeries(BarsPeriodType.Minute, 5);
                 AddDataSeries(BarsPeriodType.Minute, 15);
+
+                NewYorkZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
             }
             else if (State == State.DataLoaded)
             {
@@ -126,11 +124,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
         protected override void OnBarUpdate()
         {
-            if (Time[0].Month == 3 && Time[0].Day == 16)
-            {
-                return;
-            }
-
             runner ??= StrategyRunner_ORS.Configure(this, fractalManager, new RunnerConfiguration_ORS()
             {
                 CandleBodyPercentage = ContinuationCandleBodyPercentage,
@@ -142,9 +135,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 VWAP = vwap
             });
 
-            // Filter by event days, skip days etc.
-            if (FilterAllDayAndBankHolidays() && Position.MarketPosition == MarketPosition.Flat)
+
+            // Skip all day events (easter etc).
+            var newsForToday = GetNewsEventForToday();
+            if (newsForToday != null && Position.MarketPosition == MarketPosition.Flat &&
+                (newsForToday.AllDay || newsForToday.BankHoliday))
+            {
+                TradingHalted = true;
+                PrintInfo($"[TRADING_HALTED] event {newsForToday}.");
                 return;
+            }
 
             if (BarsInProgress == 0 && Bars.IsFirstBarOfSession)
             {
@@ -163,27 +163,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 return;
             }
 
-            if (IsDSTOverlap())
-            {
-                adjustedMarketOpen = AddHoursToTime(SessionMarketOpen, -1);
-                adjustedSessionStart = AddHoursToTime(SessionStartTime, -1);
-                adjustedSessionEnd = AddHoursToTime(SessionEndTime, -1);
-            }
-            else
-            {
-                adjustedMarketOpen = AddHoursToTime(SessionMarketOpen, 0); // ANCHOR to NY time
-                adjustedSessionStart = AddHoursToTime(SessionStartTime, 0);
-                adjustedSessionEnd = AddHoursToTime(SessionEndTime, 0);
-
-                //PrintDebug($"Market Open {adjustedMarketOpen}");
-                //PrintDebug($"Session Start {adjustedSessionStart}");
-                //PrintDebug($"Session End {adjustedSessionEnd}");
-            }
-
             // --------------------------------------------------
             // 15-minute series only
             // --------------------------------------------------
-            if (BarsInProgress == 2 && ToTime(Times[2][0]) <= adjustedMarketOpen)
+            if (BarsInProgress == 2 && NewYorkTime().TimeOfDay < new TimeSpan(09, 30, 00))
             {
                 fractalManager.DetectFractalThreeBar(15);
                 fractalManager.DetectFractalFiveBar(15);
@@ -219,7 +202,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
                 // Break Even Logic
                 if (!breakEvenSet &&
-                    ToTime(Time[0]) >= SessionEndTime &&
+                    NewYorkTime().TimeOfDay >= new TimeSpan(11, 00, 00) &&
                     Position.GetUnrealizedProfitLoss(PerformanceUnit.Currency, Close[0]) > 0)
                 {
                     var tradeType = tradeBias == TradeBias.Long ? "long" : "short";
@@ -240,7 +223,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
             // No more processing after session end
             // We can still look at the previous candles at the open of the 16:00 candle
-            if (ToTime(Time[0]) > adjustedSessionEnd || tradingComplete)
+            if (NewYorkTime().TimeOfDay > new TimeSpan(11, 00, 00) || tradingComplete)
             {
                 if (CurrentTrade?.PendingOrder != null)
                 {
@@ -254,7 +237,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             fractalManager.DetectFractalThreeBar(5, runner.Configuration.RangeHigh, runner.Configuration.RangeLow);
             fractalManager.DetectFractalFiveBar(5);
 
-            if (ToTime(Time[0]) < adjustedMarketOpen)
+            if (NewYorkTime().TimeOfDay < new TimeSpan(09, 30, 00))
             {
                 // Keep track of the daily range up until session start.
                 dailyRangeTracker.Update(High[0], Low[0], Time[0]);
@@ -263,14 +246,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             }
 
             // Initialize the trade range at open
-            if (ToTime(Time[0]) == adjustedMarketOpen && !sessionInitialized)
+            if (NewYorkTime().TimeOfDay == new TimeSpan(09, 30, 00) && !sessionInitialized)
             {
                 InitializeTradeRange();
 
                 sessionInitialized = true;
             }
 
-            if (ToTime(Time[0]) > adjustedMarketOpen)
+            if (NewYorkTime().TimeOfDay > new TimeSpan(09, 30, 00))
             {
                 if (High[0] > runner.Configuration.RangeHigh && runner.Configuration.RangeInitiator != TradeRangeInitiator.RangeHighEngaged)
                 {
