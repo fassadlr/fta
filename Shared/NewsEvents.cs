@@ -38,6 +38,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         {
             return new NewsEvent(eventTime) { IsFOMC = true };
         }
+
+        public override string ToString()
+        {
+            return $"All Day: {AllDay} | CPI {IsCPI} | NFP {IsNFP}";
+        }
     }
 
     public class NewsFilter(bool includeCPI, bool includeFOMC, bool includeNFP, bool includeNoEvents)

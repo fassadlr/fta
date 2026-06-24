@@ -21,8 +21,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         public int StopGrace { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "New York End Time", Order = 23, GroupName = "Parameters")]
+        [Display(Name = "New York End Time", Order = 22, GroupName = "Parameters")]
         public int NewYorkEndTime { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Filter News Days", Order = 23, GroupName = "Parameters")]
+        public bool FilterNewsDays { get; set; }
 
         private List<DealingRange> ranges;
 
@@ -45,6 +49,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private FractalManager fractalManager;
 
         private StrategyRunner_PO3 runner;
+        private int lastTradeCount;
+        private double dayPnL;
 
         protected override void OnStateChange()
         {
@@ -134,17 +140,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (!Events.IsInWeek(newsFilter, Time[0]))
             {
-                PrintInfo($"Skipping as NFP {newsFilter.IncludeNFP} CPI {newsFilter.IncludeCPI} FOMC {newsFilter.IncludeFOMC} NoEvents {newsFilter.IncludeNoEvents}...");
+                PrintInfo($"[TRADING_HALTED] Skipping as NFP {newsFilter.IncludeNFP} CPI {newsFilter.IncludeCPI} FOMC {newsFilter.IncludeFOMC} NoEvents {newsFilter.IncludeNoEvents}...");
                 TradingHalted = true;
                 return;
             }
 
             // Skip all day events (easter etc).
             var newsForToday = GetNewsEventForToday();
-            if (newsForToday != null && newsForToday.AllDay && Position.MarketPosition == MarketPosition.Flat)
+            if (newsForToday != null && Position.MarketPosition == MarketPosition.Flat &&
+                (newsForToday.AllDay || (FilterNewsDays && (newsForToday.IsNFP || newsForToday.IsCPI))))
             {
                 TradingHalted = true;
-                PrintInfo($"Trading skipped for day due to all day event.");
+                PrintInfo($"[TRADING_HALTED] event {newsForToday}.");
                 return;
             }
 
@@ -152,7 +159,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (CandleBodyRange(0) > 300)
             {
                 TradingHalted = true;
-                PrintInfo($"Trading halted as last candle was {CandleBodyRange(0)} points.");
+                PrintInfo($"[TRADING_HALTED] last candle {CandleBodyRange(0)} points.");
                 return;
             }
 
@@ -172,7 +179,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 Position.MarketPosition == MarketPosition.Flat)
             {
                 CancelLimitOrder();
-                PrintInfo($"Trading session ended.");
+                PrintInfo($"[TRADING_HALTED] session end");
                 TradingHalted = true;
                 return;
             }
@@ -266,7 +273,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             // Cancel limit orders close to end of sessions blocks.
             // TODO: We need to retest these once done.
             var validBlockEndHour = LondonTime().Hour == 9 || LondonTime().Hour == 12;
-            if (validBlockEndHour && Time[0].Minute >= 59)
+            if (validBlockEndHour && Time[0].Minute >= 55)
             {
                 CancelLimitOrder();
                 return;
@@ -304,6 +311,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private void ExecuteStrategies()
         {
+            if (dayPnL > 650)
+            {
+                TradingHalted = true;
+                PrintInfo($"[TRADING_HALTED] Max Profit reached {dayPnL}");
+                return;
+            }
+
             if (IsLive && State != State.Realtime)
                 return;
 
@@ -347,13 +361,20 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
         {
-            PrintDebug($"{Position.MarketPosition}");
-
             if (marketPosition != MarketPosition.Flat)
                 return;
 
             if (SystemPerformance.AllTrades.Count == 0)
                 return;
+
+
+            if (SystemPerformance.AllTrades.Count > lastTradeCount)
+            {
+                Trade lastTrade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
+
+                dayPnL += lastTrade.ProfitCurrency;
+                lastTradeCount = SystemPerformance.AllTrades.Count;
+            }
 
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
@@ -432,6 +453,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             CurrentTrade = null;
 
             TradingHalted = false;
+
+            dayPnL = 0;
+            lastTradeCount = 0;
         }
 
         private void BreakEvenOrCloseTrade()
