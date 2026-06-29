@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.IO;
 using System.Linq;
 using NinjaTrader.Cbi;
 using NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3;
@@ -24,7 +25,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         [NinjaScriptProperty]
         [Display(Name = "Export Trade Logs", Order = 3, GroupName = "Parameters")]
-        public bool ExportTradeLogs { get; set; }
+        public bool ExportTradeLogsEnabled { get; set; }
 
         internal double LastFractalHigh = 0;
         internal DateTime LastFractalHighTime;
@@ -347,6 +348,25 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             }
 
             return false;
+        }
+
+        internal void ExportTradeLogs(string fileName)
+        {
+            if (TradeLogs.Count > 0)
+            {
+                string path = fileName;
+
+                using (StreamWriter sw = new(path))
+                {
+                    sw.WriteLine("EntryTime,Bias,OrderType,Result,Pnl,Quantity,VWAPDistance,VWAPLocation,IsCPI,IsNFP");
+                    foreach (string trade in TradeLogs)
+                    {
+                        sw.WriteLine(trade);
+                    }
+                }
+
+                Print($"Trade log written to {path}");
+            }
         }
     }
 

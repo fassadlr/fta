@@ -13,18 +13,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
     public class AlgoORSv2 : AlgoBase
     {
         [NinjaScriptProperty]
-        [Display(Name = "Session Start", Order = 5, GroupName = "Parameters")]
-        public int SessionStartTime { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Session End", Order = 6, GroupName = "Parameters")]
-        public int SessionEndTime { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Session Market Open", Order = 7, GroupName = "Parameters")]
-        public int SessionMarketOpen { get; set; }
-
-        [NinjaScriptProperty]
         [Display(Name = "Cont. Stop Grace", Order = 8, GroupName = "Parameters")]
         public int ContinuationStopGrace { get; set; }
 
@@ -74,6 +62,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
         //private Order currentLimitOrder;
 
         private StrategyRunner_ORS runner;
+        private DateTime? lastInitialization;
 
         protected override void OnStateChange()
         {
@@ -94,9 +83,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 ContinuationTPMultiplier = 1;
 
                 Risk = 300;
-                SessionMarketOpen = 143000;
-                SessionStartTime = 144500;
-                SessionEndTime = 160000;
                 ContinuationStopGrace = 15;
             }
             else if (State == State.Configure)
@@ -120,35 +106,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                         1, 2, 3
                     );
             }
+            else if (State == State.Terminated)
+            {
+                if (ExportTradeLogsEnabled)
+                    ExportTradeLogs($@"C:\GitHub\fassadlr\propfirmsimulator\TradeLog_AlgoORSv2{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+            }
         }
 
         protected override void OnBarUpdate()
         {
-            runner ??= StrategyRunner_ORS.Configure(this, fractalManager, new RunnerConfiguration_ORS()
+            if (lastInitialization == null || lastInitialization?.Date != Time[0].Date)
             {
-                CandleBodyPercentage = ContinuationCandleBodyPercentage,
-                EntryPercentage = ReversalPullbackEntryPercentage,
-                MaxRiskReward = ReversalMaxRiskReward,
-                Risk = Risk,
-                StopGrace = ContinuationStopGrace,
-                TPMultiplier = ContinuationTPMultiplier,
-                VWAP = vwap
-            });
-
-
-            // Skip all day events (easter etc).
-            var newsForToday = GetNewsEventForToday();
-            if (newsForToday != null && Position.MarketPosition == MarketPosition.Flat &&
-                (newsForToday.AllDay || newsForToday.BankHoliday))
-            {
-                TradingHalted = true;
-                PrintInfo($"[TRADING_HALTED] event {newsForToday}.");
-                return;
-            }
-
-            if (BarsInProgress == 0 && Bars.IsFirstBarOfSession)
-            {
-                PrintDebug($"Starting a new trading day.");
+                PrintInfo($"Starting a new trading day.");
 
                 breakEvenSet = false;
                 dailyRangeTracker = new();
@@ -160,6 +129,33 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 // The runner resets the fractal manager instance.
                 runner = null;
 
+                TradingHalted = false;
+
+                lastInitialization = Time[0].Date;
+
+                return;
+            }
+
+            if (TradingHalted) return;
+
+            runner ??= StrategyRunner_ORS.Configure(this, fractalManager, new RunnerConfiguration_ORS()
+            {
+                CandleBodyPercentage = ContinuationCandleBodyPercentage,
+                EntryPercentage = ReversalPullbackEntryPercentage,
+                MaxRiskReward = ReversalMaxRiskReward,
+                Risk = Risk,
+                StopGrace = ContinuationStopGrace,
+                TPMultiplier = ContinuationTPMultiplier,
+                VWAP = vwap
+            });
+
+            // Skip all day events (easter etc).
+            var newsForToday = GetNewsEventForToday();
+            if (newsForToday != null && Position.MarketPosition == MarketPosition.Flat &&
+                (newsForToday.AllDay || newsForToday.BankHoliday))
+            {
+                TradingHalted = true;
+                PrintInfo($"[TRADING_HALTED] event {newsForToday}.");
                 return;
             }
 
@@ -294,7 +290,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
 
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             CurrentTrade.ProfitLoss = trade.ProfitCurrency;
-            PrintTrade($"{CurrentTrade}");
+            var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
+            var newsForToday = GetNewsEventForToday();
+            TradeLogs.Add($"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.VWAPLocation},{newsForToday != null && newsForToday.IsCPI},{newsForToday != null && newsForToday.IsNFP}");
+            PrintTrade($"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.VWAPLocation},{newsForToday != null && newsForToday.IsCPI},{newsForToday != null && newsForToday.IsNFP}");
 
             if (trade.ProfitCurrency >= 0)
                 tradingComplete = true;

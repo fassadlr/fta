@@ -80,7 +80,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoOPR
             }
             else if (State == State.Terminated)
             {
-                if (TradeLogs.Count > 0 && ExportTradeLogs)
+                if (TradeLogs.Count > 0 && ExportTradeLogsEnabled)
                 {
                     string path = $@"C:\Users\fassa\Documents\NinjaTrader Testing\OPRevTradeLog{DateTime.Now:yyyyMMdd_HHmmss}.csv";
 

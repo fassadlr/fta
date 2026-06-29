@@ -103,7 +103,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
             else if (State == State.Terminated)
             {
-                if (TradeLogs.Count > 0 && ExportTradeLogs)
+                if (TradeLogs.Count > 0 && ExportTradeLogsEnabled)
                 {
                     string path = $@"C:\Users\fassa\Documents\NinjaTrader Testing\TradeLog{DateTime.Now:yyyyMMdd_HHmmss}.csv";
 

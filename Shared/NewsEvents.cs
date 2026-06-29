@@ -41,7 +41,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
 
         public override string ToString()
         {
-            return $"All Day: {AllDay} | CPI {IsCPI} | NFP {IsNFP}";
+            return $"All Day: {AllDay} | Bank Holiday {BankHoliday} | CPI {IsCPI} | NFP {IsNFP}";
         }
     }
 
