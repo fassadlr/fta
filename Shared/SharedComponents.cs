@@ -67,6 +67,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         public double Atr { get; internal set; }
         public double BreakEvenThreshold { get; internal set; }
 
+        public double DeltaMomentum { get; internal set; }
+        public double CvdSlope { get; internal set; }
+        public object CvdRSquared { get; internal set; }
+
         public override string ToString()
         {
             return string.Join(",",

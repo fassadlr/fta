@@ -4,6 +4,8 @@ using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
 using NinjaTrader.Cbi;
+using NinjaTrader.NinjaScript.Indicators;
+using NinjaTrader.NinjaScript.MarketAnalyzerColumns;
 using NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
@@ -56,6 +58,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         internal bool TradingHalted { get; set; }
 
         internal TradeDetails CurrentTrade { get; set; }
+
+        internal OrderFlowCumulativeDelta OrderFlowCVD { get; set; }
+
+        internal OrderFlowVWAP VWAP { get; set; }
+
+        #region
+
+        #endregion
 
         internal int AdjustSessionEnd()
         {
@@ -350,7 +360,36 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             return false;
         }
 
-        internal void ExportTradeLogs(string fileName)
+        internal double GetBarDelta(int barsAgo)
+        {
+            return OrderFlowCVD.DeltaClose[barsAgo] - OrderFlowCVD.DeltaOpen[barsAgo];
+        }
+
+        internal double CalculateDeltaMomentum()
+        {
+            double recent = 0;
+            double previous = 0;
+
+            for (int i = 0; i < 5; i++)
+                recent += GetBarDelta(i);
+
+            for (int i = 5; i < 10; i++)
+                previous += GetBarDelta(i);
+
+            recent /= 5.0;
+            previous /= 5.0;
+
+            double deltaMomentum = recent - previous;
+
+            return Math.Round(deltaMomentum, 2);
+        }
+
+        internal double CalculateCvdSlope(int lookback)
+        {
+            return Math.Round((OrderFlowCVD.DeltaClose[0] - OrderFlowCVD.DeltaClose[lookback]) / lookback, 2);
+        }
+
+        internal void ExportTradeLogs(string fields, string fileName)
         {
             if (TradeLogs.Count > 0)
             {
@@ -358,7 +397,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
                 using (StreamWriter sw = new(path))
                 {
-                    sw.WriteLine("EntryTime,Bias,OrderType,Result,Pnl,Quantity,VWAPDistance,VWAPLocation,IsCPI,IsNFP");
+                    sw.WriteLine(fields);
                     foreach (string trade in TradeLogs)
                     {
                         sw.WriteLine(trade);
@@ -366,6 +405,82 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 }
 
                 Print($"Trade log written to {path}");
+            }
+        }
+
+        internal (double Slope, double RSquared) CalculateRegression(ISeries<double> series, int lookback)
+        {
+            if (CurrentBar < lookback - 1)
+                return (0, 0);
+
+            double sumX = 0;
+            double sumY = 0;
+            double sumXY = 0;
+            double sumX2 = 0;
+
+            int x = 0;
+
+            // ==========================
+            // First pass - Calculate slope
+            // ==========================
+            for (int i = lookback - 1; i >= 0; i--)
+            {
+                double y = series[i];
+
+                sumX += x;
+                sumY += y;
+                sumXY += x * y;
+                sumX2 += x * x;
+
+                x++;
+            }
+
+            double denominator = (lookback * sumX2) - (sumX * sumX);
+
+            if (denominator == 0)
+                return (0, 0);
+
+            double slope = ((lookback * sumXY) - (sumX * sumY)) / denominator;
+            double intercept = (sumY - slope * sumX) / lookback;
+
+            // ==========================
+            // Second pass - Calculate R²
+            // ==========================
+            double meanY = sumY / lookback;
+            double ssRes = 0;
+            double ssTot = 0;
+
+            x = 0;
+
+            for (int i = lookback - 1; i >= 0; i--)
+            {
+                double y = series[i];
+                double predicted = intercept + slope * x;
+
+                ssRes += Math.Pow(y - predicted, 2);
+                ssTot += Math.Pow(y - meanY, 2);
+
+                x++;
+            }
+
+            double rSquared = ssTot == 0
+                ? 1.0
+                : 1.0 - (ssRes / ssTot);
+
+            return (Math.Round(slope, 2), Math.Round(rSquared, 4));
+        }
+
+        internal void CalculateVWAPDistance()
+        {
+            if (CurrentTrade.Entry > VWAP.VWAP[0])
+            {
+                CurrentTrade.VWAPLocation = "Above";
+                CurrentTrade.VWAPDistance = Math.Round(CurrentTrade.Entry - VWAP.VWAP[0]);
+            }
+            else
+            {
+                CurrentTrade.VWAPLocation = "Below";
+                CurrentTrade.VWAPDistance = Math.Round(VWAP.VWAP[0] - CurrentTrade.Entry);
             }
         }
     }

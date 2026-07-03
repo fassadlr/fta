@@ -109,7 +109,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             else if (State == State.Terminated)
             {
                 if (ExportTradeLogsEnabled)
-                    ExportTradeLogs($@"C:\GitHub\fassadlr\propfirmsimulator\TradeLog_AlgoORSv2{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                    ExportTradeLogs("", $@"C:\GitHub\fassadlr\propfirmsimulator\TradeLog_AlgoORSv2{DateTime.Now:yyyyMMdd_HHmmss}.csv");
             }
         }
 
@@ -292,8 +292,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             CurrentTrade.ProfitLoss = trade.ProfitCurrency;
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
             var newsForToday = GetNewsEventForToday();
-            TradeLogs.Add($"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.VWAPLocation},{newsForToday != null && newsForToday.IsCPI},{newsForToday != null && newsForToday.IsNFP}");
-            PrintTrade($"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.VWAPLocation},{newsForToday != null && newsForToday.IsCPI},{newsForToday != null && newsForToday.IsNFP}");
+            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.VWAPLocation},{newsForToday != null && newsForToday.IsCPI},{newsForToday != null && newsForToday.IsNFP}";
+            TradeLogs.Add(tradeCSV);
+            PrintTrade(tradeCSV);
 
             if (trade.ProfitCurrency >= 0)
                 tradingComplete = true;

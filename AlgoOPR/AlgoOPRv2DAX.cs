@@ -125,7 +125,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoOPR
                 if (news == null)
                     return;
 
-                if (news.AllDay || news.BankHoliday)
+                if (news.AllDay)
                 {
                     PrintDebug($"[SKIPPING_SESSION] AllDay: {news.AllDay}, BankHoliday: {news.BankHoliday}");
                     tradingSkippedForDay = Time[0].Date;

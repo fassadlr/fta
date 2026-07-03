@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 {
@@ -11,6 +12,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         [NinjaScriptProperty]
         [Display(Name = "Skip Months", Order = 11, GroupName = "Parameters")]
         public string SkipMonths { get; set; }
+
+        internal HashSet<int> SkipMonthsSet { get; set; }
 
         [NinjaScriptProperty]
         [Display(Name = "Edge Multiplier", Order = 12, GroupName = "Parameters")]

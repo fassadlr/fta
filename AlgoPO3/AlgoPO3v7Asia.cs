@@ -37,7 +37,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private DailyAtr dailyAtr;
         private double atrCurrent;
-        private OrderFlowVWAP vwap;
         private bool isConnected;
 
         private FractalManager fractalManager;
@@ -65,6 +64,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             else if (State == State.Configure)
             {
                 AddDataSeries("MNQ 09-26", BarsPeriodType.Minute, 5);
+                AddDataSeries(BarsPeriodType.Tick, 1);
 
                 Ranges = [];
 
@@ -81,17 +81,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 fractalManager = new FractalManager(this);
 
-                vwap = OrderFlowVWAP(
-                        VWAPResolution.Standard,
-                        Bars.TradingHours,
-                        VWAPStandardDeviations.One,
-                        1, 2, 3
-                    );
+                VWAP = OrderFlowVWAP(VWAPResolution.Standard, Bars.TradingHours, VWAPStandardDeviations.One, 1, 2, 3);
+                OrderFlowCVD = OrderFlowCumulativeDelta(CumulativeDeltaType.BidAsk, CumulativeDeltaPeriod.Session, 1);
             }
             else if (State == State.Terminated)
             {
                 if (ExportTradeLogsEnabled)
-                    ExportTradeLogs($@"C:\GitHub\fassadlr\propfirmsimulator\TradeLog_AlgoPO3v7Asia_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                    ExportTradeLogs(
+                        "EntryTime,Bias,OrderType,Result,Pnl,Quantity,VWAPDistance,DeltaMomentum,CvdSlope,CvdRSquared",
+                        $@"C:\GitHub\fassadlr\propfirmsimulator\TradeLog_AlgoPO3v7Asia_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
             }
         }
 
@@ -112,6 +110,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 fractalManager.DetectFractalThreeBarWithPlatos(5);
 
                 DetectBOS();
+            }
+
+            // Update the CVD
+            if (BarsInProgress == 2)
+            {
+                OrderFlowCVD.Update(OrderFlowCVD.BarsArray[1].Count - 1, 1);
+                return;
             }
 
             if (TradingHalted) return;
@@ -371,6 +376,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             CalculateVWAPDistance();
 
+            CurrentTrade.DeltaMomentum = CalculateDeltaMomentum();
+
+            var regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 5);
+            CurrentTrade.CvdSlope = regressionResult.Slope;
+            CurrentTrade.CvdRSquared = regressionResult.RSquared;
+
             if (CurrentTrade.Bias == TradeBias.Long)
             {
                 if (atrCurrent >= 19)
@@ -452,20 +463,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
         }
 
-        private void CalculateVWAPDistance()
-        {
-            if (CurrentTrade.Entry > vwap.VWAP[0])
-            {
-                CurrentTrade.VWAPLocation = "Above";
-                CurrentTrade.VWAPDistance = Math.Round(CurrentTrade.Entry - vwap.VWAP[0]);
-            }
-            else
-            {
-                CurrentTrade.VWAPLocation = "Below";
-                CurrentTrade.VWAPDistance = Math.Round(vwap.VWAP[0] - CurrentTrade.Entry);
-            }
-        }
-
         protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
         {
             if (marketPosition != MarketPosition.Flat)
@@ -476,8 +473,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-            TradeLogs.Add($"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.VWAPLocation}");
-            PrintTrade($"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.VWAPLocation}");
+            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.DeltaMomentum},{CurrentTrade.CvdSlope},{CurrentTrade.CvdRSquared}";
+            TradeLogs.Add(tradeCSV);
 
             if (trade.ProfitCurrency >= 0)
                 ProcessSharedBorderRange(false);

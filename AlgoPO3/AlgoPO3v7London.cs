@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.IO;
 using System.Linq;
 using NinjaTrader.Cbi;
 using NinjaTrader.Data;
@@ -25,7 +24,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         public int NewYorkEndTime { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Filter News Days", Order = 23, GroupName = "Parameters")]
+        [Display(Name = "Max Profit", Order = 23, GroupName = "Parameters")]
+        public int MaxProfit { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Filter News Days", Order = 24, GroupName = "Parameters")]
         public bool FilterNewsDays { get; set; }
 
         private List<DealingRange> ranges;
@@ -43,7 +46,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private DailyAtr dailyAtr;
         private double atrCurrent;
-        private OrderFlowVWAP vwap;
         private bool isConnected;
 
         private FractalManager fractalManager;
@@ -79,6 +81,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
             else if (State == State.Configure)
             {
+                AddDataSeries(BarsPeriodType.Tick, 1);
+
                 ranges = [];
 
                 Events = NewsEvents.Events();
@@ -89,35 +93,28 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 LondonZone = TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time");
                 NewYorkZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+
+                SkipMonthsSet = [.. SkipMonths.Split(',').Select(x => int.Parse(x.Trim()))];
             }
             else if (State == State.DataLoaded)
             {
                 fractalManager = new FractalManager(this);
 
-                vwap = OrderFlowVWAP(
+                VWAP = OrderFlowVWAP(
                         VWAPResolution.Standard,
                         Bars.TradingHours,
                         VWAPStandardDeviations.One,
                         1, 2, 3
                     );
+
+                OrderFlowCVD = OrderFlowCumulativeDelta(CumulativeDeltaType.BidAsk, CumulativeDeltaPeriod.Session, 1);
             }
             else if (State == State.Terminated)
             {
-                if (TradeLogs.Count > 0 && ExportTradeLogsEnabled)
-                {
-                    string path = $@"C:\Users\fassa\Documents\NinjaTrader Testing\TradeLog{DateTime.Now:yyyyMMdd_HHmmss}.csv";
-
-                    using (StreamWriter sw = new(path))
-                    {
-                        sw.WriteLine("EntryTime,Bias,OrderType,Result,Pnl,Quantity,VWAPDistance,VWAPLocation");
-                        foreach (string trade in TradeLogs)
-                        {
-                            sw.WriteLine(trade);
-                        }
-                    }
-
-                    Print($"Trade log written to {path}");
-                }
+                if (ExportTradeLogsEnabled)
+                    ExportTradeLogs(
+                        "EntryTime,Bias,OrderType,Result,Pnl,Quantity,VWAPDistance,DeltaMomentum,CvdSlope,CvdRSquared",
+                        $@"C:\Users\fassa\Documents\NinjaTrader Testing\TradeLog{DateTime.Now:yyyyMMdd_HHmmss}.csv");
             }
         }
 
@@ -132,7 +129,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (TradingHalted) return;
 
-            if (SkipMonths.Split(',').Contains(Time[0].Month.ToString()))
+            if (SkipMonthsSet.Contains(Time[0].Month))
             {
                 TradingHalted = true;
                 return;
@@ -184,10 +181,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
             }
 
-            atrCurrent = dailyAtr.Atr;
+            // Update the CVD after 6am up until the close
+            if (BarsInProgress == 1)
+            {
+                OrderFlowCVD.Update(OrderFlowCVD.BarsArray[1].Count - 1, 1);
+                return;
+            }
 
-            //if (BarsInProgress != 0)
-            //    return;
+            atrCurrent = dailyAtr.Atr;
 
             fractalManager.DetectFractalThreeBarWithPlatos(1);
             fractalManager.DetectFractalFiveBar(1);
@@ -298,6 +299,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 if (shouldCancel)
                 {
+                    var tradeCSV = $"{CurrentTrade.EntryTime},{CurrentTrade.Bias},{CurrentTrade.OrderType},Win,0,{CurrentTrade.PositionSize},{CurrentTrade.VWAPDistance},{CurrentTrade.DeltaMomentum},{CurrentTrade.CvdSlope},{CurrentTrade.CvdRSquared}";
+                    TradeLogs.Add(tradeCSV);
+
                     CancelLimitOrder();
                     rangeBreakDetected = false;
                 }
@@ -311,7 +315,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private void ExecuteStrategies()
         {
-            if (dayPnL > 650)
+            if (dayPnL > MaxProfit)
             {
                 TradingHalted = true;
                 PrintInfo($"[TRADING_HALTED] Max Profit reached {dayPnL}");
@@ -338,12 +342,19 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (CurrentTrade != null && CurrentTrade.Bias == tradeDetails.Bias && CurrentTrade.Entry == tradeDetails.Entry)
                 return;
 
+            tradeDetails.DeltaMomentum = CalculateDeltaMomentum();
+
+            var regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 5);
+            tradeDetails.CvdSlope = regressionResult.Slope;
+            tradeDetails.CvdRSquared = regressionResult.RSquared;
+
             if (tradeDetails.Bias == TradeBias.Short)
                 EnterShortTrade(tradeDetails);
 
             if (tradeDetails.Bias == TradeBias.Long)
                 EnterLongTrade(tradeDetails);
         }
+
 
         protected override void OnConnectionStatusUpdate(ConnectionStatusEventArgs e)
         {
@@ -370,7 +381,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (SystemPerformance.AllTrades.Count > lastTradeCount)
             {
-                Trade lastTrade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
+                var lastTrade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
 
                 dayPnL += lastTrade.ProfitCurrency;
                 lastTradeCount = SystemPerformance.AllTrades.Count;
@@ -378,8 +389,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-            TradeLogs.Add($"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.VWAPLocation}");
-            PrintTrade($"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.VWAPLocation}");
+            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.DeltaMomentum},{CurrentTrade.CvdSlope},{CurrentTrade.CvdRSquared}";
+            TradeLogs.Add(tradeCSV);
+            PrintTrade(tradeCSV);
 
             if (trade.ProfitCurrency >= 0)
             {

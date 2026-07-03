@@ -21,8 +21,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 [
                     new LongContinuation(strategyBase, fractalManager),
                     new ShortContinuation(strategyBase, fractalManager),
-                    new LongReversalCondition(strategyBase, fractalManager),
-                    new ShortReversalCondition(strategyBase, fractalManager),
+                    //new LongReversalCondition(strategyBase, fractalManager),
+                    //new ShortReversalCondition(strategyBase, fractalManager),
                     new LongContinuationVWAP_Retrace(strategyBase, fractalManager),
                     new ShortContinuationVWAP_Retrace(strategyBase, fractalManager)
                 ],
