@@ -299,7 +299,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 if (shouldCancel)
                 {
-                    var tradeCSV = $"{CurrentTrade.EntryTime},{CurrentTrade.Bias},{CurrentTrade.OrderType},Win,0,{CurrentTrade.PositionSize},{CurrentTrade.VWAPDistance},{CurrentTrade.DeltaMomentum},{CurrentTrade.CvdSlope},{CurrentTrade.CvdRSquared}";
+                    var tradeCSV = $"{CurrentTrade.EntryTime},{CurrentTrade.Bias},{CurrentTrade.OrderType},Win,0,{CurrentTrade.PositionSize},{CurrentTrade.VWAPDistance},{CurrentTrade.DeltaMomentum},{CurrentTrade.CvdSlopeFast},{CurrentTrade.CvdRSquaredFast}";
                     TradeLogs.Add(tradeCSV);
 
                     CancelLimitOrder();
@@ -345,8 +345,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             tradeDetails.DeltaMomentum = CalculateDeltaMomentum();
 
             var regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 5);
-            tradeDetails.CvdSlope = regressionResult.Slope;
-            tradeDetails.CvdRSquared = regressionResult.RSquared;
+            tradeDetails.CvdSlopeFast = regressionResult.Slope;
+            tradeDetails.CvdRSquaredFast = regressionResult.RSquared;
 
             if (tradeDetails.Bias == TradeBias.Short)
                 EnterShortTrade(tradeDetails);
@@ -389,7 +389,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.DeltaMomentum},{CurrentTrade.CvdSlope},{CurrentTrade.CvdRSquared}";
+            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.DeltaMomentum},{CurrentTrade.CvdSlopeFast},{CurrentTrade.CvdRSquaredFast}";
             TradeLogs.Add(tradeCSV);
             PrintTrade(tradeCSV);
 

@@ -89,7 +89,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (ExportTradeLogsEnabled)
                     ExportTradeLogs(
                         "EntryTime,Bias,OrderType,Result,Pnl,Quantity,VWAPDistance,DeltaMomentum,CvdSlope,CvdRSquared",
-                        $@"C:\GitHub\fassadlr\propfirmsimulator\TradeLog_AlgoPO3v7Asia_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                        $@"C:\Users\fassa\Documents\NinjaTrader Testing\TradeLog_AlgoPO3v7Asia_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
             }
         }
 
@@ -379,8 +379,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             CurrentTrade.DeltaMomentum = CalculateDeltaMomentum();
 
             var regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 5);
-            CurrentTrade.CvdSlope = regressionResult.Slope;
-            CurrentTrade.CvdRSquared = regressionResult.RSquared;
+            CurrentTrade.CvdSlopeFast = regressionResult.Slope;
+            CurrentTrade.CvdRSquaredFast = regressionResult.RSquared;
 
             if (CurrentTrade.Bias == TradeBias.Long)
             {
@@ -473,7 +473,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.DeltaMomentum},{CurrentTrade.CvdSlope},{CurrentTrade.CvdRSquared}";
+            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.DeltaMomentum},{CurrentTrade.CvdSlopeFast},{CurrentTrade.CvdRSquaredFast}";
             TradeLogs.Add(tradeCSV);
 
             if (trade.ProfitCurrency >= 0)

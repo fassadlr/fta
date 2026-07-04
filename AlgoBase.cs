@@ -63,7 +63,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         internal OrderFlowVWAP VWAP { get; set; }
 
-        #region
+        #region Volume Delta 
+
+        internal Series<long> DeltaSeries { get; set; }
+
+        internal double CurrentBid { get; set; }
+        internal double CurrentAsk { get; set; }
+        internal long BuyVolume { get; set; }
+        internal long SellVolume { get; set; }
+        internal long PreviousBarDelta { get; set; }
 
         #endregion
 
