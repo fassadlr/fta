@@ -491,6 +491,23 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 CurrentTrade.VWAPDistance = Math.Round(VWAP.VWAP[0] - CurrentTrade.Entry);
             }
         }
+
+        internal void CalculateStatistics()
+        {
+            CurrentTrade.DeltaMomentum = CalculateDeltaMomentum();
+
+            var regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 5);
+            CurrentTrade.CvdSlopeFast = regressionResult.Slope;
+            CurrentTrade.CvdRSquaredFast = regressionResult.RSquared;
+
+            regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 10);
+            CurrentTrade.CvdSlopeSlow = regressionResult.Slope;
+            CurrentTrade.CvdRSquaredSlow = regressionResult.RSquared;
+            CurrentTrade.CvdAcceleration = CurrentTrade.CvdSlopeSlow - CurrentTrade.CvdRSquaredFast;
+
+            CurrentTrade.BarVolume = Volume[0];
+            CurrentTrade.BarVolumeDelta = PreviousBarDelta;
+        }
     }
 
     public enum TradeBias

@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using NinjaTrader.Cbi;
 using NinjaTrader.Data;
+using NinjaTrader.NinjaScript.BarsTypes;
 using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
@@ -39,6 +40,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private bool isConnected;
 
         private FractalManager fractalManager;
+        private bool rangeBreakConfirmed;
 
         protected override void OnStateChange()
         {
@@ -113,30 +115,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 DetectBOS();
             }
 
-            if (BarsInProgress == 2 && IsFirstTickOfBar)
-            {
-                // Save completed bar
-                PreviousBarDelta = BuyVolume - SellVolume;
-
-                //Print(string.Format(
-                //    "{0}  Delta={1}  Buy={2}  Sell={3}",
-                //    Time[1],
-                //    PreviousBarDelta,
-                //    BuyVolume,
-                //    SellVolume));
-
-                // Reset for new bar
-                BuyVolume = 0;
-                SellVolume = 0;
-            }
-
-            // Update the CVD
-            if (BarsInProgress == 2)
-            {
-                OrderFlowCVD.Update(OrderFlowCVD.BarsArray[1].Count - 1, 1);
-                return;
-            }
-
             if (TradingHalted) return;
 
             if (SkipMonths.Split(',').Contains(Time[0].Month.ToString()))
@@ -164,9 +142,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
             }
 
-            if (BarsInProgress != 0)
-                return;
-
             // If the session has ended stop processing.
             if (TokyoTime().Hour >= SessionEndTime &&
                 Position.MarketPosition == MarketPosition.Flat)
@@ -175,6 +150,21 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PrintInfo($"Trading session ended.");
                 TradingHalted = true;
                 return;
+            }
+
+            if (BarsInProgress == 2)
+            {
+                OrderFlowCVD.Update(OrderFlowCVD.BarsArray[1].Count - 1, 1);
+                return;
+            }
+
+            if (BarsInProgress != 0)
+                return;
+
+            if (Bars.BarsSeries.BarsType is VolumetricBarsType barsType)
+            {
+                var volBar = barsType.Volumes[CurrentBar];
+                PreviousBarDelta = volBar.BarDelta;
             }
 
             atrCurrent = dailyAtr.Atr;
@@ -189,6 +179,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             // Determine if we are still in the same dealing range.
             var found = Ranges.FirstOrDefault(r => r.IsInRange(Close[0])) ?? CreateDealingRange();
 
+            if (rangeBreakDetected && !rangeBreakConfirmed && found == CurrentRange)
+            {
+                rangeBreakConfirmed = true;
+                PrintDebug($"[RANGE_BREAK_CONFIRMED] {CurrentRange}");
+            }
+
             // Always process range breaks
             if (found != CurrentRange)
             {
@@ -202,7 +198,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     CurrentRange = found;
 
                     rangeBreakDetected = true;
-                    PrintDebug($"[RANGE_BREAK] new range {CurrentRange}, Bias {tradeBias}");
+                    rangeBreakConfirmed = false;
+                    PrintDebug($"[RANGE_BREAK_DETECTED] {CurrentRange}");
                 }
             }
 
@@ -210,7 +207,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             /* ----- STRATEGY START TIME ANCHORED TO TOKYO-----*/
             if (TokyoTime().TimeOfDay == new TimeSpan(9, 0, 0))
+            {
                 rangeBreakDetected = false;
+                rangeBreakConfirmed = false;
+            }
 
             if (TokyoTime().TimeOfDay < new TimeSpan(9, 0, 0))
                 return;
@@ -237,7 +237,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             //    return;
             //}
 
-            if (!rangeBreakDetected)
+            if (!rangeBreakConfirmed)
                 return;
 
             if (CurrentRange.Low == PreviousRange.High)
@@ -308,6 +308,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 PrintDebug($"[TRADE_SKIPPED] {CurrentTrade.Bias}, entry {CurrentTrade.Entry} below threshold {CurrentTrade.TradeMissedThreshold}");
                 rangeBreakDetected = false;
+                rangeBreakConfirmed = false;
                 return;
             }
 
@@ -315,6 +316,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 PrintDebug($"[TRADE_SKIPPED] {CurrentTrade.Bias}, entry {CurrentTrade.Entry} above threshold {CurrentTrade.TradeMissedThreshold}");
                 rangeBreakDetected = false;
+                rangeBreakConfirmed = false;
                 return;
             }
 
@@ -322,19 +324,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             CalculateVWAPDistance();
 
-            CurrentTrade.DeltaMomentum = CalculateDeltaMomentum();
-
-            var regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 5);
-            CurrentTrade.CvdSlopeFast = regressionResult.Slope;
-            CurrentTrade.CvdRSquaredFast = regressionResult.RSquared;
-
-            regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 10);
-            CurrentTrade.CvdSlopeSlow = regressionResult.Slope;
-            CurrentTrade.CvdRSquaredSlow = regressionResult.RSquared;
-            CurrentTrade.CvdAcceleration = CurrentTrade.CvdSlopeSlow - CurrentTrade.CvdRSquaredFast;
-
-            CurrentTrade.BarVolume = Volume[0];
-            CurrentTrade.BarVolumeDelta = PreviousBarDelta;
+            CalculateStatistics();
 
             if (CurrentTrade.Bias == TradeBias.Long)
             {
@@ -397,6 +387,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 ProcessSharedBorderRange(true);
 
             rangeBreakDetected = false;
+            rangeBreakConfirmed = false;
 
             CurrentTrade.PendingOrder = null;
         }
@@ -426,6 +417,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     {
                         SellVolume += e.Volume;
                     }
+
+                    PrintDebug($"{BuyVolume} {SellVolume}");
 
                     break;
             }
@@ -472,7 +465,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             CurrentRange = null;
             PreviousRange = null;
+
             rangeBreakDetected = false;
+            rangeBreakConfirmed = false;
 
             InvalidRange = null;
             SharedBorderTrade = null;
