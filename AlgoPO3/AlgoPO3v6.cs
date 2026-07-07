@@ -39,6 +39,22 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         public string EdgeHours { get; set; }
 
         [NinjaScriptProperty]
+        [Display(Name = "Include CPI Week", Order = 13, GroupName = "Parameters")]
+        public bool IncludeCPIWeek { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Include NFP Week", Order = 14, GroupName = "Parameters")]
+        public bool IncludeNFPWeek { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Include No Events Week", Order = 15, GroupName = "Parameters")]
+        public bool IncludeNoEventsWeek { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Include FOMC Week", Order = 16, GroupName = "Parameters")]
+        public bool IncludeFOMCWeek { get; set; }
+
+        [NinjaScriptProperty]
         [Display(Name = "Position Size", Order = 20, GroupName = "Parameters")]
         public int PositionSize { get; set; }
 

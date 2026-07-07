@@ -52,6 +52,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         internal bool BearishBOSDetected = false;
         internal bool BullishBOSDetected = false;
+        internal double BOSPrice = 0;
 
         internal readonly List<string> TradeLogs = [];
 
@@ -63,6 +64,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         internal OrderFlowVWAP VWAP { get; set; }
 
+        internal FractalManager FractalManager { get; set; }
+
+        #region Constants
+
+        public string LONG_TRADE = "long";
+        public string SHORT_TRADE = "short";
+
+        #endregion
+
         #region Volume Delta 
 
         internal Series<long> DeltaSeries { get; set; }
@@ -72,6 +82,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         internal long BuyVolume { get; set; }
         internal long SellVolume { get; set; }
         internal long PreviousBarDelta { get; set; }
+
+        internal Series<double> CvdSlopeSeries { get; set; }
+
+        internal Series<double> CVDSeries { get; set; }
 
         #endregion
 
@@ -293,6 +307,44 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             return TimeZoneInfo.ConvertTime(Time[0], TokyoZone);
         }
 
+        public void HaltTradingIfCandleBodyMassive()
+        {
+            if (CandleBodyRange(0) > 300)
+            {
+                TradingHalted = true;
+                PrintInfo($"Trading halted as last candle was {CandleBodyRange(0)} points.");
+                return;
+            }
+        }
+
+        public void BreakEvenTrade()
+        {
+            // Check if the stop has already been moved to break even, if so then do nothing.
+            if (CurrentTrade.StopLoss == Position.AveragePrice)
+                return;
+
+            var breakEvenDirection = "";
+
+            if (CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.BreakEvenThreshold)
+            {
+                breakEvenDirection = LONG_TRADE;
+                PrintDebug($"[BREAK_EVEN_TP] threshold reached");
+            }
+
+            if (CurrentTrade.Bias == TradeBias.Short && Low[0] <= CurrentTrade.BreakEvenThreshold)
+            {
+                breakEvenDirection = SHORT_TRADE;
+                PrintDebug($"[BREAK_EVEN_TP] threshold reached");
+            }
+
+            if (!string.IsNullOrEmpty(breakEvenDirection))
+            {
+                SetStopLoss(breakEvenDirection, CalculationMode.Price, Position.AveragePrice, true);
+                CurrentTrade.StopLoss = Position.AveragePrice;
+                PrintDebug($"[BREAK_EVEN] set {Position.AveragePrice}");
+            }
+        }
+
         public void EnterLongTrade(TradeDetails tradeDetails)
         {
             Order limitOrder = null;
@@ -416,10 +468,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             }
         }
 
-        internal (double Slope, double RSquared) CalculateRegression(ISeries<double> series, int lookback)
+        internal (double Slope, double RSquared, double SlopeZ)
+            CalculateRegression(ISeries<double> series, int lookback, int zLookback)
         {
-            if (CurrentBar < lookback - 1)
-                return (0, 0);
+            if (CurrentBar < Math.Max(lookback - 1, zLookback))
+                return (0, 0, 0);
 
             double sumX = 0;
             double sumY = 0;
@@ -446,7 +499,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             double denominator = (lookback * sumX2) - (sumX * sumX);
 
             if (denominator == 0)
-                return (0, 0);
+                return (0, 0, 0);
 
             double slope = ((lookback * sumXY) - (sumX * sumY)) / denominator;
             double intercept = (sumY - slope * sumX) / lookback;
@@ -475,7 +528,37 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 ? 1.0
                 : 1.0 - (ssRes / ssTot);
 
-            return (Math.Round(slope, 2), Math.Round(rSquared, 4));
+            // ==========================
+            // Store slope
+            // ==========================
+            CvdSlopeSeries[0] = slope;
+
+            // ==========================
+            // Calculate Slope Z-score
+            // ==========================
+            double meanSlope = 0;
+
+            for (int i = 0; i < zLookback; i++)
+                meanSlope += CvdSlopeSeries[i];
+
+            meanSlope /= zLookback;
+
+            double variance = 0;
+
+            for (int i = 0; i < zLookback; i++)
+                variance += Math.Pow(CvdSlopeSeries[i] - meanSlope, 2);
+
+            double stdDev = Math.Sqrt(variance / zLookback);
+
+            double slopeZ = stdDev > 0
+                ? (slope - meanSlope) / stdDev
+                : 0;
+
+            return (
+                Math.Round(slope, 2),
+                Math.Round(rSquared, 4),
+                Math.Round(slopeZ, 2)
+            );
         }
 
         internal void CalculateVWAPDistance()
@@ -496,17 +579,52 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         {
             CurrentTrade.DeltaMomentum = CalculateDeltaMomentum();
 
-            var regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 5);
+            var regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 5, 20);
             CurrentTrade.CvdSlopeFast = regressionResult.Slope;
             CurrentTrade.CvdRSquaredFast = regressionResult.RSquared;
 
-            regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 10);
+            regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 10, 20);
             CurrentTrade.CvdSlopeSlow = regressionResult.Slope;
             CurrentTrade.CvdRSquaredSlow = regressionResult.RSquared;
             CurrentTrade.CvdAcceleration = CurrentTrade.CvdSlopeSlow - CurrentTrade.CvdRSquaredFast;
 
             CurrentTrade.BarVolume = Volume[0];
             CurrentTrade.BarVolumeDelta = PreviousBarDelta;
+        }
+
+        internal TradeBias? DetectBOS(int timeframe)
+        {
+            //---Bullish BOS ---
+            if (FractalManager.Fractals.TryGetValue((timeframe, FractalType.HighThreeBar), out (double Price, DateTime Time) lastFractalHigh))
+            {
+                if (Close[0] > lastFractalHigh.Price)
+                {
+                    BearishBOSDetected = false;
+                    BullishBOSDetected = true;
+                    BOSPrice = lastFractalHigh.Price;
+
+                    PrintDebug($"[BULLISH_BOS] at {Close[0]}, fractal {lastFractalHigh.Price}");
+
+                    return TradeBias.Long;
+                }
+            }
+
+            // --- Bearish BOS ---
+            if (FractalManager.Fractals.TryGetValue((timeframe, FractalType.LowThreeBar), out (double Price, DateTime Time) lastFractalLow))
+            {
+                if (Close[0] < lastFractalLow.Price)
+                {
+                    BearishBOSDetected = true;
+                    BullishBOSDetected = false;
+                    BOSPrice = lastFractalLow.Price;
+
+                    PrintDebug($"[BEARISH_BOS] at {Close[0]}, fractal {lastFractalLow.Price}");
+
+                    return TradeBias.Short;
+                }
+            }
+
+            return null;
         }
     }
 

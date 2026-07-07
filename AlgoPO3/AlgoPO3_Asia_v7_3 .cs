@@ -85,6 +85,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 VWAP = OrderFlowVWAP(VWAPResolution.Standard, Bars.TradingHours, VWAPStandardDeviations.One, 1, 2, 3);
                 OrderFlowCVD = OrderFlowCumulativeDelta(CumulativeDeltaType.BidAsk, CumulativeDeltaPeriod.Session, 1);
 
+                CvdSlopeSeries = new Series<double>(this);
+
                 DeltaSeries = new Series<long>(this);
             }
             else if (State == State.Terminated)

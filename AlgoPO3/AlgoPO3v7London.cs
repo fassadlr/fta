@@ -31,6 +31,22 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         [Display(Name = "Filter News Days", Order = 24, GroupName = "Parameters")]
         public bool FilterNewsDays { get; set; }
 
+        [NinjaScriptProperty]
+        [Display(Name = "Include CPI Week", Order = 25, GroupName = "Parameters")]
+        public bool IncludeCPIWeek { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Include NFP Week", Order = 26, GroupName = "Parameters")]
+        public bool IncludeNFPWeek { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Include No Events Week", Order = 27, GroupName = "Parameters")]
+        public bool IncludeNoEventsWeek { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Include FOMC Week", Order = 28, GroupName = "Parameters")]
+        public bool IncludeFOMCWeek { get; set; }
+
         private List<DealingRange> ranges;
 
         private DealingRange CurrentRange { get; set; }
@@ -47,8 +63,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private DailyAtr dailyAtr;
         private double atrCurrent;
         private bool isConnected;
-
-        private FractalManager fractalManager;
 
         private StrategyRunner_PO3 runner;
         private int lastTradeCount;
@@ -98,7 +112,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
             else if (State == State.DataLoaded)
             {
-                fractalManager = new FractalManager(this);
+                FractalManager = new FractalManager(this);
 
                 VWAP = OrderFlowVWAP(
                         VWAPResolution.Standard,
@@ -160,7 +174,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
             }
 
-            runner ??= StrategyRunner_PO3.Configure(this, fractalManager, new RunnerConfiguration_PO3()
+            runner ??= StrategyRunner_PO3.Configure(this, FractalManager, new RunnerConfiguration_PO3()
             {
                 Ranges = ranges,
                 Risk = Risk,
@@ -190,8 +204,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             atrCurrent = dailyAtr.Atr;
 
-            fractalManager.DetectFractalThreeBarWithPlatos(1);
-            fractalManager.DetectFractalFiveBar(1);
+            FractalManager.DetectFractalThreeBarWithPlatos(1);
+            FractalManager.DetectFractalFiveBar(1);
 
             DetectBOS();
 
@@ -344,7 +358,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             tradeDetails.DeltaMomentum = CalculateDeltaMomentum();
 
-            var regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 5);
+            var regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 5, 20);
             tradeDetails.CvdSlopeFast = regressionResult.Slope;
             tradeDetails.CvdRSquaredFast = regressionResult.RSquared;
 
@@ -414,7 +428,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private void DetectBOS()
         {
             //---Bullish BOS ---
-            if (fractalManager.Fractals.TryGetValue((1, FractalType.HighFiveBar), out (double Price, DateTime Time) lastFractalHigh))
+            if (FractalManager.Fractals.TryGetValue((1, FractalType.HighFiveBar), out (double Price, DateTime Time) lastFractalHigh))
             {
                 if (Close[0] > lastFractalHigh.Price)
                 {
@@ -426,7 +440,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             // --- Bearish BOS ---
-            if (fractalManager.Fractals.TryGetValue((1, FractalType.LowFiveBar), out (double Price, DateTime Time) lastFractalLow))
+            if (FractalManager.Fractals.TryGetValue((1, FractalType.LowFiveBar), out (double Price, DateTime Time) lastFractalLow))
             {
                 if (Close[0] < lastFractalLow.Price)
                 {
@@ -460,7 +474,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             dailyAtr ??= new DailyAtr();
 
-            fractalManager.Fractals.Clear();
+            FractalManager.Fractals.Clear();
 
             CurrentTrade = null;
 
