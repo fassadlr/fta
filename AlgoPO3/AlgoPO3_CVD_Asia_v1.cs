@@ -42,6 +42,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private EMA cvdEma;
 
+        private bool takeContinuationTrade;
+
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
@@ -195,6 +197,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     CurrentRange = found;
 
                     rangeBreakDetected = true;
+                    takeContinuationTrade = false;
 
                     PrintDebug($"[RANGE_BREAK] new range {CurrentRange}");
                 }
@@ -209,10 +212,24 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (TokyoTime().TimeOfDay == new TimeSpan(9, 0, 0))
                 rangeBreakDetected = false;
 
+            if (CurrentRange.Low == PreviousRange.High)
+            {
+                rangeBias = RangeBias.Bullish;
+                tradeBias = TradeBias.Long;
+                PrintDebug($"Range bias {rangeBias}: Trade bias {tradeBias}");
+            }
+
+            if (CurrentRange.High == PreviousRange.Low)
+            {
+                rangeBias = RangeBias.Bearish;
+                tradeBias = TradeBias.Short;
+                PrintDebug($"Range bias {rangeBias}: Trade bias {tradeBias}");
+            }
+
             // If we are in a position then break even or close and stop processing.
             if (Position.MarketPosition != MarketPosition.Flat)
             {
-                BreakEvenTrade();
+                //    BreakEvenTrade();
                 return;
             }
 
@@ -233,20 +250,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (!rangeBreakDetected)
                 return;
 
-            if (CurrentRange.Low == PreviousRange.High)
-            {
-                rangeBias = RangeBias.Bullish;
-                tradeBias = TradeBias.Long;
-                PrintDebug($"Range bias {rangeBias}: Trade bias {tradeBias}");
-            }
-
-            if (CurrentRange.High == PreviousRange.Low)
-            {
-                rangeBias = RangeBias.Bearish;
-                tradeBias = TradeBias.Short;
-                PrintDebug($"Range bias {rangeBias}: Trade bias {tradeBias}");
-            }
-
             if (rangeBias == RangeBias.Neutral)
                 return;
 
@@ -265,6 +268,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (atrCurrent == 0)
             {
                 PrintDebug($"[INITIAL_ATR] skipping trade, ATR {atrCurrent}");
+                return;
+            }
+
+            if (takeContinuationTrade && CurrentRange.GetPositionInRange(rangeBias, Close[0]) != DealingRangePosition.Premium)
+            {
+                PrintDebug($"[CONTINUATION_TRADE_FAIL] skipping trade, not in premium zone");
                 return;
             }
 
@@ -338,11 +347,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     return;
                 }
 
-                EnterLong(0, CalculatePositionSize(), LONG_TRADE);
-                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias}, {CurrentTrade.Entry}, atr {atrCurrent}");
+                EnterLong(0, CalculatePositionSize(Close[0] - CurrentTrade.StopLoss, 400), LONG_TRADE);
+                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} stop {CurrentTrade.StopLoss}");
 
                 SetStopLoss(LONG_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, true);
-                PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
                 SetProfitTarget(LONG_TRADE, CalculationMode.Price, CurrentTrade.TakeProfit);
 
                 return;
@@ -358,11 +366,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     return;
                 }
 
-                EnterShort(0, CalculatePositionSize(), SHORT_TRADE);
-                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias}, {CurrentTrade.Entry}, atr {atrCurrent}");
+                EnterShort(0, CalculatePositionSize(CurrentTrade.StopLoss - Close[0], 400), SHORT_TRADE);
+                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} stop {CurrentTrade.StopLoss}");
 
                 SetStopLoss(SHORT_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, true);
-                PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
                 SetProfitTarget(SHORT_TRADE, CalculationMode.Price, CurrentTrade.TakeProfit);
 
                 return;
@@ -397,13 +404,17 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             PrintTrade(tradeCSV);
             TradeLogs.Add(tradeCSV);
 
-            //if (trade.ProfitCurrency >= 0)
-            //    ProcessSharedBorderRange(false);
-            //else
-            //    ProcessSharedBorderRange(true);
+            if (trade.ProfitCurrency > 0)
+            {
+                takeContinuationTrade = true;
+            }
+            else
+            {
+                takeContinuationTrade = false;
+            }
 
-            if (CurrentTrade.IsRangeContinuationTrade)
-                rangeBreakDetected = false;
+            //if (CurrentTrade.IsRangeContinuationTrade)
+            //    rangeBreakDetected = false;
         }
 
         private double CalculateStopLoss()
@@ -412,14 +423,23 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (tradeBias == TradeBias.Short)
             {
-                //FractalManager.Fractals.TryGetValue((1, FractalType.HighThreeBar), out var threeBarFractal);
-                if (FractalManager.Fractals.TryGetValue((1, FractalType.HighFiveBar), out var fiveBarFractal))
-                {
-                    if (fiveBarFractal.Price > CurrentRange.ExtHigh)
-                        return fiveBarFractal.Price;
-                }
+                if (FractalManager.Fractals.TryGetValue((1, FractalType.HighThreeBar), out var threeBarFractal))
+                    if (threeBarFractal.Price > CurrentRange.ExtHigh) candidates.Add(threeBarFractal.Price);
 
-                return CurrentRange.ExtHigh;
+                if (FractalManager.Fractals.TryGetValue((1, FractalType.HighFiveBar), out var fiveBarFractal))
+                    if (fiveBarFractal.Price > CurrentRange.ExtHigh) candidates.Add(fiveBarFractal.Price);
+
+                if (Open[0] > Math.Round(CurrentRange.ExtHigh))
+                    candidates.Add(Open[0]);
+
+                if (ImbalanceFormed(TradeBias.Short, out double imbalanceStart))
+                    if (imbalanceStart > CurrentRange.ExtHigh) candidates.Add(imbalanceStart);
+
+                // which one is the closest to the ext high 
+                if (candidates.Any())
+                    return candidates.Min();
+
+                return CurrentRange.ExtLow;
             }
 
             if (tradeBias == TradeBias.Long)
@@ -430,7 +450,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (FractalManager.Fractals.TryGetValue((1, FractalType.LowFiveBar), out var fiveBarFractal))
                     if (fiveBarFractal.Price < CurrentRange.ExtLow) candidates.Add(fiveBarFractal.Price);
 
-                if (Open[0] < CurrentRange.ExtLow)
+                if (Open[0] < Math.Round(CurrentRange.ExtLow))
                     candidates.Add(Open[0]);
 
                 if (ImbalanceFormed(TradeBias.Long, out double imbalanceStart))

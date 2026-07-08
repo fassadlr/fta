@@ -398,7 +398,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                    )
                 {
                     PrintDebug($"[BULLISH_IMB_FORMED] {tradeBias}: {High[2]} {Low[0]}");
-                    imbalanceStart = Low[2];
+                    imbalanceStart = Low[1];
                     return true;
                 }
             }
@@ -410,7 +410,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                    )
                 {
                     PrintDebug($"[BEARISH_IMB_FORMED] {tradeBias}: {High[0]} {Low[2]}");
-                    imbalanceStart = High[2];
+                    imbalanceStart = High[1];
                     return true;
                 }
             }
