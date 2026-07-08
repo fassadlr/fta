@@ -42,7 +42,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private EMA cvdEma;
 
-        private bool takeContinuationTrade;
+        enum TradeState
+        {
+            Normal,
+            Continuation,
+        }
+
+        private TradeState tradeState;
 
         protected override void OnStateChange()
         {
@@ -197,7 +203,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     CurrentRange = found;
 
                     rangeBreakDetected = true;
-                    takeContinuationTrade = false;
 
                     PrintDebug($"[RANGE_BREAK] new range {CurrentRange}");
                 }
@@ -271,9 +276,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
             }
 
-            if (takeContinuationTrade && CurrentRange.GetPositionInRange(rangeBias, Close[0]) != DealingRangePosition.Premium)
+            if (tradeState == TradeState.Normal && CurrentRange.GetPositionInRange(rangeBias, Close[0]) == DealingRangePosition.Premium)
             {
-                PrintDebug($"[CONTINUATION_TRADE_FAIL] skipping trade, not in premium zone");
+                PrintDebug($"[TRADE_STATE_FAIL] skipping trade, not in discount.");
+                rangeBreakDetected = false;
+                return;
+            }
+
+            if (tradeState == TradeState.Continuation && CurrentRange.GetPositionInRange(rangeBias, Close[0]) == DealingRangePosition.Discount)
+            {
+                PrintDebug($"[TRADE_STATE_FAIL] skipping trade, not in premium.");
                 return;
             }
 
@@ -294,7 +306,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     CurrentTrade.StopLoss = CurrentRange.High;
                     CurrentTrade.TakeProfit = CurrentRange.Low;
                     CurrentTrade.BreakEvenThreshold = CurrentRange.OBCE1;
-                    CurrentTrade.IsRangeContinuationTrade = true;
                 }
             }
 
@@ -315,7 +326,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     CurrentTrade.StopLoss = CurrentRange.Low;
                     CurrentTrade.TakeProfit = CurrentRange.High;
                     CurrentTrade.BreakEvenThreshold = CurrentRange.OBCE2;
-                    CurrentTrade.IsRangeContinuationTrade = true;
                 }
             }
 
@@ -406,15 +416,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (trade.ProfitCurrency > 0)
             {
-                takeContinuationTrade = true;
+                if (tradeState == TradeState.Continuation)
+                    tradeState = TradeState.Normal;
+                else
+                    tradeState = TradeState.Continuation;
             }
             else
-            {
-                takeContinuationTrade = false;
-            }
-
-            //if (CurrentTrade.IsRangeContinuationTrade)
-            //    rangeBreakDetected = false;
+                tradeState = TradeState.Normal;
         }
 
         private double CalculateStopLoss()

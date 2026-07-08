@@ -79,7 +79,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
 
         public long BarVolumeDelta { get; internal set; }
         public double BarVolume { get; internal set; }
-        public bool IsRangeContinuationTrade { get; internal set; }
 
         public override string ToString()
         {
