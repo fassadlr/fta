@@ -387,6 +387,37 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             CurrentTrade = tradeDetails;
         }
 
+        internal bool ImbalanceFormed(TradeBias tradeBias, out double imbalanceStart)
+        {
+            imbalanceStart = 0;
+
+            if (tradeBias == TradeBias.Long)
+            {
+                if (Low[0] > High[2] &&         // IMB
+                    Low[0] - High[2] >= 1       // IMB gap distance
+                   )
+                {
+                    PrintDebug($"[BULLISH_IMB_FORMED] {tradeBias}: {High[2]} {Low[0]}");
+                    imbalanceStart = Low[2];
+                    return true;
+                }
+            }
+
+            if (tradeBias == TradeBias.Short)
+            {
+                if (High[0] < Low[2] &&         // IMB
+                    Low[2] - High[0] >= 1       // IMB gap distance
+                   )
+                {
+                    PrintDebug($"[BEARISH_IMB_FORMED] {tradeBias}: {High[0]} {Low[2]}");
+                    imbalanceStart = High[2];
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         internal bool ImbalanceFormed(TradeBias tradeBias, DealingRange range)
         {
             if (tradeBias == TradeBias.Long)

@@ -408,6 +408,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private double CalculateStopLoss()
         {
+            var candidates = new List<double>();
+
             if (tradeBias == TradeBias.Short)
             {
                 //FractalManager.Fractals.TryGetValue((1, FractalType.HighThreeBar), out var threeBarFractal);
@@ -422,12 +424,21 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (tradeBias == TradeBias.Long)
             {
-                //FractalManager.Fractals.TryGetValue((1, FractalType.HighThreeBar), out var threeBarFractal);
+                if (FractalManager.Fractals.TryGetValue((1, FractalType.LowThreeBar), out var threeBarFractal))
+                    if (threeBarFractal.Price < CurrentRange.ExtLow) candidates.Add(threeBarFractal.Price);
+
                 if (FractalManager.Fractals.TryGetValue((1, FractalType.LowFiveBar), out var fiveBarFractal))
-                {
-                    if (fiveBarFractal.Price < CurrentRange.ExtLow)
-                        return fiveBarFractal.Price;
-                }
+                    if (fiveBarFractal.Price < CurrentRange.ExtLow) candidates.Add(fiveBarFractal.Price);
+
+                if (Open[0] < CurrentRange.ExtLow)
+                    candidates.Add(Open[0]);
+
+                if (ImbalanceFormed(TradeBias.Long, out double imbalanceStart))
+                    if (imbalanceStart < CurrentRange.ExtLow) candidates.Add(imbalanceStart);
+
+                // which one is the closest to the ext low
+                if (candidates.Any())
+                    return candidates.Max();
 
                 return CurrentRange.ExtLow;
             }
