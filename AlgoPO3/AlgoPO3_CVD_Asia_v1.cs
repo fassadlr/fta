@@ -22,13 +22,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private bool rangeBreakDetected = false;
 
-        enum TradeState
-        {
-            Normal,
-            Continuation,
-        }
-
-        private TradeState tradeState;
+        private CVD_TradeType_Enum CVD_TradeType;
 
         protected override void OnStateChange()
         {
@@ -45,6 +39,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 Risk = 400;
 
                 SkipMonths = "8";
+
+                DailyMaxLoss = 0;
+                DailyMaxProfit = 1000;
 
                 // Tokyo Time
                 SessionEndHour = 12;
@@ -222,14 +219,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (IsLive && !IsConnected)
                 return;
 
-            if (tradeState == TradeState.Normal && CurrentRange.GetPositionInRange(RangeBias, Close[0]) == DealingRangePosition.Premium)
+            if (CVD_TradeType == CVD_TradeType_Enum.Normal && CurrentRange.GetPositionInRange(RangeBias, Close[0]) == DealingRangePosition.Premium)
             {
                 PrintDebug($"[TRADE_STATE_FAIL] skipping trade, not in discount.");
                 rangeBreakDetected = false;
                 return;
             }
 
-            if (tradeState == TradeState.Continuation && CurrentRange.GetPositionInRange(RangeBias, Close[0]) == DealingRangePosition.Discount)
+            if (CVD_TradeType == CVD_TradeType_Enum.Continuation && CurrentRange.GetPositionInRange(RangeBias, Close[0]) == DealingRangePosition.Discount)
             {
                 PrintDebug($"[TRADE_STATE_FAIL] skipping trade, not in premium.");
                 return;
@@ -275,20 +272,39 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             /* ----- TRADE INSPECTION BEFORE PLACEMENT ----- */
 
-            if (CurrentTrade.Bias == TradeBias.Long && CVDEma[0] > OrderFlowCVD.DeltaClose[0])
+            if (CurrentTrade.Bias == TradeBias.Long)
             {
-                PrintDebug($"[CVD_INSPECTION_FAIL] EMA {Math.Round(CVDEma[0])} > CVD {OrderFlowCVD.DeltaClose[0]}");
-                return;
+                if (CVDEma[0] > OrderFlowCVD.DeltaClose[0])
+                {
+                    PrintDebug($"[CVD_INSPECTION_FAIL_LONG] EMA {Math.Round(CVDEma[0])} > CVD {OrderFlowCVD.DeltaClose[0]}");
+                    return;
+                }
+
+                if (OrderFlowCVD.DeltaClose[0] - CVDEma[0] < 215)
+                {
+                    PrintDebug($"[CVD_INSPECTION_FAIL_LONG] EMA DISTANCE < 215 {OrderFlowCVD.DeltaClose[0] - CVDEma[0]}");
+                    return;
+                }
             }
 
-            if (CurrentTrade.Bias == TradeBias.Short && CVDEma[0] < OrderFlowCVD.DeltaClose[0])
+            if (CurrentTrade.Bias == TradeBias.Short)
             {
-                PrintDebug($"[CVD_INSPECTION_FAIL] EMA {Math.Round(CVDEma[0])} < CVD {OrderFlowCVD.DeltaClose[0]}");
-                return;
+                if (CVDEma[0] < OrderFlowCVD.DeltaClose[0])
+                {
+                    PrintDebug($"[CVD_INSPECTION_FAIL_SHORT] EMA {Math.Round(CVDEma[0])} < CVD {OrderFlowCVD.DeltaClose[0]}");
+                    return;
+                }
+
+                if (CVDEma[0] - OrderFlowCVD.DeltaClose[0] < 215)
+                {
+                    PrintDebug($"[CVD_INSPECTION_FAIL_SHORT] EMA DISTANCE < 215 {CVDEma[0] - OrderFlowCVD.DeltaClose[0]}");
+                    return;
+                }
             }
 
             /* ----- COLLECT ANY STATISTICS ----- */
             CollectStatistics();
+            CurrentTrade.CVD_TradeType = CVD_TradeType;
 
             /* ----- PLACE THE TRADE ----- */
             if (CurrentTrade.Bias == TradeBias.Long)
@@ -362,13 +378,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (trade.ProfitCurrency > 0)
             {
-                if (tradeState == TradeState.Continuation)
-                    tradeState = TradeState.Normal;
+                if (CVD_TradeType == CVD_TradeType_Enum.Continuation)
+                    CVD_TradeType = CVD_TradeType_Enum.Normal;
                 else
-                    tradeState = TradeState.Continuation;
+                    CVD_TradeType = CVD_TradeType_Enum.Continuation;
             }
             else
-                tradeState = TradeState.Normal;
+                CVD_TradeType = CVD_TradeType_Enum.Normal;
         }
 
         private double CalculateStopLoss()
@@ -450,7 +466,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             DayPnL = 0;
             LastTradeCount = 0;
 
-            tradeState = TradeState.Normal;
+            CVD_TradeType = CVD_TradeType_Enum.Normal;
         }
     }
 }

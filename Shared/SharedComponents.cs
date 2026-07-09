@@ -12,6 +12,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         Continuation,
     }
 
+    public enum CVD_TradeType_Enum
+    {
+        Normal,
+        Continuation,
+    }
+
     public class TradeState
     {
         public bool MSSDetectedBullish { get; set; }
@@ -80,6 +86,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         public long BarVolumeDelta { get; internal set; }
         public double BarVolume { get; internal set; }
         public double CVD_EMA_Distance { get; internal set; }
+
+        public CVD_TradeType_Enum CVD_TradeType { get; set; }
 
         public override string ToString()
         {

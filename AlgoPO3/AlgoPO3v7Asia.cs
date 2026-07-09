@@ -35,7 +35,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "PO3 Algo Asia v7.2";
+                Name = "PO3 Algo Asia v7.3";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -48,6 +48,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 EdgeHourMultiplier = 1.5;
                 SkipMonths = "8";
                 StopGrace = 10;
+
+                DailyMaxProfit = 350;
 
                 SessionEndTime = 12; // Tokyo Time
             }
