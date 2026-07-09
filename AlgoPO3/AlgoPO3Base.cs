@@ -12,7 +12,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         [NinjaScriptProperty]
         [Display(Name = "Skip Months", Order = 11, GroupName = "Parameters")]
         public string SkipMonths { get; set; }
-
         internal HashSet<int> SkipMonthsSet { get; set; }
 
         [NinjaScriptProperty]
@@ -22,6 +21,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         internal int[] BlockEndHoursParsed;
         internal int[] EdgeHoursParsed;
         internal int[] SkipHoursParsed;
+
+        internal RangeBias RangeBias { get; set; }
+        internal TradeBias TradeBias { get; set; }
+
+        internal DealingRange CurrentRange { get; set; }
+        internal DealingRange PreviousRange { get; set; }
+
+        internal List<DealingRange> Ranges { get; set; }
 
         internal InvalidRange InvalidRange { get; set; }
         internal SharedBorderTrade SharedBorderTrade { get; set; }
@@ -63,6 +70,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             return false;
+        }
+
+        internal DealingRange CreateDealingRange()
+        {
+            var newDealingRange = new DealingRange(PO3, Close[0]);
+            Ranges.Add(newDealingRange);
+            PrintDebug($"Creating new range: {newDealingRange}");
+            return newDealingRange;
         }
     }
 }

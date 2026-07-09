@@ -13,34 +13,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
     public class AlgoPO3_CVD_Asia_v1 : AlgoPO3Base
     {
         [NinjaScriptProperty]
-        [Display(Name = "Position Size", Order = 20, GroupName = "Parameters")]
-        public int PositionSize { get; set; }
+        [Display(Name = "Risk", Order = 20, GroupName = "Parameters")]
+        public int Risk { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Stop Grace", Order = 21, GroupName = "Parameters")]
-        public int StopGrace { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Session End Time", Order = 22, GroupName = "Parameters")]
-        public int SessionEndTime { get; set; }
-
-        private List<DealingRange> Ranges { get; set; }
-
-        private DealingRange CurrentRange { get; set; }
-        private DealingRange PreviousRange { get; set; }
-
-        private DateTime? lastInitialization;
-
-        private RangeBias rangeBias;
-        private TradeBias tradeBias;
+        [Display(Name = "Session End Hour", Order = 21, GroupName = "Parameters")]
+        public int SessionEndHour { get; set; }
 
         private bool rangeBreakDetected = false;
-
-        private DailyAtr dailyAtr;
-        private double atrCurrent;
-        private bool isConnected;
-
-        private EMA cvdEma;
 
         enum TradeState
         {
@@ -62,27 +42,20 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 IsOverlay = true;
 
                 PO3 = 81;
-                PositionSize = 5;
-                IsOverlay = true;
+                Risk = 400;
 
-                EdgeHourMultiplier = 1.5;
                 SkipMonths = "8";
-                StopGrace = 10;
 
                 // Tokyo Time
-                SessionEndTime = 12;
+                SessionEndHour = 12;
             }
             else if (State == State.Configure)
             {
-                AddDataSeries("MNQ 09-26", BarsPeriodType.Minute, 5);
                 AddDataSeries(BarsPeriodType.Tick, 1);
 
                 Ranges = [];
 
                 Events = NewsEvents.Events();
-
-                tradeBias = TradeBias.Neutral;
-                rangeBias = RangeBias.Neutral;
 
                 TokyoZone = TimeZoneInfo.FindSystemTimeZoneById("Tokyo Standard Time");
                 LondonZone = TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time");
@@ -97,42 +70,31 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 CVDSeries = new Series<double>(this);
                 CvdSlopeSeries = new Series<double>(this);
 
-                cvdEma = EMA(CVDSeries, 20);
+                CVDEma = EMA(CVDSeries, 20);
             }
             else if (State == State.Terminated)
             {
                 if (ExportTradeLogsEnabled)
                     ExportTradeLogs(
-                        "EntryTime,Bias,OrderType,Result,Pnl,Quantity,BarVolume,BarVolumeDelta,CvdSlopeFast,CvdRSquaredFast,CvdSlopeSlow,CvdRSquaredSlow",
+                        "EntryTime,Bias,OrderType,Result,Pnl,Quantity,BarVolume,BarVolumeDelta,CvdSlopeFast,CvdRSquaredFast,CvdSlopeSlow,CvdRSquaredSlow,CVD_EMA_Distance",
                         $@"C:\Users\fassa\Documents\NinjaTrader Testing\TradeLog_AlgoPO3v7Asia_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
             }
         }
 
         protected override void OnBarUpdate()
         {
-            if (lastInitialization == null || lastInitialization?.Date != Time[0].Date)
+            if (LastInitialization == null || LastInitialization?.Date != Time[0].Date)
             {
                 PerformCleanupBeforeSessionStart();
-                lastInitialization = Time[0].Date;
+                LastInitialization = Time[0].Date;
                 return;
             }
 
-            if (BarsInProgress == 0)
-            {
-                FractalManager.DetectFractalThreeBar(1);
-                FractalManager.DetectFractalFiveBar(1);
-            }
-
-            // Always process fractal and BOS detection.
-            if (BarsInProgress == 1)
-            {
-                dailyAtr.Calculate(High[0], Low[0], Close[0]);
-
-                FractalManager.DetectFractalThreeBarWithPlatos(5);
-                tradeBias = DetectBOS(5) ?? tradeBias;
-            }
-
             if (TradingHalted) return;
+
+            BasePnlChecks();
+
+            //BaseNewsEventsChecks();
 
             // Skip all day events (easter etc).
             var eventForToday = GetNewsEventForToday();
@@ -146,11 +108,17 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             // Stop trading when the last candle is disproportionally big.
-            HaltTradingIfCandleBodyMassive();
+            BaseCandleVolatilityChecks();
+
+            // Process fractals on the 1min
+            if (BarsInProgress == 0)
+            {
+                FractalManager.DetectFractalThreeBar(1);
+                FractalManager.DetectFractalFiveBar(1);
+            }
 
             // If the session has ended stop processing.
-            if (TokyoTime().Hour >= SessionEndTime &&
-                Position.MarketPosition == MarketPosition.Flat)
+            if (TokyoTime().Hour >= SessionEndHour && Position.MarketPosition == MarketPosition.Flat)
             {
                 CancelLimitOrder();
                 PrintInfo($"Trading session ended.");
@@ -159,7 +127,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             // Update the CVD
-            if (BarsInProgress == 2)
+            if (BarsInProgress == 1)
             {
                 OrderFlowCVD.Update(OrderFlowCVD.BarsArray[1].Count - 1, 1);
                 return;
@@ -178,39 +146,38 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PreviousBarDelta = volBar.BarDelta;
             }
 
-            atrCurrent = dailyAtr.Atr;
+            /* ----- PROCESS RANGE INFORMATION -----*/
 
-            // Create the initial dealing range, this will only happen once per session.
             if (CurrentRange == null)
             {
                 CurrentRange = CreateDealingRange();
                 return;
             }
 
-            // Determine if we are still in the same dealing range.
             var found = Ranges.FirstOrDefault(r => r.IsInRange(Close[0])) ?? CreateDealingRange();
-
-            // Always process range breaks
             if (found != CurrentRange)
             {
                 if (PreviousRange != CurrentRange)
                 {
-                    // Update Current Range's coverage as a candle could've open and closed into a new range.
-                    CurrentRange.UpdateCoverage(Close[0]);
-
                     PreviousRange = CurrentRange;
 
                     CurrentRange = found;
 
                     rangeBreakDetected = true;
 
-                    PrintDebug($"[RANGE_BREAK] new range {CurrentRange}");
+                    PrintDebug($"[RANGE_BREAK_DETECTED] {CurrentRange}");
                 }
             }
 
-            CurrentRange.UpdateCoverage(Close[0]);
+            if (PreviousRange == null)
+                return;
 
-            /* ----- STRATEGY START TIME ANCHORED TO TOKYO-----*/
+            /* 
+             * ----- STRATEGY START TIME ANCHORED TO TOKYO-----
+             * 
+             * At the open we reset the range break.
+            */
+
             if (TokyoTime().TimeOfDay < new TimeSpan(9, 0, 0))
                 return;
 
@@ -219,29 +186,23 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (CurrentRange.Low == PreviousRange.High)
             {
-                rangeBias = RangeBias.Bullish;
-                tradeBias = TradeBias.Long;
-                PrintDebug($"Range bias {rangeBias}: Trade bias {tradeBias}");
+                RangeBias = RangeBias.Bullish;
+                TradeBias = TradeBias.Long;
+                PrintDebug($"Range bias {RangeBias}: Trade bias {TradeBias}");
             }
 
             if (CurrentRange.High == PreviousRange.Low)
             {
-                rangeBias = RangeBias.Bearish;
-                tradeBias = TradeBias.Short;
-                PrintDebug($"Range bias {rangeBias}: Trade bias {tradeBias}");
+                RangeBias = RangeBias.Bearish;
+                TradeBias = TradeBias.Short;
+                PrintDebug($"Range bias {RangeBias}: Trade bias {TradeBias}");
             }
 
-            // If we are in a position then break even or close and stop processing.
+            /* ----- WE ARE IN A POSITION  ----- */
             if (Position.MarketPosition != MarketPosition.Flat)
-            {
-                //    BreakEvenTrade();
                 return;
-            }
 
-            /*
-             ### From here we are flat or waiting on a pending order to execute ###
-            */
-
+            /* ----- WE ARE WAITING FOR AN ENTRY ----- */
             if (DetectAndCheckInvalidRange())
                 return;
 
@@ -255,52 +216,36 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (!rangeBreakDetected)
                 return;
 
-            if (rangeBias == RangeBias.Neutral)
-                return;
-
             if (IsLive && State != State.Realtime)
                 return;
 
-            if (IsLive && !isConnected)
+            if (IsLive && !IsConnected)
                 return;
 
-            if (atrCurrent > 50)
-            {
-                PrintDebug($"[EXCESSIVE_ATR] skipping trade, ATR {atrCurrent}");
-                return;
-            }
-
-            if (atrCurrent == 0)
-            {
-                PrintDebug($"[INITIAL_ATR] skipping trade, ATR {atrCurrent}");
-                return;
-            }
-
-            if (tradeState == TradeState.Normal && CurrentRange.GetPositionInRange(rangeBias, Close[0]) == DealingRangePosition.Premium)
+            if (tradeState == TradeState.Normal && CurrentRange.GetPositionInRange(RangeBias, Close[0]) == DealingRangePosition.Premium)
             {
                 PrintDebug($"[TRADE_STATE_FAIL] skipping trade, not in discount.");
                 rangeBreakDetected = false;
                 return;
             }
 
-            if (tradeState == TradeState.Continuation && CurrentRange.GetPositionInRange(rangeBias, Close[0]) == DealingRangePosition.Discount)
+            if (tradeState == TradeState.Continuation && CurrentRange.GetPositionInRange(RangeBias, Close[0]) == DealingRangePosition.Discount)
             {
                 PrintDebug($"[TRADE_STATE_FAIL] skipping trade, not in premium.");
                 return;
             }
 
-            if (rangeBias == RangeBias.Bearish && tradeBias == TradeBias.Short)
+            if (RangeBias == RangeBias.Bearish && TradeBias == TradeBias.Short)
             {
                 CurrentTrade = new TradeDetails()
                 {
                     Bias = TradeBias.Short,
-                    Atr = atrCurrent,
                     StopLoss = CalculateStopLoss(),
                     TakeProfit = CurrentRange.Eq,
                     BreakEvenThreshold = CurrentRange.BR3,
                 };
 
-                var rangePosition = CurrentRange.GetPositionInRange(rangeBias, Close[0]);
+                var rangePosition = CurrentRange.GetPositionInRange(RangeBias, Close[0]);
                 if (rangePosition == DealingRangePosition.Premium)
                 {
                     CurrentTrade.StopLoss = CurrentRange.High;
@@ -309,18 +254,17 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 }
             }
 
-            if (rangeBias == RangeBias.Bullish && tradeBias == TradeBias.Long)
+            if (RangeBias == RangeBias.Bullish && TradeBias == TradeBias.Long)
             {
                 CurrentTrade = new TradeDetails()
                 {
                     Bias = TradeBias.Long,
-                    Atr = atrCurrent,
                     StopLoss = CalculateStopLoss(),
                     TakeProfit = CurrentRange.Eq,
                     BreakEvenThreshold = CurrentRange.BR2,
                 };
 
-                var rangePosition = CurrentRange.GetPositionInRange(rangeBias, Close[0]);
+                var rangePosition = CurrentRange.GetPositionInRange(RangeBias, Close[0]);
                 if (rangePosition == DealingRangePosition.Premium)
                 {
                     CurrentTrade.StopLoss = CurrentRange.Low;
@@ -329,24 +273,24 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 }
             }
 
-            /***** TRADE INSPECTION BEFORE PLACEMENT *****/
+            /* ----- TRADE INSPECTION BEFORE PLACEMENT ----- */
 
-            if (CurrentTrade.Bias == TradeBias.Long && cvdEma[0] > OrderFlowCVD.DeltaClose[0])
+            if (CurrentTrade.Bias == TradeBias.Long && CVDEma[0] > OrderFlowCVD.DeltaClose[0])
             {
-                PrintDebug($"[CVD_INSPECTION_FAIL] EMA {Math.Round(cvdEma[0])} > CVD {OrderFlowCVD.DeltaClose[0]}");
+                PrintDebug($"[CVD_INSPECTION_FAIL] EMA {Math.Round(CVDEma[0])} > CVD {OrderFlowCVD.DeltaClose[0]}");
                 return;
             }
 
-            if (CurrentTrade.Bias == TradeBias.Short && cvdEma[0] < OrderFlowCVD.DeltaClose[0])
+            if (CurrentTrade.Bias == TradeBias.Short && CVDEma[0] < OrderFlowCVD.DeltaClose[0])
             {
-                PrintDebug($"[CVD_INSPECTION_FAIL] EMA {Math.Round(cvdEma[0])} < CVD {OrderFlowCVD.DeltaClose[0]}");
+                PrintDebug($"[CVD_INSPECTION_FAIL] EMA {Math.Round(CVDEma[0])} < CVD {OrderFlowCVD.DeltaClose[0]}");
                 return;
             }
 
-            /*---------------------------------------------*/
+            /* ----- COLLECT ANY STATISTICS ----- */
+            CollectStatistics();
 
-            CalculateStatistics();
-
+            /* ----- PLACE THE TRADE ----- */
             if (CurrentTrade.Bias == TradeBias.Long)
             {
                 var rr = CalculateRiskReward(Close[0] - CurrentTrade.StopLoss, CurrentTrade.TakeProfit - Close[0]);
@@ -357,7 +301,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     return;
                 }
 
-                EnterLong(0, CalculatePositionSize(Close[0] - CurrentTrade.StopLoss, 400), LONG_TRADE);
+                EnterLong(0, CalculatePositionSize(Close[0] - CurrentTrade.StopLoss, Risk), LONG_TRADE);
                 PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} stop {CurrentTrade.StopLoss}");
 
                 SetStopLoss(LONG_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, true);
@@ -376,7 +320,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     return;
                 }
 
-                EnterShort(0, CalculatePositionSize(CurrentTrade.StopLoss - Close[0], 400), SHORT_TRADE);
+                EnterShort(0, CalculatePositionSize(CurrentTrade.StopLoss - Close[0], Risk), SHORT_TRADE);
                 PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} stop {CurrentTrade.StopLoss}");
 
                 SetStopLoss(SHORT_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, true);
@@ -390,12 +334,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (e.Status == ConnectionStatus.Connected)
             {
-                isConnected = true;
+                IsConnected = true;
                 Print("[CONNECTED]");
             }
             else
             {
-                isConnected = false;
+                IsConnected = false;
                 Print("[DISCONNECTED]");
             }
         }
@@ -408,9 +352,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (SystemPerformance.AllTrades.Count == 0)
                 return;
 
+            BasePnlUpdates();
+
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.BarVolume},{CurrentTrade.BarVolumeDelta},{CurrentTrade.CvdSlopeFast},{CurrentTrade.CvdRSquaredFast},{CurrentTrade.CvdSlopeSlow},{CurrentTrade.CvdRSquaredSlow}";
+            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.BarVolume},{CurrentTrade.BarVolumeDelta},{CurrentTrade.CvdSlopeFast},{CurrentTrade.CvdRSquaredFast},{CurrentTrade.CvdSlopeSlow},{CurrentTrade.CvdRSquaredSlow},{CurrentTrade.CVD_EMA_Distance}";
             PrintTrade(tradeCSV);
             TradeLogs.Add(tradeCSV);
 
@@ -429,7 +375,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             var candidates = new List<double>();
 
-            if (tradeBias == TradeBias.Short)
+            if (TradeBias == TradeBias.Short)
             {
                 if (FractalManager.Fractals.TryGetValue((1, FractalType.HighThreeBar), out var threeBarFractal))
                     if (threeBarFractal.Price > CurrentRange.ExtHigh) candidates.Add(threeBarFractal.Price);
@@ -450,7 +396,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return CurrentRange.ExtLow;
             }
 
-            if (tradeBias == TradeBias.Long)
+            if (TradeBias == TradeBias.Long)
             {
                 if (FractalManager.Fractals.TryGetValue((1, FractalType.LowThreeBar), out var threeBarFractal))
                     if (threeBarFractal.Price < CurrentRange.ExtLow) candidates.Add(threeBarFractal.Price);
@@ -489,128 +435,22 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             InvalidRange = null;
             SharedBorderTrade = null;
 
-            rangeBias = RangeBias.Neutral;
-            tradeBias = TradeBias.Neutral;
+            RangeBias = RangeBias.Neutral;
+            TradeBias = TradeBias.Neutral;
 
             BullishBOSDetected = false;
             BearishBOSDetected = false;
-
-            dailyAtr ??= new DailyAtr();
 
             FractalManager.Fractals.Clear();
 
             CurrentTrade = null;
 
             TradingHalted = false;
-        }
 
-        private int CalculatePositionSize()
-        {
-            int positionSize = PositionSize;
+            DayPnL = 0;
+            LastTradeCount = 0;
 
-            // TODO: Test this with Python
-            var validEdgeHour = TokyoTime().Hour == 10;
-            if (validEdgeHour && atrCurrent <= 20)
-            {
-                positionSize = (int)(PositionSize * EdgeHourMultiplier);
-                PrintDebug($"[POSITION_ADJUSTED_EDGEHOUR] {positionSize}");
-            }
-
-            if (atrCurrent > 20 && atrCurrent <= 25)
-            {
-                positionSize = PositionSize + 1;
-                PrintDebug($"[POSITION_ADJUSTED_ATR] {positionSize}");
-            }
-
-            if (atrCurrent > 25 && atrCurrent <= 36)
-            {
-                positionSize = PositionSize;
-                PrintDebug($"[POSITION_ADJUSTED_ATR] {positionSize}");
-            }
-
-            if (atrCurrent > 36)
-            {
-                positionSize = PositionSize - 1;
-                PrintDebug($"[POSITION_ADJUSTED_ATR] {positionSize}");
-            }
-
-            return positionSize;
-        }
-
-        private void ProcessSharedBorderRange(bool isLoss)
-        {
-            var current = Ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.StopLoss));
-            var previous = Ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.TakeProfit));
-
-            // It is possible that we jumped ranges and as such this cannot be processed further.
-            if (current == null || previous == null)
-                return;
-
-            if (isLoss == false)
-            {
-                current = Ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.TakeProfit));
-                previous = Ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.StopLoss));
-            }
-
-            var currentSharedBorderRange = GetSharedBorderRange(current, isLoss, rangeBias, CurrentTrade.Bias);
-            if (SharedBorderTrade != null && SharedBorderTrade.Border == currentSharedBorderRange)
-            {
-                SharedBorderTrade.Trades++;
-
-                PrintDebug($"[RANGE_INVALID] Shared border range {SharedBorderTrade.Border} trades incremented to {SharedBorderTrade.Trades}");
-                if (SharedBorderTrade.Trades >= 2)
-                    CreateInvalidRange(current, previous, isLoss, CurrentTrade.Bias);
-            }
-            else
-            {
-                SharedBorderTrade = new SharedBorderTrade() { Trades = 1, Border = currentSharedBorderRange };
-                PrintDebug($"[RANGE_INVALID] Shared border range set to {SharedBorderTrade.Border}");
-            }
-        }
-
-        private static double GetSharedBorderRange(DealingRange applicable, bool isLoss, RangeBias rangeBias, TradeBias tradeBias)
-        {
-            if (rangeBias == RangeBias.Bearish)
-            {
-                if (tradeBias == TradeBias.Short) return isLoss ? applicable.Low : applicable.High;
-                if (tradeBias == TradeBias.Long) return isLoss ? applicable.High : applicable.Low;
-            }
-
-            if (rangeBias == RangeBias.Bullish)
-            {
-                if (tradeBias == TradeBias.Long) return isLoss ? applicable.High : applicable.Low;
-                if (tradeBias == TradeBias.Short) return isLoss ? applicable.Low : applicable.High;
-            }
-
-            return 0;
-        }
-
-        private void CreateInvalidRange(DealingRange current, DealingRange previous, bool isLoss, TradeBias lastTradeBias)
-        {
-            if (InvalidRange != null)
-                return;
-
-            if (rangeBias == RangeBias.Bearish && lastTradeBias == TradeBias.Short)
-                InvalidRange = new InvalidRange(isLoss ? current.BR3 : previous.BR3, isLoss ? previous.BR2 : current.BR2);
-
-            if (rangeBias == RangeBias.Bearish && lastTradeBias == TradeBias.Long)
-                InvalidRange = new InvalidRange(isLoss ? previous.BR3 : current.BR3, isLoss ? current.BR2 : previous.BR2);
-
-            if (rangeBias == RangeBias.Bullish && lastTradeBias == TradeBias.Long)
-                InvalidRange = new InvalidRange(isLoss ? previous.BR3 : current.BR3, isLoss ? current.BR2 : previous.BR2);
-
-            if (rangeBias == RangeBias.Bullish && lastTradeBias == TradeBias.Short)
-                InvalidRange = new InvalidRange(isLoss ? current.BR3 : previous.BR3, isLoss ? previous.BR2 : current.BR2);
-
-            PrintDebug($"[RANGE_INVALID_CREATED] Invalid range created {rangeBias} {lastTradeBias} {InvalidRange}");
-        }
-
-        private DealingRange CreateDealingRange()
-        {
-            var newDealingRange = new DealingRange(PO3, Close[0]);
-            Ranges.Add(newDealingRange);
-            PrintDebug($"Creating new range: {newDealingRange}");
-            return newDealingRange;
+            tradeState = TradeState.Normal;
         }
     }
 }

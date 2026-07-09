@@ -1,6 +1,5 @@
 #region Using declarations
 using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using NinjaTrader.Cbi;
@@ -62,10 +61,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         [Display(Name = "Stop Grace", Order = 21, GroupName = "Parameters")]
         public int StopGrace { get; set; }
 
-        private List<DealingRange> Ranges { get; set; }
-
-        private DealingRange CurrentRange { get; set; }
-        private DealingRange PreviousRange { get; set; }
         private DateTime? lastInitialization;
 
         private MSSBias mssBias;
@@ -535,20 +530,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
         }
 
-        private void CalculateVWAPDistance()
-        {
-            if (CurrentTrade.Entry > vwap.VWAP[0])
-            {
-                CurrentTrade.VWAPLocation = "Above";
-                CurrentTrade.VWAPDistance = Math.Round(CurrentTrade.Entry - vwap.VWAP[0]);
-            }
-            else
-            {
-                CurrentTrade.VWAPLocation = "Below";
-                CurrentTrade.VWAPDistance = Math.Round(vwap.VWAP[0] - CurrentTrade.Entry);
-            }
-        }
-
         protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
         {
             if (marketPosition != MarketPosition.Flat)
@@ -814,14 +795,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 InvalidRange = new InvalidRange(isLoss ? current.BR3 : previous.BR3, isLoss ? previous.BR2 : current.BR2);
 
             PrintDebug($"[RANGE_INVALID_CREATED] Invalid range created {rangeBias} {lastTradeBias} {InvalidRange}");
-        }
-
-        private DealingRange CreateDealingRange()
-        {
-            var newDealingRange = new DealingRange(PO3, Close[0]);
-            Ranges.Add(newDealingRange);
-            PrintDebug($"Creating new range: {newDealingRange}");
-            return newDealingRange;
         }
     }
 }

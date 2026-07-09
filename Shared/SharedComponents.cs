@@ -79,6 +79,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
 
         public long BarVolumeDelta { get; internal set; }
         public double BarVolume { get; internal set; }
+        public double CVD_EMA_Distance { get; internal set; }
 
         public override string ToString()
         {

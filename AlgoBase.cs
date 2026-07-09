@@ -29,6 +29,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         [Display(Name = "Export Trade Logs", Order = 3, GroupName = "Parameters")]
         public bool ExportTradeLogsEnabled { get; set; }
 
+        [NinjaScriptProperty]
+        [Display(Name = "Daily Max Loss", Order = 4, GroupName = "Parameters")]
+        public double DailyMaxLoss { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Daily Max Profit", Order = 5, GroupName = "Parameters")]
+        public double DailyMaxProfit { get; set; }
+
         internal double LastFractalHigh = 0;
         internal DateTime LastFractalHighTime;
 
@@ -61,10 +69,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         internal TradeDetails CurrentTrade { get; set; }
 
         internal OrderFlowCumulativeDelta OrderFlowCVD { get; set; }
+        internal EMA CVDEma { get; set; }
 
         internal OrderFlowVWAP VWAP { get; set; }
 
         internal FractalManager FractalManager { get; set; }
+
+        internal int LastTradeCount { get; set; }
+        internal double DayPnL { get; set; }
+
+        internal DateTime? LastInitialization { get; set; }
+
+        internal bool IsConnected { get; set; }
 
         #region Constants
 
@@ -86,6 +102,37 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         internal Series<double> CvdSlopeSeries { get; set; }
 
         internal Series<double> CVDSeries { get; set; }
+
+        #endregion
+
+        #region Base Pnl
+
+        internal void BasePnlUpdates()
+        {
+            if (SystemPerformance.AllTrades.Count > LastTradeCount)
+            {
+                var lastTrade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
+                DayPnL += lastTrade.ProfitCurrency;
+                LastTradeCount = SystemPerformance.AllTrades.Count;
+            }
+        }
+
+        internal void BasePnlChecks()
+        {
+            if (DailyMaxProfit != 0 && DayPnL > DailyMaxProfit)
+            {
+                TradingHalted = true;
+                PrintInfo($"[TRADING_HALTED] Max Profit reached {DayPnL}");
+                return;
+            }
+
+            if (DailyMaxLoss != 0 && DayPnL < DailyMaxLoss)
+            {
+                TradingHalted = true;
+                PrintInfo($"[TRADING_HALTED] Max Loss reached {DayPnL}");
+                return;
+            }
+        }
 
         #endregion
 
@@ -307,7 +354,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             return TimeZoneInfo.ConvertTime(Time[0], TokyoZone);
         }
 
-        public void HaltTradingIfCandleBodyMassive()
+        public void BaseCandleVolatilityChecks()
         {
             if (CandleBodyRange(0) > 300)
             {
@@ -606,7 +653,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             }
         }
 
-        internal void CalculateStatistics()
+        internal void CollectStatistics()
         {
             CurrentTrade.DeltaMomentum = CalculateDeltaMomentum();
 
@@ -621,6 +668,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
             CurrentTrade.BarVolume = Volume[0];
             CurrentTrade.BarVolumeDelta = PreviousBarDelta;
+
+            CurrentTrade.CVD_EMA_Distance = Math.Round(Math.Abs(OrderFlowCVD.DeltaClose[0] - CVDEma[0]));
         }
 
         internal TradeBias? DetectBOS(int timeframe)

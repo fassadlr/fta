@@ -261,6 +261,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 NewsEvent.CreateCPIEvent(new DateTime(2026, 06, 10, 08, 30, 00)),   // CPI
                 NewsEvent.CreateFOMCEvent(new DateTime(2026, 06, 17, 14, 00, 0)),   // FOMC
                 NewsEvent.CreateUSBankHoliday(new DateTime(2026, 06, 19)),          // US BANK Holiday
+
+                // Jul 2026
+                NewsEvent.CreateNFPEvent(new DateTime(2026, 07, 02, 08, 30, 00)),   // NFP
+                NewsEvent.CreateAllDay(new DateTime(2026, 07, 03)),                 // This was the 4th early market closure, no trading for all strats.
+                NewsEvent.CreateCPIEvent(new DateTime(2026, 07, 14, 08, 30, 00)),   // CPI
+                NewsEvent.CreateFOMCEvent(new DateTime(2026, 07, 29, 14, 00, 0)),   // FOMC
             };
 
             // Add xmas period 2024
