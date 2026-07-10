@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 {
@@ -33,7 +34,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         internal InvalidRange InvalidRange { get; set; }
         internal SharedBorderTrade SharedBorderTrade { get; set; }
 
-        internal TradeSessionState TradingSession;
+        internal TradeSessionState TradingSession { get; set; }
+
+        internal CVD_TradeType_Enum CVD_TradeType { get; set; }
 
         internal void CancelLimitOrder()
         {

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using NinjaTrader.Cbi;
@@ -46,7 +47,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         [Display(Name = "Include FOMC Week", Order = 28, GroupName = "Parameters")]
         public bool IncludeFOMCWeek { get; set; }
 
+        private List<DealingRange> ranges;
+
+        private DealingRange CurrentRange { get; set; }
+        private DealingRange PreviousRange { get; set; }
+
         private DateTime? lastInitialization;
+
+        private TradeBias tradeBias;
 
         private bool rangeBreakDetected = false;
 
@@ -87,9 +95,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 AddDataSeries(BarsPeriodType.Tick, 1);
 
-                Ranges = [];
+                ranges = [];
 
                 Events = NewsEvents.Events();
+
+                tradeBias = TradeBias.Neutral;
 
                 newsFilter = new NewsFilter(IncludeCPIWeek, IncludeFOMCWeek, IncludeNFPWeek, IncludeNoEventsWeek);
 
@@ -164,7 +174,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             runner ??= StrategyRunner_PO3.Configure(this, FractalManager, new RunnerConfiguration_PO3()
             {
-                Ranges = Ranges,
+                Ranges = ranges,
                 Risk = Risk,
                 StopGrace = StopGrace,
             });
@@ -205,7 +215,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             // Determine if we are still in the same dealing range.
-            var found = Ranges.FirstOrDefault(r => r.IsInRange(Close[0])) ?? CreateDealingRange();
+            var found = ranges.FirstOrDefault(r => r.IsInRange(Close[0])) ?? CreateDealingRange();
 
             // Always process range breaks
             if (found != CurrentRange)
@@ -240,14 +250,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 runner.Configuration.RangeBias != RangeBias.Bullish)
             {
                 runner.Configuration.RangeBias = RangeBias.Bullish;
-                PrintDebug($"Range bias {runner.Configuration.RangeBias}: Trade bias {TradeBias}");
+                PrintDebug($"Range bias {runner.Configuration.RangeBias}: Trade bias {tradeBias}");
             }
 
             if (CurrentRange.High == PreviousRange?.Low &&
                 runner.Configuration.RangeBias != RangeBias.Bearish)
             {
                 runner.Configuration.RangeBias = RangeBias.Bearish;
-                PrintDebug($"Range bias {runner.Configuration.RangeBias}: Trade bias {TradeBias}");
+                PrintDebug($"Range bias {runner.Configuration.RangeBias}: Trade bias {tradeBias}");
             }
 
             // If we are in a position then break even or close and stop processing.
@@ -317,7 +327,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private void ExecuteStrategies()
         {
-            BasePnlChecks();
+            if (DayPnL > MaxProfit)
+            {
+                TradingHalted = true;
+                PrintInfo($"[TRADING_HALTED] Max Profit reached {DayPnL}");
+                return;
+            }
 
             if (IsLive && State != State.Realtime)
                 return;
@@ -375,7 +390,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (SystemPerformance.AllTrades.Count == 0)
                 return;
 
-            BasePnlUpdates();
+            if (SystemPerformance.AllTrades.Count > LastTradeCount)
+            {
+                var lastTrade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
+
+                DayPnL += lastTrade.ProfitCurrency;
+                LastTradeCount = SystemPerformance.AllTrades.Count;
+            }
 
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
@@ -432,7 +453,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             PrintDebug("[SESSION_START] resetting state");
 
-            Ranges.Clear();
+            ranges.Clear();
 
             CancelLimitOrder();
 
@@ -443,7 +464,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             InvalidRange = null;
             SharedBorderTrade = null;
 
-            TradeBias = TradeBias.Neutral;
+            tradeBias = TradeBias.Neutral;
 
             BullishBOSDetected = false;
             BearishBOSDetected = false;
@@ -502,8 +523,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private void ProcessSharedBorderRange(bool isLoss)
         {
-            var current = Ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.OriginalStopLoss));
-            var previous = Ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.TakeProfit));
+            var current = ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.OriginalStopLoss));
+            var previous = ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.TakeProfit));
 
             // It is possible that we jumped ranges and as such this cannot be processed further.
             if (current == null || previous == null)
@@ -511,8 +532,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (isLoss == false)
             {
-                current = Ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.TakeProfit));
-                previous = Ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.OriginalStopLoss));
+                current = ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.TakeProfit));
+                previous = ranges.FirstOrDefault(r => r.IsInRange(CurrentTrade.OriginalStopLoss));
             }
 
             var currentSharedBorderRange = GetSharedBorderRange(current, isLoss, CurrentTrade.Bias);
@@ -554,6 +575,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 InvalidRange = new InvalidRange(isLoss ? previous.BR3 : current.BR3, isLoss ? current.BR2 : previous.BR2);
 
             PrintDebug($"[RANGE_INVALID_CREATED] Invalid range created loss:{isLoss} rangeBias: {runner.Configuration.RangeBias}  last trade: {lastTradeBias} {InvalidRange}");
+        }
+
+        private DealingRange CreateDealingRange()
+        {
+            var newDealingRange = new DealingRange(PO3, Close[0]);
+            ranges.Add(newDealingRange);
+            PrintDebug($"Creating new range: {newDealingRange}");
+            return newDealingRange;
         }
     }
 }

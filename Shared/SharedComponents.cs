@@ -88,6 +88,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         public double CVD_EMA_Distance { get; internal set; }
 
         public CVD_TradeType_Enum CVD_TradeType { get; set; }
+        public string CVD_EMA_Alignment { get; internal set; }
 
         public override string ToString()
         {

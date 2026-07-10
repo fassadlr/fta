@@ -3,7 +3,6 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using NinjaTrader.Cbi;
 using NinjaTrader.Data;
-using NinjaTrader.NinjaScript.BarsTypes;
 using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
@@ -20,22 +19,19 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         public int StopGrace { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Session End Time", Order = 22, GroupName = "Parameters")]
-        public int SessionEndTime { get; set; }
-
-        private DateTime? lastInitialization;
+        [Display(Name = "Session End Hour", Order = 22, GroupName = "Parameters")]
+        public int SessionEndHour { get; set; }
 
         private bool rangeBreakDetected = false;
 
         private DailyAtr dailyAtr;
         private double atrCurrent;
-        private bool isConnected;
 
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
             {
-                Name = "Algo PO3 Asia v7.3";
+                Name = "Algo PO3 Asia v7.3.1";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -51,12 +47,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 DailyMaxProfit = 350;
 
-                SessionEndTime = 12; // Tokyo Time
+                SessionEndHour = 12; // Tokyo Time
             }
             else if (State == State.Configure)
             {
                 AddDataSeries("MNQ 09-26", BarsPeriodType.Minute, 5);
-                //AddDataSeries(BarsPeriodType.Tick, 1);
+                AddDataSeries(BarsPeriodType.Tick, 1);
 
                 Ranges = [];
 
@@ -71,23 +67,29 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 FractalManager = new FractalManager(this);
 
                 VWAP = OrderFlowVWAP(VWAPResolution.Standard, Bars.TradingHours, VWAPStandardDeviations.One, 1, 2, 3);
-                //OrderFlowCVD = OrderFlowCumulativeDelta(CumulativeDeltaType.BidAsk, CumulativeDeltaPeriod.Session, 1);
+
+                OrderFlowCVD = OrderFlowCumulativeDelta(CumulativeDeltaType.BidAsk, CumulativeDeltaPeriod.Session, 1);
+                CVDSeries = new Series<double>(this);
+
+                CVDEma = EMA(CVDSeries, 20);
             }
             else if (State == State.Terminated)
             {
                 if (ExportTradeLogsEnabled)
                     ExportTradeLogs(
-                        "EntryTime,Bias,OrderType,Result,Pnl,Quantity,BarVolume,BarVolumeDelta,CvdSlopeFast,CvdRSquaredFast,CvdSlopeSlow,CvdRSquaredSlow",
-                        $@"C:\Users\fassa\Documents\NinjaTrader Testing\TradeLog_AlgoPO3v7Asia_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                        "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD_EMA_Distance,CVD_EMA_Alignment",
+                        $@"C:\Users\fassa\Documents\NinjaTrader Testing\TradeLog_AlgoPO3_Asia_v7_3_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
             }
         }
 
         protected override void OnBarUpdate()
         {
-            if (lastInitialization == null || lastInitialization?.Date != Time[0].Date)
+            //try
+            //{
+            if (LastInitialization == null || LastInitialization?.Date != Time[0].Date)
             {
                 PerformCleanupBeforeSessionStart();
-                lastInitialization = Time[0].Date;
+                LastInitialization = Time[0].Date;
                 return;
             }
 
@@ -123,15 +125,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             // Stop trading when the last candle is disproportionally big.
-            if (CandleBodyRange(0) > 300)
-            {
-                TradingHalted = true;
-                PrintInfo($"Trading halted as last candle was {CandleBodyRange(0)} points.");
-                return;
-            }
+            BaseCandleVolatilityChecks();
 
             // If the session has ended stop processing.
-            if (TokyoTime().Hour >= SessionEndTime &&
+            if (TokyoTime().Hour >= SessionEndHour &&
                 Position.MarketPosition == MarketPosition.Flat)
             {
                 CancelLimitOrder();
@@ -141,20 +138,17 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             // Update the CVD
-            //if (BarsInProgress == 2)
-            //{
-            //    OrderFlowCVD.Update(OrderFlowCVD.BarsArray[1].Count - 1, 1);
-            //    return;
-            //}
+            if (BarsInProgress == 2)
+            {
+                OrderFlowCVD.Update(OrderFlowCVD.BarsArray[1].Count - 1, 1);
+                return;
+            }
 
             if (BarsInProgress != 0)
                 return;
 
-            if (Bars.BarsSeries.BarsType is VolumetricBarsType barsType)
-            {
-                var volBar = barsType.Volumes[CurrentBar];
-                PreviousBarDelta = volBar.BarDelta;
-            }
+            if (OrderFlowCVD.CurrentBar >= 0)
+                CVDSeries[0] = OrderFlowCVD.DeltaClose[0];
 
             atrCurrent = dailyAtr.Atr;
 
@@ -275,7 +269,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (IsLive && State != State.Realtime)
                 return;
 
-            if (IsLive && !isConnected)
+            if (IsLive && !IsConnected)
                 return;
 
             if (atrCurrent > 50)
@@ -369,13 +363,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
             }
 
-            /*---------------------------------------------*/
+            /* ----- COLLECT ANY STATISTICS ----- */
 
             CalculateVWAPDistance();
-            //CalculateStatistics();
 
-            var bosRange = Ranges.Current(BOSPrice);
-            PrintDebug($"[PD_TRADE_LOCATION] BOS Location {bosRange.GetPositionInRange(RangeBias, BOSPrice)}, Price Location {bosRange.GetPositionInRange(RangeBias, CurrentTrade.Entry)}");
+            CollectStatistics();
 
             if (CurrentTrade.Bias == TradeBias.Long)
             {
@@ -442,18 +434,23 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 return;
             }
+            //}
+            //catch (Exception ex)
+            //{
+            //    Print(ex);
+            //}
         }
 
         protected override void OnConnectionStatusUpdate(ConnectionStatusEventArgs e)
         {
             if (e.Status == ConnectionStatus.Connected)
             {
-                isConnected = true;
+                IsConnected = true;
                 Print("[CONNECTED]");
             }
             else
             {
-                isConnected = false;
+                IsConnected = false;
                 Print("[DISCONNECTED]");
             }
         }
@@ -470,7 +467,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.BarVolume},{CurrentTrade.BarVolumeDelta},{CurrentTrade.CvdSlopeFast},{CurrentTrade.CvdRSquaredFast},{CurrentTrade.CvdSlopeSlow},{CurrentTrade.CvdRSquaredSlow}";
+            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.CVD_EMA_Distance},{CurrentTrade.CVD_EMA_Alignment}";
             TradeLogs.Add(tradeCSV);
 
             if (trade.ProfitCurrency >= 0)

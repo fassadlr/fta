@@ -546,8 +546,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             }
         }
 
-        internal (double Slope, double RSquared, double SlopeZ)
-            CalculateRegression(ISeries<double> series, int lookback, int zLookback)
+        internal (double Slope, double RSquared, double SlopeZ) CalculateRegression(ISeries<double> series, int lookback, int zLookback)
         {
             if (CurrentBar < Math.Max(lookback - 1, zLookback))
                 return (0, 0, 0);
@@ -655,21 +654,22 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         internal void CollectStatistics()
         {
-            CurrentTrade.DeltaMomentum = CalculateDeltaMomentum();
+            //CurrentTrade.DeltaMomentum = CalculateDeltaMomentum();
 
-            var regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 5, 20);
-            CurrentTrade.CvdSlopeFast = regressionResult.Slope;
-            CurrentTrade.CvdRSquaredFast = regressionResult.RSquared;
+            //var regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 5, 20);
+            //CurrentTrade.CvdSlopeFast = regressionResult.Slope;
+            //CurrentTrade.CvdRSquaredFast = regressionResult.RSquared;
 
-            regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 10, 20);
-            CurrentTrade.CvdSlopeSlow = regressionResult.Slope;
-            CurrentTrade.CvdRSquaredSlow = regressionResult.RSquared;
-            CurrentTrade.CvdAcceleration = CurrentTrade.CvdSlopeSlow - CurrentTrade.CvdRSquaredFast;
+            //regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 10, 20);
+            //CurrentTrade.CvdSlopeSlow = regressionResult.Slope;
+            //CurrentTrade.CvdRSquaredSlow = regressionResult.RSquared;
+            //CurrentTrade.CvdAcceleration = CurrentTrade.CvdSlopeSlow - CurrentTrade.CvdRSquaredFast;
 
-            CurrentTrade.BarVolume = Volume[0];
-            CurrentTrade.BarVolumeDelta = PreviousBarDelta;
+            //CurrentTrade.BarVolume = Volume[0];
+            //CurrentTrade.BarVolumeDelta = PreviousBarDelta;
 
             CurrentTrade.CVD_EMA_Distance = Math.Round(Math.Abs(OrderFlowCVD.DeltaClose[0] - CVDEma[0]));
+            CurrentTrade.CVD_EMA_Alignment = OrderFlowCVD.DeltaClose[0] > CVDEma[0] ? "Above" : "Below";
         }
 
         internal TradeBias? DetectBOS(int timeframe)

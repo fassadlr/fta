@@ -4,7 +4,6 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using NinjaTrader.Cbi;
 using NinjaTrader.Data;
-using NinjaTrader.NinjaScript.BarsTypes;
 using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
@@ -21,8 +20,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         public int SessionEndHour { get; set; }
 
         private bool rangeBreakDetected = false;
-
-        private CVD_TradeType_Enum CVD_TradeType;
 
         protected override void OnStateChange()
         {
@@ -73,13 +70,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 if (ExportTradeLogsEnabled)
                     ExportTradeLogs(
-                        "EntryTime,Bias,OrderType,Result,Pnl,Quantity,BarVolume,BarVolumeDelta,CvdSlopeFast,CvdRSquaredFast,CvdSlopeSlow,CvdRSquaredSlow,CVD_EMA_Distance",
-                        $@"C:\Users\fassa\Documents\NinjaTrader Testing\TradeLog_AlgoPO3v7Asia_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                        "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD_EMA_Distance",
+                        $@"C:\Users\fassa\Documents\NinjaTrader Testing\TradeLog_AlgoPO3_CVD_Asia_v1_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
             }
         }
 
         protected override void OnBarUpdate()
         {
+            //try
+            //{
             if (LastInitialization == null || LastInitialization?.Date != Time[0].Date)
             {
                 PerformCleanupBeforeSessionStart();
@@ -90,8 +89,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (TradingHalted) return;
 
             BasePnlChecks();
-
-            //BaseNewsEventsChecks();
 
             // Skip all day events (easter etc).
             var eventForToday = GetNewsEventForToday();
@@ -136,12 +133,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (OrderFlowCVD.CurrentBar >= 0)
                 CVDSeries[0] = OrderFlowCVD.DeltaClose[0];
-
-            if (Bars.BarsSeries.BarsType is VolumetricBarsType barsType)
-            {
-                var volBar = barsType.Volumes[CurrentBar];
-                PreviousBarDelta = volBar.BarDelta;
-            }
 
             /* ----- PROCESS RANGE INFORMATION -----*/
 
@@ -344,6 +335,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 return;
             }
+            //}
+            //catch (Exception ex) { Print($"Error in OnBarUpdate: {ex.Message}"); }
         }
 
         protected override void OnConnectionStatusUpdate(ConnectionStatusEventArgs e)
@@ -372,7 +365,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.BarVolume},{CurrentTrade.BarVolumeDelta},{CurrentTrade.CvdSlopeFast},{CurrentTrade.CvdRSquaredFast},{CurrentTrade.CvdSlopeSlow},{CurrentTrade.CvdRSquaredSlow},{CurrentTrade.CVD_EMA_Distance}";
+            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.CVD_EMA_Distance}";
             PrintTrade(tradeCSV);
             TradeLogs.Add(tradeCSV);
 
@@ -399,8 +392,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (FractalManager.Fractals.TryGetValue((1, FractalType.HighFiveBar), out var fiveBarFractal))
                     if (fiveBarFractal.Price > CurrentRange.ExtHigh) candidates.Add(fiveBarFractal.Price);
 
-                if (Open[0] > Math.Round(CurrentRange.ExtHigh))
-                    candidates.Add(Open[0]);
+                if (High[0] > Math.Round(CurrentRange.ExtHigh))
+                    candidates.Add(High[0]);
 
                 if (ImbalanceFormed(TradeBias.Short, out double imbalanceStart))
                     if (imbalanceStart > CurrentRange.ExtHigh) candidates.Add(imbalanceStart);
@@ -420,8 +413,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (FractalManager.Fractals.TryGetValue((1, FractalType.LowFiveBar), out var fiveBarFractal))
                     if (fiveBarFractal.Price < CurrentRange.ExtLow) candidates.Add(fiveBarFractal.Price);
 
-                if (Open[0] < Math.Round(CurrentRange.ExtLow))
-                    candidates.Add(Open[0]);
+                if (Low[0] < Math.Round(CurrentRange.ExtLow))
+                    candidates.Add(Low[0]);
 
                 if (ImbalanceFormed(TradeBias.Long, out double imbalanceStart))
                     if (imbalanceStart < CurrentRange.ExtLow) candidates.Add(imbalanceStart);

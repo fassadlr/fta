@@ -264,9 +264,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
 
                 // Jul 2026
                 NewsEvent.CreateNFPEvent(new DateTime(2026, 07, 02, 08, 30, 00)),   // NFP
-                NewsEvent.CreateAllDay(new DateTime(2026, 07, 03)),                 // This was the 4th early market closure, no trading for all strats.
+                NewsEvent.CreateAllDay(new DateTime(2026, 07, 03)),                 // US BANK Holiday - Not classed as bank holiday as July 4 is total shutdown, the whole day.
+                NewsEvent.CreateFOMCEvent(new DateTime(2026, 07, 08, 14, 00, 0)),   // FOMC
                 NewsEvent.CreateCPIEvent(new DateTime(2026, 07, 14, 08, 30, 00)),   // CPI
-                NewsEvent.CreateFOMCEvent(new DateTime(2026, 07, 29, 14, 00, 0)),   // FOMC
             };
 
             // Add xmas period 2024
