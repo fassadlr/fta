@@ -93,6 +93,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
             }
 
+            if (TradingHalted) return;
+
             BasePnlChecks();
 
             // Always process fractal and BOS detection.
@@ -104,8 +106,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 TradeBias = DetectBOS(5) ?? TradeBias;
             }
-
-            if (TradingHalted) return;
 
             if (SkipMonths.Split(',').Contains(Time[0].Month.ToString()))
             {
@@ -350,17 +350,50 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             /***** TRADE INSPECTION BEFORE PLACEMENT *****/
 
-            // If the entry is below/above the trade missed threshold then skip.
-            if (CurrentTrade.Bias == TradeBias.Short && Close[0] < CurrentTrade.TradeMissedThreshold)
+            if (CurrentTrade.Bias == TradeBias.Long)
             {
-                PrintDebug($"[TRADE_SKIPPED] {CurrentTrade.Bias}, entry {CurrentTrade.Entry} below threshold {CurrentTrade.TradeMissedThreshold}");
-                return;
+                // If the entry is below/above the trade missed threshold then skip.
+                if (Close[0] > CurrentTrade.TradeMissedThreshold)
+                {
+                    PrintDebug($"[TRADE_SKIPPED] {CurrentTrade.Bias}, entry {CurrentTrade.Entry} above threshold {CurrentTrade.TradeMissedThreshold}");
+                    return;
+                }
+
+                if (CVDEma[0] > OrderFlowCVD.DeltaClose[0])
+                {
+                    PrintDebug($"[CVD_BIAS_FAIL_LONG] EMA {Math.Round(CVDEma[0])} > CVD {OrderFlowCVD.DeltaClose[0]}");
+                    return;
+                }
+
+                //var CVD_EMA_Distance = Math.Round(OrderFlowCVD.DeltaClose[0] - CVDEma[0]);
+                //var CVD_EMA_DistanceCheck = CVD_EMA_Distance < 800 || CVD_EMA_Distance > 1400;
+
+                //if (!CVD_EMA_DistanceCheck)
+                //{
+                //    PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CVD_EMA_Distance}");
+                //    return;
+                //}
             }
 
-            if (CurrentTrade.Bias == TradeBias.Long && Close[0] > CurrentTrade.TradeMissedThreshold)
+            if (CurrentTrade.Bias == TradeBias.Short)
             {
-                PrintDebug($"[TRADE_SKIPPED] {CurrentTrade.Bias}, entry {CurrentTrade.Entry} above threshold {CurrentTrade.TradeMissedThreshold}");
-                return;
+                // If the entry is below/above the trade missed threshold then skip.
+                if (Close[0] < CurrentTrade.TradeMissedThreshold)
+                {
+                    PrintDebug($"[TRADE_SKIPPED] {CurrentTrade.Bias}, entry {CurrentTrade.Entry} below threshold {CurrentTrade.TradeMissedThreshold}");
+                    return;
+                }
+
+                //var CVD_EMA_Distance = Math.Round(CVDEma[0] - OrderFlowCVD.DeltaClose[0]);
+                //var CVD_EMA_DistanceCheck = CVD_EMA_Distance < 1000 ||
+                //    (CVD_EMA_Distance >= 1200 && CVD_EMA_Distance < 1600) ||
+                //    CVD_EMA_Distance > 2000;
+
+                //if (!CVD_EMA_DistanceCheck)
+                //{
+                //    PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CVD_EMA_Distance}");
+                //    return;
+                //}
             }
 
             /* ----- COLLECT ANY STATISTICS ----- */

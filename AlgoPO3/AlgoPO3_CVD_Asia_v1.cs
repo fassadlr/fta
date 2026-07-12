@@ -70,7 +70,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 if (ExportTradeLogsEnabled)
                     ExportTradeLogs(
-                        "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD_EMA_Distance",
+                        "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD_EMA_Distance, CVD_TradeType",
                         $@"C:\Users\fassa\Documents\NinjaTrader Testing\TradeLog_AlgoPO3_CVD_Asia_v1_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
             }
         }
@@ -267,13 +267,21 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 if (CVDEma[0] > OrderFlowCVD.DeltaClose[0])
                 {
-                    PrintDebug($"[CVD_INSPECTION_FAIL_LONG] EMA {Math.Round(CVDEma[0])} > CVD {OrderFlowCVD.DeltaClose[0]}");
+                    PrintDebug($"[CVD_BIAS_FAIL_LONG] EMA {Math.Round(CVDEma[0])} > CVD {OrderFlowCVD.DeltaClose[0]}");
                     return;
                 }
 
-                if (OrderFlowCVD.DeltaClose[0] - CVDEma[0] < 215)
+                var CVD_EMA_Distance = Math.Round(OrderFlowCVD.DeltaClose[0] - CVDEma[0]);
+                //var CVD_EMA_DistanceCheck =
+                //    (CVD_EMA_Distance >= 100 && CVD_EMA_Distance < 150) ||
+                //    (CVD_EMA_Distance >= 200 && CVD_EMA_Distance < 800) ||
+                //    (CVD_EMA_Distance >= 1200 && CVD_EMA_Distance < 1600);
+
+                var CVD_EMA_DistanceCheck = CVD_EMA_Distance >= 100;
+
+                if (!CVD_EMA_DistanceCheck)
                 {
-                    PrintDebug($"[CVD_INSPECTION_FAIL_LONG] EMA DISTANCE < 215 {OrderFlowCVD.DeltaClose[0] - CVDEma[0]}");
+                    PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CVD_EMA_Distance}");
                     return;
                 }
             }
@@ -282,13 +290,21 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 if (CVDEma[0] < OrderFlowCVD.DeltaClose[0])
                 {
-                    PrintDebug($"[CVD_INSPECTION_FAIL_SHORT] EMA {Math.Round(CVDEma[0])} < CVD {OrderFlowCVD.DeltaClose[0]}");
+                    PrintDebug($"[CVD_BIAS_FAIL_SHORT] EMA {Math.Round(CVDEma[0])} < CVD {OrderFlowCVD.DeltaClose[0]}");
                     return;
                 }
 
-                if (CVDEma[0] - OrderFlowCVD.DeltaClose[0] < 215)
+                var CVD_EMA_Distance = Math.Round(CVDEma[0] - OrderFlowCVD.DeltaClose[0]);
+                //var CVD_EMA_DistanceCheck =
+                //    (CVD_EMA_Distance >= 100 & CVD_EMA_Distance < 600) ||
+                //    (CVD_EMA_Distance >= 800 & CVD_EMA_Distance < 1600) ||
+                //    CVD_EMA_Distance >= 2000;
+
+                var CVD_EMA_DistanceCheck = CVD_EMA_Distance >= 100;
+
+                if (!CVD_EMA_DistanceCheck)
                 {
-                    PrintDebug($"[CVD_INSPECTION_FAIL_SHORT] EMA DISTANCE < 215 {CVDEma[0] - OrderFlowCVD.DeltaClose[0]}");
+                    PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CVD_EMA_Distance}");
                     return;
                 }
             }
@@ -365,7 +381,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.CVD_EMA_Distance}";
+            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.CVD_EMA_Distance}, {CurrentTrade.CVD_TradeType}";
             PrintTrade(tradeCSV);
             TradeLogs.Add(tradeCSV);
 
