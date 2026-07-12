@@ -25,7 +25,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Algo PO3 CVD Asia v1";
+                Name = "Algo PO3 CVD Asia v1.1";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -42,6 +42,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 // Tokyo Time
                 SessionEndHour = 12;
+
+                PrintTo = PrintTo.OutputTab2;
             }
             else if (State == State.Configure)
             {

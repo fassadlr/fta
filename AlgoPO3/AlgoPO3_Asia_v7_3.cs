@@ -48,6 +48,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 DailyMaxProfit = 350;
 
                 SessionEndHour = 12; // Tokyo Time
+
+                PrintTo = PrintTo.OutputTab1;
             }
             else if (State == State.Configure)
             {
