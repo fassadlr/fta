@@ -141,49 +141,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 OrderFlowCVD.Update(OrderFlowCVD.BarsArray[1].Count - 1, 1);
 
-                // Virtual trades MUST be closed on the tick series.
-                if (CurrentTrade != null && CurrentTrade.IsVirtual)
-                {
-                    PrintDebug($"[CVD_UPDATE] {Low[0]} {High[0]}");
-
-                    var contractTickValue = TickSize * Instrument.MasterInstrument.PointValue * TickSize * CurrentTrade.PositionSize;
-
-                    if (CurrentTrade.Bias == TradeBias.Short &&
-                        (Low[0] <= CurrentTrade.TakeProfit || High[0] >= CurrentTrade.StopLoss))
-                    {
-                        CurrentTrade.IsVirtual = false;
-
-                        UpdateCVDTradeType(Low[0] <= CurrentTrade.TakeProfit);
-
-                        LastTradeCount++;
-
-                        if (Low[0] <= CurrentTrade.TakeProfit)
-                            DayPnL += (CurrentTrade.Entry - CurrentTrade.TakeProfit) * contractTickValue;
-
-                        if (High[0] >= CurrentTrade.StopLoss)
-                            DayPnL += (CurrentTrade.StopLoss - CurrentTrade.Entry) * contractTickValue;
-
-                        PrintInfo($"[VIRTUAL_POSITION_CLOSED] {CurrentTrade.Bias}");
-                    }
-
-                    if (CurrentTrade.Bias == TradeBias.Long &&
-                        (High[0] >= CurrentTrade.TakeProfit || Low[0] <= CurrentTrade.StopLoss))
-                    {
-                        CurrentTrade.IsVirtual = false;
-
-                        UpdateCVDTradeType(High[0] >= CurrentTrade.TakeProfit);
-
-                        LastTradeCount++;
-
-                        if (High[0] >= CurrentTrade.TakeProfit)
-                            DayPnL += (CurrentTrade.TakeProfit - CurrentTrade.Entry) * contractTickValue;
-
-                        if (Low[0] <= CurrentTrade.StopLoss)
-                            DayPnL += (CurrentTrade.Entry - CurrentTrade.StopLoss) * contractTickValue;
-
-                        PrintInfo($"[VIRTUAL_POSITION_CLOSED] {CurrentTrade.Bias}");
-                    }
-                }
+                ProcessVirtualTrade();
 
                 return;
             }
@@ -460,19 +418,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             TradeLogs.Add(tradeCSV);
 
             UpdateCVDTradeType(trade.ProfitCurrency > 0);
-        }
-
-        private void UpdateCVDTradeType(bool isWin)
-        {
-            if (isWin)
-            {
-                if (CVD_TradeType == CVD_TradeType_Enum.Continuation)
-                    CVD_TradeType = CVD_TradeType_Enum.Normal;
-                else
-                    CVD_TradeType = CVD_TradeType_Enum.Continuation;
-            }
-            else
-                CVD_TradeType = CVD_TradeType_Enum.Normal;
         }
 
         private double CalculateStopLoss()

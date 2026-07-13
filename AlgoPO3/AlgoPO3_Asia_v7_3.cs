@@ -83,7 +83,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (ExportTradeLogsEnabled)
                     ExportTradeLogs(
                         "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD,CVD_EMA,CVD_EMA_Alignment",
-                        $@"C:\Users\fassa\Documents\NinjaTrader Testing\TradeLog_AlgoPO3_Asia_v7_3_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                        $@"C:\Users\fassa\Documents\NinjaTrader Testing\AlgoPO3_Asia_v7_3_1_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
             }
         }
 
