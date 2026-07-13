@@ -92,20 +92,20 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             //try
             //{
 
-            if (BarsInProgress == 0 && !DataSetValidation[0])
-            {
-                DataSetValidation[0] = true;
-                PrintInfo("[DATASET_VALIDATION] Primary series validated.");
-            }
+            //if (BarsInProgress == 0 && !DataSetValidation[0])
+            //{
+            //    DataSetValidation[0] = true;
+            //    PrintInfo("[DATASET_VALIDATION] Primary series validated.");
+            //}
 
-            if (BarsInProgress == 1 && !DataSetValidation[1])
-            {
-                DataSetValidation[1] = true;
-                PrintInfo("[DATASET_VALIDATION] Secondary series validated.");
-            }
+            //if (BarsInProgress == 1 && !DataSetValidation[1])
+            //{
+            //    DataSetValidation[1] = true;
+            //    PrintInfo("[DATASET_VALIDATION] Secondary series validated.");
+            //}
 
-            if (!DataSetValidation.All(v => v.Value))
-                return;
+            //if (!DataSetValidation.All(v => v.Value))
+            //    return;
 
             if (LastInitialization == null || LastInitialization?.Date != Time[0].Date)
             {
