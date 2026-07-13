@@ -82,6 +82,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         internal bool IsConnected { get; set; }
 
+        internal Dictionary<int, bool> DataSetValidation { get; set; }
+
         #region Constants
 
         public string LONG_TRADE = "long";
@@ -312,7 +314,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         public void PrintTrade(string toPrint)
         {
             if (TradeLogEnabled)
-                Print($"{toPrint}");
+                Print($"{Time[0]} {toPrint}");
         }
 
         public NewsEvent GetNewsEventForToday()
@@ -668,6 +670,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             //CurrentTrade.BarVolume = Volume[0];
             //CurrentTrade.BarVolumeDelta = PreviousBarDelta;
 
+            CurrentTrade.CVD = Math.Round(OrderFlowCVD.DeltaClose[0]);
+            CurrentTrade.CVD_EMA = Math.Round(CVDEma[0]);
             CurrentTrade.CVD_EMA_Distance = Math.Round(Math.Abs(OrderFlowCVD.DeltaClose[0] - CVDEma[0]));
             CurrentTrade.CVD_EMA_Alignment = OrderFlowCVD.DeltaClose[0] > CVDEma[0] ? "Above" : "Below";
         }

@@ -54,8 +54,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 Events = NewsEvents.Events();
 
                 TokyoZone = TimeZoneInfo.FindSystemTimeZoneById("Tokyo Standard Time");
-                LondonZone = TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time");
-                NewYorkZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+
+                DataSetValidation = new Dictionary<int, bool> { { 0, false }, { 1, false } };
             }
             else if (State == State.DataLoaded)
             {
@@ -72,8 +72,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 if (ExportTradeLogsEnabled)
                     ExportTradeLogs(
-                        "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD_EMA_Distance, CVD_TradeType",
-                        $@"C:\Users\fassa\Documents\NinjaTrader Testing\TradeLog_AlgoPO3_CVD_Asia_v1_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                        "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD,CVD_EMA,CVD_TradeType",
+                        $@"C:\Users\fassa\Documents\NinjaTrader Testing\TradeLog_AlgoPO3_CVD_Asia_v1_1_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
             }
         }
 
@@ -81,14 +81,36 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             //try
             //{
-            if (LastInitialization == null || LastInitialization?.Date != Time[0].Date)
+
+            if (TradingHalted && BarsInProgress == 0 && Bars.IsFirstBarOfSession)
             {
                 PerformCleanupBeforeSessionStart();
-                LastInitialization = Time[0].Date;
-                return;
+
+                DataSetValidation[0] = false;
+                DataSetValidation[1] = false;
             }
 
-            if (TradingHalted) return;
+            if (TradingHalted)
+                return;
+
+            if (BarsInProgress == 0 && !DataSetValidation[0])
+            {
+                DataSetValidation[0] = true;
+                PrintInfo("[DATASET_VALIDATION] Primary series validated.");
+            }
+
+            if (BarsInProgress == 1 && !DataSetValidation[1])
+            {
+                DataSetValidation[1] = true;
+                PrintInfo("[DATASET_VALIDATION] Secondary series validated.");
+            }
+
+            if (!DataSetValidation.All(v => v.Value))
+                return;
+
+            /* ----- SESSION INITIALIZATION ----- */
+            if (TokyoTime().TimeOfDay < new TimeSpan(8, 0, 0))
+                return;
 
             BasePnlChecks();
 
@@ -106,17 +128,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             // Stop trading when the last candle is disproportionally big.
             BaseCandleVolatilityChecks();
 
-            // Process fractals on the 1min
-            if (BarsInProgress == 0)
-            {
-                FractalManager.DetectFractalThreeBar(1);
-                FractalManager.DetectFractalFiveBar(1);
-            }
-
             // If the session has ended stop processing.
-            if (TokyoTime().Hour >= SessionEndHour && Position.MarketPosition == MarketPosition.Flat)
+            if (TokyoTime().Hour >= SessionEndHour && (Position.MarketPosition == MarketPosition.Flat || (CurrentTrade != null && !CurrentTrade.IsVirtual)))
             {
-                CancelLimitOrder();
                 PrintInfo($"Trading session ended.");
                 TradingHalted = true;
                 return;
@@ -133,8 +147,24 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (BarsInProgress != 0)
                 return;
 
+            // Process fractals on the 1min
+            FractalManager.DetectFractalThreeBar(1);
+            FractalManager.DetectFractalFiveBar(1);
+
             if (OrderFlowCVD.CurrentBar >= 0)
                 CVDSeries[0] = OrderFlowCVD.DeltaClose[0];
+
+            /* 
+             * ----- STRATEGY START TIME ANCHORED TO TOKYO-----
+             * 
+             * At the open we reset the range break.
+            */
+
+            if (TokyoTime().TimeOfDay < new TimeSpan(9, 0, 0))
+                return;
+
+            if (TokyoTime().TimeOfDay == new TimeSpan(9, 0, 0))
+                PrintInfo($"[SESSION_START]");
 
             /* ----- PROCESS RANGE INFORMATION -----*/
 
@@ -162,18 +192,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (PreviousRange == null)
                 return;
 
-            /* 
-             * ----- STRATEGY START TIME ANCHORED TO TOKYO-----
-             * 
-             * At the open we reset the range break.
-            */
-
-            if (TokyoTime().TimeOfDay < new TimeSpan(9, 0, 0))
-                return;
-
-            if (TokyoTime().TimeOfDay == new TimeSpan(9, 0, 0))
-                rangeBreakDetected = false;
-
             /* ----- SET TRADE BIAS  ----- */
             if (CurrentRange.Low == PreviousRange.High)
             {
@@ -191,19 +209,26 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             /* ----- WE ARE IN A POSITION  ----- */
             if (Position.MarketPosition != MarketPosition.Flat)
-            {
                 return;
-            }
 
             /* ----- WE ARE IN A VIRTUAL POSITION  ----- */
             if (CurrentTrade != null && CurrentTrade.IsVirtual)
             {
+                var contractTickValue = TickSize * Instrument.MasterInstrument.PointValue * TickSize * CurrentTrade.PositionSize;
                 if (CurrentTrade.Bias == TradeBias.Short &&
                     (Low[0] <= CurrentTrade.TakeProfit || High[0] >= CurrentTrade.StopLoss))
                 {
                     CurrentTrade.IsVirtual = false;
 
                     UpdateCVDTradeType(Low[0] <= CurrentTrade.TakeProfit);
+
+                    LastTradeCount++;
+
+                    if (Low[0] <= CurrentTrade.TakeProfit)
+                        DayPnL += (CurrentTrade.Entry - CurrentTrade.TakeProfit) * contractTickValue;
+
+                    if (High[0] >= CurrentTrade.StopLoss)
+                        DayPnL += (CurrentTrade.StopLoss - CurrentTrade.Entry) * contractTickValue;
 
                     PrintInfo($"[VIRTUAL_POSITION_CLOSED] {CurrentTrade.Bias}");
                 }
@@ -215,6 +240,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                     UpdateCVDTradeType(High[0] >= CurrentTrade.TakeProfit);
 
+                    LastTradeCount++;
+
+                    if (High[0] >= CurrentTrade.TakeProfit)
+                        DayPnL += (CurrentTrade.TakeProfit - CurrentTrade.Entry) * contractTickValue;
+
+                    if (Low[0] <= CurrentTrade.StopLoss)
+                        DayPnL += (CurrentTrade.Entry - CurrentTrade.StopLoss) * contractTickValue;
+
                     PrintInfo($"[VIRTUAL_POSITION_CLOSED] {CurrentTrade.Bias}");
                 }
 
@@ -222,17 +255,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             /* ----- WE ARE WAITING FOR AN ENTRY ----- */
-            if (DetectAndCheckInvalidRange())
-                return;
-
-            // Cancel limit orders close to end of sessions blocks.
-            if (TokyoTime().Hour == 11 && Time[0].Minute >= 45)
-            {
-                CancelLimitOrder();
-                return;
-            }
 
             if (!rangeBreakDetected)
+                return;
+
+            // This still needs to be checked as ranges can be jumped with large candles.
+            if (RangeBias == RangeBias.Neutral)
                 return;
 
             if (IsLive && State != State.Realtime)
@@ -306,13 +334,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 var CVD_EMA_DistanceCheck =
                     (CVD_EMA_Distance >= 100 && CVD_EMA_Distance < 150) ||
                     (CVD_EMA_Distance >= 200 && CVD_EMA_Distance < 800) ||
-                    (CVD_EMA_Distance >= 1200 && CVD_EMA_Distance < 1600);
+                    (CVD_EMA_Distance >= 1400 && CVD_EMA_Distance < 1600);
 
                 if (!CVD_EMA_DistanceCheck)
                 {
                     PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CVD_EMA_Distance}");
+                    PrintInfo($"[VIRTUAL_POSITION_OPENED] {CurrentTrade.Bias}");
                     CurrentTrade.IsVirtual = true;
-                    return;
                 }
             }
 
@@ -327,19 +355,20 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 var CVD_EMA_Distance = Math.Round(CVDEma[0] - OrderFlowCVD.DeltaClose[0]);
                 var CVD_EMA_DistanceCheck =
                     (CVD_EMA_Distance >= 100 & CVD_EMA_Distance < 600) ||
-                    (CVD_EMA_Distance >= 800 & CVD_EMA_Distance < 1600) ||
-                    CVD_EMA_Distance >= 2000;
+                    (CVD_EMA_Distance >= 800 & CVD_EMA_Distance < 1000) ||
+                    (CVD_EMA_Distance >= 1200 & CVD_EMA_Distance < 1600);
 
                 if (!CVD_EMA_DistanceCheck)
                 {
                     PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CVD_EMA_Distance}");
+                    PrintInfo($"[VIRTUAL_POSITION_OPENED] {CurrentTrade.Bias}");
                     CurrentTrade.IsVirtual = true;
-                    return;
                 }
             }
 
             /* ----- COLLECT ANY STATISTICS ----- */
             CollectStatistics();
+
             CurrentTrade.CVD_TradeType = CVD_TradeType;
 
             /* ----- PLACE THE TRADE ----- */
@@ -350,8 +379,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 {
                     PrintDebug($"[RISK_REWARD_BELOW_THRESHOLD_LONG] {rr}");
                     rangeBreakDetected = false;
+                    CurrentTrade.IsVirtual = false;
                     return;
                 }
+
+                if (CurrentTrade.IsVirtual)
+                    return;
 
                 EnterLong(0, CalculatePositionSize(Close[0] - CurrentTrade.StopLoss, Risk), LONG_TRADE);
                 PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} stop {CurrentTrade.StopLoss}");
@@ -369,8 +402,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 {
                     PrintDebug($"[RISK_REWARD_BELOW_THRESHOLD_SHORT] {rr}");
                     rangeBreakDetected = false;
+                    CurrentTrade.IsVirtual = false;
                     return;
                 }
+
+                if (CurrentTrade.IsVirtual)
+                    return;
 
                 EnterShort(0, CalculatePositionSize(CurrentTrade.StopLoss - Close[0], Risk), SHORT_TRADE);
                 PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} stop {CurrentTrade.StopLoss}");
@@ -410,7 +447,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.CVD_EMA_Distance}, {CurrentTrade.CVD_TradeType}";
+            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.CVD},{CurrentTrade.CVD_EMA},{CurrentTrade.CVD_TradeType}";
             PrintTrade(tradeCSV);
             TradeLogs.Add(tradeCSV);
 
@@ -481,7 +518,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private void PerformCleanupBeforeSessionStart()
         {
-            PrintDebug("[SESSION_START] resetting state");
+            PrintDebug("[SESSION_INIT]");
 
             Ranges.Clear();
 

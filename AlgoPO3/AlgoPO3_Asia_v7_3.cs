@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using NinjaTrader.Cbi;
@@ -63,6 +64,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 TokyoZone = TimeZoneInfo.FindSystemTimeZoneById("Tokyo Standard Time");
                 LondonZone = TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time");
                 NewYorkZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+
+                DataSetValidation = new Dictionary<int, bool> { { 0, false }, { 1, false } };
             }
             else if (State == State.DataLoaded)
             {
@@ -79,7 +82,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 if (ExportTradeLogsEnabled)
                     ExportTradeLogs(
-                        "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD_EMA_Distance,CVD_EMA_Alignment",
+                        "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD,CVD_EMA,CVD_EMA_Alignment",
                         $@"C:\Users\fassa\Documents\NinjaTrader Testing\TradeLog_AlgoPO3_Asia_v7_3_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
             }
         }
@@ -88,6 +91,22 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             //try
             //{
+
+            if (BarsInProgress == 0 && !DataSetValidation[0])
+            {
+                DataSetValidation[0] = true;
+                PrintInfo("[DATASET_VALIDATION] Primary series validated.");
+            }
+
+            if (BarsInProgress == 1 && !DataSetValidation[1])
+            {
+                DataSetValidation[1] = true;
+                PrintInfo("[DATASET_VALIDATION] Secondary series validated.");
+            }
+
+            if (!DataSetValidation.All(v => v.Value))
+                return;
+
             if (LastInitialization == null || LastInitialization?.Date != Time[0].Date)
             {
                 PerformCleanupBeforeSessionStart();
@@ -502,7 +521,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.CVD_EMA_Distance},{CurrentTrade.CVD_EMA_Alignment}";
+            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.CVD},{CurrentTrade.CVD_EMA},{CurrentTrade.CVD_EMA_Alignment}";
             TradeLogs.Add(tradeCSV);
 
             if (trade.ProfitCurrency >= 0)
