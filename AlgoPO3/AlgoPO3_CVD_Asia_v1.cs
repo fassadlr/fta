@@ -174,6 +174,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (TokyoTime().TimeOfDay == new TimeSpan(9, 0, 0))
                 rangeBreakDetected = false;
 
+            /* ----- SET TRADE BIAS  ----- */
             if (CurrentRange.Low == PreviousRange.High)
             {
                 RangeBias = RangeBias.Bullish;
@@ -190,7 +191,35 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             /* ----- WE ARE IN A POSITION  ----- */
             if (Position.MarketPosition != MarketPosition.Flat)
+            {
                 return;
+            }
+
+            /* ----- WE ARE IN A VIRTUAL POSITION  ----- */
+            if (CurrentTrade != null && CurrentTrade.IsVirtual)
+            {
+                if (CurrentTrade.Bias == TradeBias.Short &&
+                    (Low[0] <= CurrentTrade.TakeProfit || High[0] >= CurrentTrade.StopLoss))
+                {
+                    CurrentTrade.IsVirtual = false;
+
+                    UpdateCVDTradeType(Low[0] <= CurrentTrade.TakeProfit);
+
+                    PrintInfo($"[VIRTUAL_POSITION_CLOSED] {CurrentTrade.Bias}");
+                }
+
+                if (CurrentTrade.Bias == TradeBias.Long &&
+                    (High[0] >= CurrentTrade.TakeProfit || Low[0] <= CurrentTrade.StopLoss))
+                {
+                    CurrentTrade.IsVirtual = false;
+
+                    UpdateCVDTradeType(High[0] >= CurrentTrade.TakeProfit);
+
+                    PrintInfo($"[VIRTUAL_POSITION_CLOSED] {CurrentTrade.Bias}");
+                }
+
+                return;
+            }
 
             /* ----- WE ARE WAITING FOR AN ENTRY ----- */
             if (DetectAndCheckInvalidRange())
@@ -274,16 +303,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 }
 
                 var CVD_EMA_Distance = Math.Round(OrderFlowCVD.DeltaClose[0] - CVDEma[0]);
-                //var CVD_EMA_DistanceCheck =
-                //    (CVD_EMA_Distance >= 100 && CVD_EMA_Distance < 150) ||
-                //    (CVD_EMA_Distance >= 200 && CVD_EMA_Distance < 800) ||
-                //    (CVD_EMA_Distance >= 1200 && CVD_EMA_Distance < 1600);
-
-                var CVD_EMA_DistanceCheck = CVD_EMA_Distance >= 100;
+                var CVD_EMA_DistanceCheck =
+                    (CVD_EMA_Distance >= 100 && CVD_EMA_Distance < 150) ||
+                    (CVD_EMA_Distance >= 200 && CVD_EMA_Distance < 800) ||
+                    (CVD_EMA_Distance >= 1200 && CVD_EMA_Distance < 1600);
 
                 if (!CVD_EMA_DistanceCheck)
                 {
                     PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CVD_EMA_Distance}");
+                    CurrentTrade.IsVirtual = true;
                     return;
                 }
             }
@@ -297,16 +325,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 }
 
                 var CVD_EMA_Distance = Math.Round(CVDEma[0] - OrderFlowCVD.DeltaClose[0]);
-                //var CVD_EMA_DistanceCheck =
-                //    (CVD_EMA_Distance >= 100 & CVD_EMA_Distance < 600) ||
-                //    (CVD_EMA_Distance >= 800 & CVD_EMA_Distance < 1600) ||
-                //    CVD_EMA_Distance >= 2000;
-
-                var CVD_EMA_DistanceCheck = CVD_EMA_Distance >= 100;
+                var CVD_EMA_DistanceCheck =
+                    (CVD_EMA_Distance >= 100 & CVD_EMA_Distance < 600) ||
+                    (CVD_EMA_Distance >= 800 & CVD_EMA_Distance < 1600) ||
+                    CVD_EMA_Distance >= 2000;
 
                 if (!CVD_EMA_DistanceCheck)
                 {
                     PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CVD_EMA_Distance}");
+                    CurrentTrade.IsVirtual = true;
                     return;
                 }
             }
@@ -354,7 +381,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
             }
             //}
-            //catch (Exception ex) { Print($"Error in OnBarUpdate: {ex.Message}"); }
+            //catch (Exception ex) { Print($"Error in OnBarUpdate: {ex}"); }
         }
 
         protected override void OnConnectionStatusUpdate(ConnectionStatusEventArgs e)
@@ -387,7 +414,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             PrintTrade(tradeCSV);
             TradeLogs.Add(tradeCSV);
 
-            if (trade.ProfitCurrency > 0)
+            UpdateCVDTradeType(trade.ProfitCurrency > 0);
+        }
+
+        private void UpdateCVDTradeType(bool isWin)
+        {
+            if (isWin)
             {
                 if (CVD_TradeType == CVD_TradeType_Enum.Continuation)
                     CVD_TradeType = CVD_TradeType_Enum.Normal;
