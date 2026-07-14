@@ -77,6 +77,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         internal int LastTradeCount { get; set; }
         internal double DayPnL { get; set; }
+        internal double DayPnLVirtual { get; set; }
 
         internal DateTime? LastInitialization { get; set; }
 
@@ -115,23 +116,24 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             {
                 var lastTrade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
                 DayPnL += lastTrade.ProfitCurrency;
+                PrintInfo($"[PNL_UPDATE] {lastTrade.ProfitCurrency} DayPnL {DayPnL}");
                 LastTradeCount = SystemPerformance.AllTrades.Count;
             }
         }
 
         internal void BasePnlChecks()
         {
-            if (DailyMaxProfit != 0 && DayPnL > DailyMaxProfit)
+            if (DailyMaxProfit != 0 && (DayPnL + DayPnLVirtual) > DailyMaxProfit)
             {
                 TradingHalted = true;
-                PrintInfo($"[TRADING_HALTED] Max Profit reached {DayPnL}");
+                PrintInfo($"[TRADING_HALTED] Max Profit reached {DayPnL + DayPnLVirtual}");
                 return;
             }
 
-            if (DailyMaxLoss != 0 && DayPnL < DailyMaxLoss)
+            if (DailyMaxLoss != 0 && (DayPnL + DayPnLVirtual) < DailyMaxLoss)
             {
                 TradingHalted = true;
-                PrintInfo($"[TRADING_HALTED] Max Loss reached {DayPnL}");
+                PrintInfo($"[TRADING_HALTED] Max Loss reached {DayPnL + DayPnLVirtual}");
                 return;
             }
         }

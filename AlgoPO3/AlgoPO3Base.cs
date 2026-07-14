@@ -93,7 +93,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             // Virtual trades MUST be closed on the tick series.
             if (CurrentTrade != null && CurrentTrade.IsVirtual)
             {
-                var contractTickValue = TickSize * Instrument.MasterInstrument.PointValue * TickSize * CurrentTrade.PositionSize;
+                var contractTickValue = Instrument.MasterInstrument.PointValue * CurrentTrade.PositionSize;
 
                 if (CurrentTrade.Bias == TradeBias.Short &&
                     (Low[0] <= CurrentTrade.TakeProfit || High[0] >= CurrentTrade.StopLoss))
@@ -102,15 +102,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                     UpdateCVDTradeType(Low[0] <= CurrentTrade.TakeProfit);
 
-                    LastTradeCount++;
-
                     if (Low[0] <= CurrentTrade.TakeProfit)
-                        DayPnL += (CurrentTrade.Entry - CurrentTrade.TakeProfit) * contractTickValue;
+                        DayPnLVirtual += (CurrentTrade.Entry - CurrentTrade.TakeProfit) * contractTickValue;
 
                     if (High[0] >= CurrentTrade.StopLoss)
-                        DayPnL += (CurrentTrade.StopLoss - CurrentTrade.Entry) * contractTickValue;
+                        DayPnLVirtual -= (CurrentTrade.StopLoss - CurrentTrade.Entry) * contractTickValue;
 
-                    PrintInfo($"[VIRTUAL_POSITION_CLOSED] {CurrentTrade.Bias}");
+                    PrintInfo($"[VIRTUAL_POSITION_CLOSED] {CurrentTrade.Bias} Virtual Day Pnl {DayPnLVirtual}");
                 }
 
                 if (CurrentTrade.Bias == TradeBias.Long &&
@@ -120,15 +118,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                     UpdateCVDTradeType(High[0] >= CurrentTrade.TakeProfit);
 
-                    LastTradeCount++;
-
                     if (High[0] >= CurrentTrade.TakeProfit)
-                        DayPnL += (CurrentTrade.TakeProfit - CurrentTrade.Entry) * contractTickValue;
+                        DayPnLVirtual += (CurrentTrade.TakeProfit - CurrentTrade.Entry) * contractTickValue;
 
                     if (Low[0] <= CurrentTrade.StopLoss)
-                        DayPnL += (CurrentTrade.Entry - CurrentTrade.StopLoss) * contractTickValue;
+                        DayPnLVirtual -= (CurrentTrade.Entry - CurrentTrade.StopLoss) * contractTickValue;
 
-                    PrintInfo($"[VIRTUAL_POSITION_CLOSED] {CurrentTrade.Bias}");
+                    PrintInfo($"[VIRTUAL_POSITION_CLOSED] {CurrentTrade.Bias} Virtual Day Pnl {DayPnLVirtual}");
                 }
             }
         }

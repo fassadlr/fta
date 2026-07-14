@@ -25,7 +25,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Algo PO3 CVD Asia v1.1";
+                Name = "Algo PO3 CVD Asia v1.2";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -349,10 +349,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     return;
                 }
 
+                CurrentTrade.PositionSize = CalculatePositionSize(Close[0] - CurrentTrade.StopLoss, Risk);
                 if (CurrentTrade.IsVirtual)
                     return;
 
-                EnterLong(0, CalculatePositionSize(Close[0] - CurrentTrade.StopLoss, Risk), LONG_TRADE);
+                EnterLong(0, CurrentTrade.PositionSize, LONG_TRADE);
                 PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} stop {CurrentTrade.StopLoss}");
 
                 SetStopLoss(LONG_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, true);
@@ -372,10 +373,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     return;
                 }
 
+                CurrentTrade.PositionSize = CalculatePositionSize(CurrentTrade.StopLoss - Close[0], Risk);
                 if (CurrentTrade.IsVirtual)
                     return;
 
-                EnterShort(0, CalculatePositionSize(CurrentTrade.StopLoss - Close[0], Risk), SHORT_TRADE);
+                EnterShort(0, CurrentTrade.PositionSize, SHORT_TRADE);
                 PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} stop {CurrentTrade.StopLoss}");
 
                 SetStopLoss(SHORT_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, true);
@@ -497,6 +499,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             TradingHalted = false;
 
             DayPnL = 0;
+            DayPnLVirtual = 0;
             LastTradeCount = 0;
 
             CVD_TradeType = CVD_TradeType_Enum.Normal;
