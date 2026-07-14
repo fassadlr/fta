@@ -32,7 +32,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Algo PO3 Asia v7.3.1";
+                Name = "Algo PO3 Asia v7.3.2";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -54,7 +54,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
             else if (State == State.Configure)
             {
-                AddDataSeries("MNQ 09-26", BarsPeriodType.Minute, 5);
+                AddDataSeries(BarsPeriodType.Minute, 5);
                 AddDataSeries(BarsPeriodType.Tick, 1);
 
                 Ranges = [];
@@ -65,7 +65,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 LondonZone = TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time");
                 NewYorkZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
 
-                DataSetValidation = new Dictionary<int, bool> { { 0, false }, { 1, false } };
+                DataSetValidation = new Dictionary<int, bool> { { 0, false }, { 1, false }, { 2, false } };
             }
             else if (State == State.DataLoaded)
             {
@@ -91,42 +91,40 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             //try
             //{
-
-            //if (BarsInProgress == 0 && !DataSetValidation[0])
-            //{
-            //    DataSetValidation[0] = true;
-            //    PrintInfo("[DATASET_VALIDATION] Primary series validated.");
-            //}
-
-            //if (BarsInProgress == 1 && !DataSetValidation[1])
-            //{
-            //    DataSetValidation[1] = true;
-            //    PrintInfo("[DATASET_VALIDATION] Secondary series validated.");
-            //}
-
-            //if (!DataSetValidation.All(v => v.Value))
-            //    return;
-
-            if (LastInitialization == null || LastInitialization?.Date != Time[0].Date)
+            if (BarsInProgress == 0 && Bars.IsFirstBarOfSession)
             {
                 PerformCleanupBeforeSessionStart();
-                LastInitialization = Time[0].Date;
-                return;
+
+                DataSetValidation[0] = false;
+                DataSetValidation[1] = false;
+                DataSetValidation[2] = false;
             }
 
-            if (TradingHalted) return;
+            if (TradingHalted)
+                return;
+
+            if (BarsInProgress == 0 && !DataSetValidation[0])
+            {
+                DataSetValidation[0] = true;
+                PrintInfo("[DATASET_VALIDATION] Primary series validated.");
+            }
+
+            if (BarsInProgress == 1 && !DataSetValidation[1])
+            {
+                DataSetValidation[1] = true;
+                PrintInfo("[DATASET_VALIDATION] Secondary series validated.");
+            }
+
+            if (BarsInProgress == 2 && !DataSetValidation[2])
+            {
+                DataSetValidation[2] = true;
+                PrintInfo("[DATASET_VALIDATION] Third series validated.");
+            }
+
+            if (!DataSetValidation.All(v => v.Value))
+                return;
 
             BasePnlChecks();
-
-            // Always process fractal and BOS detection.
-            if (BarsInProgress == 1)
-            {
-                dailyAtr.Calculate(High[0], Low[0], Close[0]);
-
-                FractalManager.DetectFractalThreeBarWithPlatos(5);
-
-                TradeBias = DetectBOS(5) ?? TradeBias;
-            }
 
             if (SkipMonths.Split(',').Contains(Time[0].Month.ToString()))
             {
@@ -156,6 +154,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PrintInfo($"Trading session ended.");
                 TradingHalted = true;
                 return;
+            }
+
+            // Always process fractal and BOS detection.
+            if (BarsInProgress == 1)
+            {
+                dailyAtr.Calculate(High[0], Low[0], Close[0]);
+
+                FractalManager.DetectFractalThreeBarWithPlatos(5);
+
+                TradeBias = DetectBOS(5) ?? TradeBias;
             }
 
             // Update the CVD
@@ -385,15 +393,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     PrintDebug($"[CVD_BIAS_FAIL_LONG] EMA {Math.Round(CVDEma[0])} > CVD {OrderFlowCVD.DeltaClose[0]}");
                     return;
                 }
-
-                //var CVD_EMA_Distance = Math.Round(OrderFlowCVD.DeltaClose[0] - CVDEma[0]);
-                //var CVD_EMA_DistanceCheck = CVD_EMA_Distance < 800 || CVD_EMA_Distance > 1400;
-
-                //if (!CVD_EMA_DistanceCheck)
-                //{
-                //    PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CVD_EMA_Distance}");
-                //    return;
-                //}
             }
 
             if (CurrentTrade.Bias == TradeBias.Short)
@@ -404,17 +403,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     PrintDebug($"[TRADE_SKIPPED] {CurrentTrade.Bias}, entry {CurrentTrade.Entry} below threshold {CurrentTrade.TradeMissedThreshold}");
                     return;
                 }
-
-                //var CVD_EMA_Distance = Math.Round(CVDEma[0] - OrderFlowCVD.DeltaClose[0]);
-                //var CVD_EMA_DistanceCheck = CVD_EMA_Distance < 1000 ||
-                //    (CVD_EMA_Distance >= 1200 && CVD_EMA_Distance < 1600) ||
-                //    CVD_EMA_Distance > 2000;
-
-                //if (!CVD_EMA_DistanceCheck)
-                //{
-                //    PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CVD_EMA_Distance}");
-                //    return;
-                //}
             }
 
             /* ----- COLLECT ANY STATISTICS ----- */
@@ -426,9 +414,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (CurrentTrade.Bias == TradeBias.Long)
             {
                 if (atrCurrent >= 19)
-                {
                     CurrentTrade.StopLoss = CurrentTrade.Entry - Math.Round(atrCurrent);
-                }
 
                 if (Close[0] > CurrentTrade.Entry)
                 {
@@ -459,9 +445,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (CurrentTrade.Bias == TradeBias.Short)
             {
                 if (atrCurrent >= 19)
-                {
                     CurrentTrade.StopLoss = CurrentTrade.Entry + Math.Round(atrCurrent);
-                }
 
                 if (Close[0] < CurrentTrade.Entry)
                 {
@@ -536,7 +520,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private void PerformCleanupBeforeSessionStart()
         {
-            PrintDebug("[SESSION_START] resetting state");
+            PrintInfo("[SESSION_INIT]");
 
             Ranges.Clear();
 
@@ -564,6 +548,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             TradingHalted = false;
 
             DayPnL = 0;
+            DayPnLVirtual = 0;
             LastTradeCount = 0;
         }
 

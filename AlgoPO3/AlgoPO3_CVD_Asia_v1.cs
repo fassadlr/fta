@@ -82,7 +82,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             //try
             //{
 
-            if (TradingHalted && BarsInProgress == 0 && Bars.IsFirstBarOfSession)
+            if (BarsInProgress == 0 && Bars.IsFirstBarOfSession)
             {
                 PerformCleanupBeforeSessionStart();
 
@@ -219,7 +219,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
 
             /* ----- WE ARE WAITING FOR AN ENTRY ----- */
-
             if (!rangeBreakDetected)
                 return;
 
