@@ -80,7 +80,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 Risk = 300;
                 IsOverlay = true;
 
-                EdgeHourMultiplier = 1.5;
+                EdgeMultiplier = 1.5;
                 SkipMonths = "8";
                 StopGrace = 3;
 

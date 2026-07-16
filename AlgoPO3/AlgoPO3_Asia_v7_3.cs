@@ -32,7 +32,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Algo PO3 Asia v7.3.2";
+                Name = "Algo PO3 Asia v7.3.3";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -42,8 +42,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PositionSize = 5;
                 IsOverlay = true;
 
-                EdgeHourMultiplier = 1.5;
-                SkipMonths = "8";
+                EdgeMultiplier = 1;
+                SkipMonths = "0";
                 StopGrace = 10;
 
                 DailyMaxProfit = 350;
@@ -83,7 +83,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (ExportTradeLogsEnabled)
                     ExportTradeLogs(
                         "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD,CVD_EMA,CVD_EMA_Alignment",
-                        $@"C:\Users\fassa\Documents\NinjaTrader Testing\AlgoPO3_Asia_v7_3_1_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                        $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\{Name.Replace(" ", "_")}_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
             }
         }
 
@@ -435,7 +435,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     CurrentTrade.PendingOrder = EnterLongStopMarket(0, true, CalculatePositionSize(), CurrentTrade.Entry, "long entry");
                 }
 
-                SetStopLoss("long entry", CalculationMode.Price, CurrentTrade.StopLoss, true);
+                SetStopLoss("long entry", CalculationMode.Price, CurrentTrade.StopLoss, false);
                 PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
                 SetProfitTarget("long entry", CalculationMode.Price, CurrentTrade.TakeProfit);
 
@@ -466,7 +466,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     CurrentTrade.PendingOrder = EnterShortStopMarket(0, true, CalculatePositionSize(), CurrentTrade.Entry, "short entry");
                 }
 
-                SetStopLoss("short entry", CalculationMode.Price, CurrentTrade.StopLoss, true);
+                SetStopLoss("short entry", CalculationMode.Price, CurrentTrade.StopLoss, false);
                 PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
                 SetProfitTarget("short entry", CalculationMode.Price, CurrentTrade.TakeProfit);
 
@@ -617,7 +617,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             var validEdgeHour = TokyoTime().Hour == 10;
             if (validEdgeHour && atrCurrent <= 20)
             {
-                positionSize = (int)(PositionSize * EdgeHourMultiplier);
+                positionSize = (int)(PositionSize * EdgeMultiplier);
                 PrintDebug($"[POSITION_ADJUSTED_EDGEHOUR] {positionSize}");
             }
 

@@ -17,7 +17,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         [NinjaScriptProperty]
         [Display(Name = "Edge Multiplier", Order = 12, GroupName = "Parameters")]
-        public double EdgeHourMultiplier { get; set; }
+        public double EdgeMultiplier { get; set; }
 
         internal int[] BlockEndHoursParsed;
         internal int[] EdgeHoursParsed;

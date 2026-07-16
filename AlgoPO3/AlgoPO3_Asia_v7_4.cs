@@ -42,7 +42,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PositionSize = 5;
                 IsOverlay = true;
 
-                EdgeHourMultiplier = 1.5;
+                EdgeMultiplier = 1.5;
                 SkipMonths = "8";
                 StopGrace = 10;
 
@@ -667,7 +667,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             var validEdgeHour = TokyoTime().Hour == 10;
             if (validEdgeHour && atrCurrent <= 20)
             {
-                positionSize = (int)(PositionSize * EdgeHourMultiplier);
+                positionSize = (int)(PositionSize * EdgeMultiplier);
                 PrintDebug($"[POSITION_ADJUSTED_EDGEHOUR] {positionSize}");
             }
 

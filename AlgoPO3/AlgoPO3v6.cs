@@ -99,7 +99,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 BlockEndHours = "3,9,12";
                 EdgeHours = "1,3,9,11";
-                EdgeHourMultiplier = 1.5;
+                EdgeMultiplier = 1.5;
                 SkipHours = "4,5,7,10";
                 SkipMonths = "8";
                 StopGrace = 3;
@@ -709,7 +709,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (EdgeHoursParsed.Contains(Time[0].Hour) && atrCurrent <= 20)
             {
-                positionSize = (int)(PositionSize * EdgeHourMultiplier);
+                positionSize = (int)(PositionSize * EdgeMultiplier);
                 PrintDebug($"[POSITION_ADJUSTED_EDGEHOUR] {positionSize}");
             }
 
