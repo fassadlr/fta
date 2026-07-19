@@ -119,7 +119,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         1, 2, 3
                     );
 
-                OrderFlowCVD = OrderFlowCumulativeDelta(CumulativeDeltaType.BidAsk, CumulativeDeltaPeriod.Session, 1);
+                OrderFlowCVDIndicator = OrderFlowCumulativeDelta(CumulativeDeltaType.BidAsk, CumulativeDeltaPeriod.Session, 1);
             }
             else if (State == State.Terminated)
             {
@@ -196,7 +196,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             // Update the CVD after 6am up until the close
             if (BarsInProgress == 1)
             {
-                OrderFlowCVD.Update(OrderFlowCVD.BarsArray[1].Count - 1, 1);
+                OrderFlowCVDIndicator.Update(OrderFlowCVDIndicator.BarsArray[1].Count - 1, 1);
                 return;
             }
 
@@ -356,7 +356,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             tradeDetails.DeltaMomentum = CalculateDeltaMomentum();
 
-            var regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 5, 20);
+            var regressionResult = CalculateRegression(OrderFlowCVDIndicator.DeltaClose, 5, 20);
             tradeDetails.CvdSlopeFast = regressionResult.Slope;
             tradeDetails.CvdRSquaredFast = regressionResult.RSquared;
 

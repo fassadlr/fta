@@ -73,10 +73,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 VWAP = OrderFlowVWAP(VWAPResolution.Standard, Bars.TradingHours, VWAPStandardDeviations.One, 1, 2, 3);
 
-                OrderFlowCVD = OrderFlowCumulativeDelta(CumulativeDeltaType.BidAsk, CumulativeDeltaPeriod.Session, 1);
+                OrderFlowCVDIndicator = OrderFlowCumulativeDelta(CumulativeDeltaType.BidAsk, CumulativeDeltaPeriod.Session, 1);
                 CVDSeries = new Series<double>(this);
 
-                CVDEma = EMA(CVDSeries, 20);
+                CVDEmaIndicator = EMA(CVDSeries, 20);
             }
             else if (State == State.Terminated)
             {
@@ -168,7 +168,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 // Update the CVD
                 if (BarsInProgress == 2)
                 {
-                    OrderFlowCVD.Update(OrderFlowCVD.BarsArray[1].Count - 1, 1);
+                    OrderFlowCVDIndicator.Update(OrderFlowCVDIndicator.BarsArray[1].Count - 1, 1);
 
                     ProcessVirtualTrade();
 
@@ -178,8 +178,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (BarsInProgress != 0)
                     return;
 
-                if (OrderFlowCVD.CurrentBar >= 0)
-                    CVDSeries[0] = OrderFlowCVD.DeltaClose[0];
+                if (OrderFlowCVDIndicator.CurrentBar >= 0)
+                    CVDSeries[0] = OrderFlowCVDIndicator.DeltaClose[0];
 
                 atrCurrent = dailyAtr.Atr;
 
@@ -395,13 +395,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         return;
                     }
 
-                    if (CVDEma[0] > OrderFlowCVD.DeltaClose[0])
+                    if (CVDEmaIndicator[0] > OrderFlowCVDIndicator.DeltaClose[0])
                     {
-                        PrintDebug($"[CVD_BIAS_FAIL_LONG] EMA {Math.Round(CVDEma[0])} > CVD {OrderFlowCVD.DeltaClose[0]}");
+                        PrintDebug($"[CVD_BIAS_FAIL_LONG] EMA {Math.Round(CVDEmaIndicator[0])} > CVD {OrderFlowCVDIndicator.DeltaClose[0]}");
                         return;
                     }
 
-                    var CVD_EMA_Distance = Math.Round(OrderFlowCVD.DeltaClose[0] - CVDEma[0]);
+                    var CVD_EMA_Distance = Math.Round(OrderFlowCVDIndicator.DeltaClose[0] - CVDEmaIndicator[0]);
                     var CVD_EMA_DistanceCheck = CVD_EMA_Distance < 800 || CVD_EMA_Distance > 1400;
                     if (!CVD_EMA_DistanceCheck)
                     {
@@ -420,7 +420,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         return;
                     }
 
-                    var CVD_EMA_Distance = Math.Round(CVDEma[0] - OrderFlowCVD.DeltaClose[0]);
+                    var CVD_EMA_Distance = Math.Round(CVDEmaIndicator[0] - OrderFlowCVDIndicator.DeltaClose[0]);
                     var CVD_EMA_DistanceCheck = CVD_EMA_Distance < 1000 ||
                         (CVD_EMA_Distance >= 1200 && CVD_EMA_Distance < 1600) ||
                         CVD_EMA_Distance > 1800;

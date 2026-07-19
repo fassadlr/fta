@@ -30,11 +30,19 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         public bool ExportTradeLogsEnabled { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Daily Max Loss", Order = 4, GroupName = "Parameters")]
+        [Display(Name = "Import CVD Data", Order = 4, GroupName = "Parameters")]
+        public bool ImportCVDDataFlag { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Export CVD Data", Order = 5, GroupName = "Parameters")]
+        public bool ExportCVDDataFlag { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Daily Max Loss", Order = 6, GroupName = "Parameters")]
         public double DailyMaxLoss { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Daily Max Profit", Order = 5, GroupName = "Parameters")]
+        [Display(Name = "Daily Max Profit", Order = 7, GroupName = "Parameters")]
         public double DailyMaxProfit { get; set; }
 
         internal double LastFractalHigh = 0;
@@ -68,8 +76,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         internal TradeDetails CurrentTrade { get; set; }
 
-        internal OrderFlowCumulativeDelta OrderFlowCVD { get; set; }
-        internal EMA CVDEma { get; set; }
+        internal OrderFlowCumulativeDelta OrderFlowCVDIndicator { get; set; }
+        internal EMA CVDEmaIndicator { get; set; }
 
         internal OrderFlowVWAP VWAP { get; set; }
 
@@ -135,6 +143,36 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 TradingHalted = true;
                 PrintInfo($"[TRADING_HALTED] Max Loss reached {DayPnL + DayPnLVirtual}");
                 return;
+            }
+        }
+
+        internal void BasePnlChecksTickLevel(double price)
+        {
+            if (DailyMaxProfit != 0)
+            {
+                var contractTickValue = Instrument.MasterInstrument.PointValue * CurrentTrade.PositionSize;
+
+                if (CurrentTrade.Bias == TradeBias.Short)
+                {
+                    var tradePnl = (CurrentTrade.Entry - price) * contractTickValue;
+                    //PrintDebug($"{tradePnl + DayPnL}");
+                    if (tradePnl + DayPnL > DailyMaxProfit)
+                    {
+                        ExitShort();
+                        PrintInfo($"[MAX_PROFIT_THRESHOLD_SHORT] Day Pnl {DayPnL}");
+                    }
+                }
+
+                if (CurrentTrade.Bias == TradeBias.Long)
+                {
+                    var tradePnl = (price - CurrentTrade.Entry) * contractTickValue;
+                    //PrintDebug($"{tradePnl + DayPnL}");
+                    if (tradePnl + DayPnL > DailyMaxProfit)
+                    {
+                        ExitLong();
+                        PrintInfo($"[MAX_PROFIT_THRESHOLD_LONG] Day Pnl {DayPnL}");
+                    }
+                }
             }
         }
 
@@ -504,7 +542,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         internal double GetBarDelta(int barsAgo)
         {
-            return OrderFlowCVD.DeltaClose[barsAgo] - OrderFlowCVD.DeltaOpen[barsAgo];
+            return OrderFlowCVDIndicator.DeltaClose[barsAgo] - OrderFlowCVDIndicator.DeltaOpen[barsAgo];
         }
 
         internal double CalculateDeltaMomentum()
@@ -528,7 +566,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         internal double CalculateCvdSlope(int lookback)
         {
-            return Math.Round((OrderFlowCVD.DeltaClose[0] - OrderFlowCVD.DeltaClose[lookback]) / lookback, 2);
+            return Math.Round((OrderFlowCVDIndicator.DeltaClose[0] - OrderFlowCVDIndicator.DeltaClose[lookback]) / lookback, 2);
         }
 
         internal void ExportTradeLogs(string fields, string fileName)
@@ -549,6 +587,51 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 Print($"Trade log written to {path}");
             }
         }
+
+        internal void ExportCVD(List<(string TimeStamp, double Price)> cvdData, string fileName)
+        {
+            if (!cvdData.Any())
+                return;
+
+            string path = fileName;
+
+            using (StreamWriter sw = new(path))
+            {
+                foreach (var (TimeStamp, Price) in cvdData)
+                {
+                    sw.WriteLine($"{TimeStamp}, {Price}");
+                }
+            }
+
+            Print($"CVD data written to {path}");
+        }
+
+        internal void ImportCVDData(string whichData, string fileName)
+        {
+            string path = fileName;
+
+            using (StreamReader sr = new(path))
+            {
+                while (!sr.EndOfStream)
+                {
+                    var line = sr.ReadLine().Split(',');
+
+                    if (whichData == "EMA")
+                        CvdEmaImport.Add(DateTime.Parse(line[0]), Double.Parse(line[1]));
+
+                    if (whichData == "DeltaClose")
+                        CvdDeltaCloseImport.Add(DateTime.Parse(line[0]), Double.Parse(line[1]));
+                }
+            }
+
+            Print($"CVD data read from {fileName}");
+        }
+
+        internal readonly List<(string, double)> CvdEmaExport = [];
+        internal readonly List<(string, double)> CvdDeltaCloseExport = [];
+
+        internal readonly Dictionary<DateTime, double> CvdEmaImport = [];
+        internal readonly Dictionary<DateTime, double> CvdDeltaCloseImport = [];
 
         internal (double Slope, double RSquared, double SlopeZ) CalculateRegression(ISeries<double> series, int lookback, int zLookback)
         {
@@ -672,10 +755,20 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             //CurrentTrade.BarVolume = Volume[0];
             //CurrentTrade.BarVolumeDelta = PreviousBarDelta;
 
-            CurrentTrade.CVD = Math.Round(OrderFlowCVD.DeltaClose[0]);
-            CurrentTrade.CVD_EMA = Math.Round(CVDEma[0]);
-            CurrentTrade.CVD_EMA_Distance = Math.Round(Math.Abs(OrderFlowCVD.DeltaClose[0] - CVDEma[0]));
-            CurrentTrade.CVD_EMA_Alignment = OrderFlowCVD.DeltaClose[0] > CVDEma[0] ? "Above" : "Below";
+            if (!ImportCVDDataFlag)
+            {
+                CurrentTrade.CVD = Math.Round(OrderFlowCVDIndicator.DeltaClose[0]);
+                CurrentTrade.CVD_EMA = Math.Round(CVDEmaIndicator[0]);
+                CurrentTrade.CVD_EMA_Distance = Math.Round(Math.Abs(OrderFlowCVDIndicator.DeltaClose[0] - CVDEmaIndicator[0]));
+                CurrentTrade.CVD_EMA_Alignment = OrderFlowCVDIndicator.DeltaClose[0] > CVDEmaIndicator[0] ? "Above" : "Below";
+            }
+            else
+            {
+                CurrentTrade.CVD = Math.Round(CvdDeltaCloseImport[Time[0]]);
+                CurrentTrade.CVD_EMA = Math.Round(CvdEmaImport[Time[0]]);
+                CurrentTrade.CVD_EMA_Distance = Math.Round(Math.Abs(CurrentTrade.CVD - CurrentTrade.CVD_EMA));
+                CurrentTrade.CVD_EMA_Alignment = CurrentTrade.CVD > CurrentTrade.CVD_EMA ? "Above" : "Below";
+            }
         }
 
         internal TradeBias? DetectBOS(int timeframe)

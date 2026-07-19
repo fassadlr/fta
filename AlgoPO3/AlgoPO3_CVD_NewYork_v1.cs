@@ -70,12 +70,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 FractalManager = new FractalManager(this);
 
-                OrderFlowCVD = OrderFlowCumulativeDelta(CumulativeDeltaType.BidAsk, CumulativeDeltaPeriod.Session, 1);
+                OrderFlowCVDIndicator = OrderFlowCumulativeDelta(CumulativeDeltaType.BidAsk, CumulativeDeltaPeriod.Session, 1);
 
                 CVDSeries = new Series<double>(this);
                 CvdSlopeSeries = new Series<double>(this);
 
-                CVDEma = EMA(CVDSeries, 20);
+                CVDEmaIndicator = EMA(CVDSeries, 20);
             }
             else if (State == State.Terminated)
             {
@@ -148,7 +148,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             // Update the CVD
             if (BarsInProgress == 1)
             {
-                OrderFlowCVD.Update(OrderFlowCVD.BarsArray[1].Count - 1, 1);
+                OrderFlowCVDIndicator.Update(OrderFlowCVDIndicator.BarsArray[1].Count - 1, 1);
 
                 ProcessVirtualTrade();
 
@@ -163,8 +163,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             FractalManager.DetectFractalThreeBar(1);
             FractalManager.DetectFractalFiveBar(1);
 
-            if (OrderFlowCVD.CurrentBar >= 0)
-                CVDSeries[0] = OrderFlowCVD.DeltaClose[0];
+            if (OrderFlowCVDIndicator.CurrentBar >= 0)
+                CVDSeries[0] = OrderFlowCVDIndicator.DeltaClose[0];
 
             /* 
              * ----- STRATEGY START TIME ANCHORED TO New York-----
@@ -305,18 +305,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (CurrentTrade.Bias == TradeBias.Long)
             {
-                if (CVDEma[0] > OrderFlowCVD.DeltaClose[0])
+                if (CVDEmaIndicator[0] > OrderFlowCVDIndicator.DeltaClose[0])
                 {
-                    PrintDebug($"[CVD_BIAS_FAIL_LONG] EMA {Math.Round(CVDEma[0])} > CVD {OrderFlowCVD.DeltaClose[0]}");
+                    PrintDebug($"[CVD_BIAS_FAIL_LONG] EMA {Math.Round(CVDEmaIndicator[0])} > CVD {OrderFlowCVDIndicator.DeltaClose[0]}");
                     return;
                 }
             }
 
             if (CurrentTrade.Bias == TradeBias.Short)
             {
-                if (CVDEma[0] < OrderFlowCVD.DeltaClose[0])
+                if (CVDEmaIndicator[0] < OrderFlowCVDIndicator.DeltaClose[0])
                 {
-                    PrintDebug($"[CVD_BIAS_FAIL_SHORT] EMA {Math.Round(CVDEma[0])} < CVD {OrderFlowCVD.DeltaClose[0]}");
+                    PrintDebug($"[CVD_BIAS_FAIL_SHORT] EMA {Math.Round(CVDEmaIndicator[0])} < CVD {OrderFlowCVDIndicator.DeltaClose[0]}");
                     return;
                 }
             }
