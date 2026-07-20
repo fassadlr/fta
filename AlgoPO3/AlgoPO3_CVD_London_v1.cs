@@ -36,10 +36,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
                 ConnectionLossHandling = ConnectionLossHandling.KeepRunning;
-                IsOverlay = true;
 
                 PO3 = 81;
-                Risk = 400;
+                Risk = 300;
 
                 SkipMonths = "0";
 

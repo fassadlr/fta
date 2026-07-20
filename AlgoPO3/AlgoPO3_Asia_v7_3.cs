@@ -45,7 +45,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 SkipMonths = "0";
                 StopGrace = 10;
 
-                DailyMaxProfit = 350;
+                DailyMaxProfit = 300;
 
                 SessionEndHour = 12; // Tokyo Time
 
@@ -246,7 +246,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             // If we are in a position then break even or close and stop processing.
             if (Position.MarketPosition != MarketPosition.Flat)
             {
-                BreakEvenOrCloseTrade();
                 return;
             }
 
@@ -603,56 +602,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             DayPnL = 0;
             DayPnLVirtual = 0;
             LastTradeCount = 0;
-        }
-
-        private void BreakEvenOrCloseTrade()
-        {
-            if (CurrentTrade.StopLoss == Position.AveragePrice)
-                return;
-
-            var breakEvenDirection = "";
-
-            if (CurrentTrade.Bias != TradeBias)
-            {
-                if (CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.BreakEvenThreshold)
-                {
-                    PrintDebug($"[BREAK_EVEN_BIAS] changed from {CurrentTrade.Bias} to {TradeBias}, {Position.AveragePrice}");
-                    breakEvenDirection = LONG_TRADE;
-                }
-
-                if (CurrentTrade.Bias == TradeBias.Short && Low[0] <= CurrentTrade.BreakEvenThreshold)
-                {
-                    breakEvenDirection = SHORT_TRADE;
-                    PrintDebug($"[BREAK_EVEN_BIAS] changed from {CurrentTrade.Bias} to {TradeBias}, {Position.AveragePrice}");
-                }
-            }
-            else
-            {
-                if (CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.BreakEvenThreshold)
-                {
-                    breakEvenDirection = LONG_TRADE;
-                    PrintDebug($"[BREAK_EVEN_TP] threshold reached");
-                }
-
-                if (CurrentTrade.Bias == TradeBias.Short && Low[0] <= CurrentTrade.BreakEvenThreshold)
-                {
-                    breakEvenDirection = SHORT_TRADE;
-                    PrintDebug($"[BREAK_EVEN_TP] threshold reached");
-                }
-            }
-
-            if (!string.IsNullOrEmpty(breakEvenDirection))
-            {
-                if (Time[0] == CurrentTrade.EntryTime)
-                {
-                    PrintDebug($"[BREAK_EVEN_INVALID] Cannot set break even on the same candle as entry.");
-                    return;
-                }
-
-                SetStopLoss(breakEvenDirection, CalculationMode.Price, Position.AveragePrice, true);
-                CurrentTrade.StopLoss = Position.AveragePrice;
-                PrintDebug($"[BREAK_EVEN] set {Position.AveragePrice}");
-            }
         }
 
         private int CalculatePositionSize()
