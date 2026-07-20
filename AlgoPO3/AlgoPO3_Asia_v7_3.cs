@@ -459,7 +459,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     PrintDebug($"[PLACE_TRADE_LIMIT] {CurrentTrade.Bias}, {CurrentTrade.Entry}, atr {atrCurrent}");
                     CurrentTrade.OrderType = OrderType.Limit;
                     CurrentTrade.PositionSize = CalculatePositionSize();
-                    CurrentTrade.PendingOrder = EnterLongLimit(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, "long entry");
+                    CurrentTrade.PendingOrder = EnterLongLimit(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, LONG_TRADE);
                 }
                 else
                 {
@@ -472,12 +472,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias} at {CurrentTrade.Entry}, {Close[0]}, atr {atrCurrent}");
                     CurrentTrade.OrderType = OrderType.StopMarket;
                     CurrentTrade.PositionSize = CalculatePositionSize();
-                    CurrentTrade.PendingOrder = EnterLongStopMarket(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, "long entry");
+                    CurrentTrade.PendingOrder = EnterLongStopMarket(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, LONG_TRADE);
                 }
 
-                SetStopLoss("long entry", CalculationMode.Price, CurrentTrade.StopLoss, false);
+                SetStopLoss(LONG_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, false);
                 PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
-                SetProfitTarget("long entry", CalculationMode.Price, CurrentTrade.TakeProfit);
+                SetProfitTarget(LONG_TRADE, CalculationMode.Price, CurrentTrade.TakeProfit);
 
                 return;
             }
@@ -492,7 +492,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     PrintDebug($"[PLACE_TRADE_LIMIT] {CurrentTrade.Bias}, {CurrentTrade.Entry}, atr {atrCurrent}");
                     CurrentTrade.OrderType = OrderType.Limit;
                     CurrentTrade.PositionSize = CalculatePositionSize();
-                    CurrentTrade.PendingOrder = EnterShortLimit(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, "short entry");
+                    CurrentTrade.PendingOrder = EnterShortLimit(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, SHORT_TRADE);
                 }
                 else
                 {
@@ -505,12 +505,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias} at {CurrentTrade.Entry}, {Close[0]}, atr {atrCurrent}");
                     CurrentTrade.OrderType = OrderType.StopMarket;
                     CurrentTrade.PositionSize = CalculatePositionSize();
-                    CurrentTrade.PendingOrder = EnterShortStopMarket(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, "short entry");
+                    CurrentTrade.PendingOrder = EnterShortStopMarket(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, SHORT_TRADE);
                 }
 
-                SetStopLoss("short entry", CalculationMode.Price, CurrentTrade.StopLoss, false);
+                SetStopLoss(SHORT_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, false);
                 PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
-                SetProfitTarget("short entry", CalculationMode.Price, CurrentTrade.TakeProfit);
+                SetProfitTarget(SHORT_TRADE, CalculationMode.Price, CurrentTrade.TakeProfit);
 
                 return;
             }
@@ -535,6 +535,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
         }
 
+        protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
+        {
+            if ((execution.Order.Name == LONG_TRADE || execution.Order.Name == SHORT_TRADE) &&
+                execution.Order.OrderState == OrderState.Filled && Position.MarketPosition != MarketPosition.Flat)
+            {
+                CurrentTrade.EntryTime = new DateTime(time.Year, time.Month, time.Day, time.Hour, time.Minute, 0);
+            }
+        }
+
         protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
         {
             if (marketPosition != MarketPosition.Flat)
@@ -549,6 +558,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
             var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.CVD},{CurrentTrade.CVD_EMA},{CurrentTrade.CVD_EMA_Alignment}";
             TradeLogs.Add(tradeCSV);
+
+            PrintTrade(tradeCSV);
 
             if (trade.ProfitCurrency >= 0)
                 ProcessSharedBorderRange(false);
@@ -606,12 +617,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.BreakEvenThreshold)
                 {
                     PrintDebug($"[BREAK_EVEN_BIAS] changed from {CurrentTrade.Bias} to {TradeBias}, {Position.AveragePrice}");
-                    breakEvenDirection = "long entry";
+                    breakEvenDirection = LONG_TRADE;
                 }
 
                 if (CurrentTrade.Bias == TradeBias.Short && Low[0] <= CurrentTrade.BreakEvenThreshold)
                 {
-                    breakEvenDirection = "short entry";
+                    breakEvenDirection = SHORT_TRADE;
                     PrintDebug($"[BREAK_EVEN_BIAS] changed from {CurrentTrade.Bias} to {TradeBias}, {Position.AveragePrice}");
                 }
             }
@@ -619,19 +630,25 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 if (CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.BreakEvenThreshold)
                 {
-                    breakEvenDirection = "long entry";
+                    breakEvenDirection = LONG_TRADE;
                     PrintDebug($"[BREAK_EVEN_TP] threshold reached");
                 }
 
                 if (CurrentTrade.Bias == TradeBias.Short && Low[0] <= CurrentTrade.BreakEvenThreshold)
                 {
-                    breakEvenDirection = "short entry";
+                    breakEvenDirection = SHORT_TRADE;
                     PrintDebug($"[BREAK_EVEN_TP] threshold reached");
                 }
             }
 
             if (!string.IsNullOrEmpty(breakEvenDirection))
             {
+                if (Time[0] == CurrentTrade.EntryTime)
+                {
+                    PrintDebug($"[BREAK_EVEN_INVALID] Cannot set break even on the same candle as entry.");
+                    return;
+                }
+
                 SetStopLoss(breakEvenDirection, CalculationMode.Price, Position.AveragePrice, true);
                 CurrentTrade.StopLoss = Position.AveragePrice;
                 PrintDebug($"[BREAK_EVEN] set {Position.AveragePrice}");
