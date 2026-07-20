@@ -57,20 +57,22 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 AddDataSeries(BarsPeriodType.Minute, 5);
 
-                if (IsLive || ExportCVDDataFlag || (!IsLive && !ImportCVDDataFlag && !ExportCVDDataFlag))
+                if (ImportCVDDataFlag)
+                {
+                    DataSetValidation = new Dictionary<int, bool> { { 0, false }, { 1, false } };
+                }
+                else
+                {
                     AddDataSeries(BarsPeriodType.Tick, 1);
+                    DataSetValidation = new Dictionary<int, bool> { { 0, false }, { 1, false }, { 2, false } };
+                }
 
                 Ranges = [];
 
                 Events = NewsEvents.Events();
 
                 TokyoZone = TimeZoneInfo.FindSystemTimeZoneById("Tokyo Standard Time");
-
-                if (IsLive || ExportCVDDataFlag || (!IsLive && !ImportCVDDataFlag && !ExportCVDDataFlag))
-                    DataSetValidation = new Dictionary<int, bool> { { 0, false }, { 1, false }, { 2, false } };
-
-                if (ImportCVDDataFlag)
-                    DataSetValidation = new Dictionary<int, bool> { { 0, false }, { 1, false } };
+                NewYorkZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
             }
             else if (State == State.DataLoaded)
             {
@@ -78,7 +80,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 VWAP = OrderFlowVWAP(VWAPResolution.Standard, Bars.TradingHours, VWAPStandardDeviations.One, 1, 2, 3);
 
-                if (IsLive || ExportCVDDataFlag || (!IsLive && !ImportCVDDataFlag && !ExportCVDDataFlag))
+                if (!ImportCVDDataFlag)
                 {
                     OrderFlowCVDIndicator = OrderFlowCumulativeDelta(CumulativeDeltaType.BidAsk, CumulativeDeltaPeriod.Session, 1);
                     CVDSeries = new Series<double>(this);
@@ -138,7 +140,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PrintInfo("[DATASET_VALIDATION] Secondary series validated.");
             }
 
-            if ((IsLive || ExportCVDDataFlag || (!IsLive && !ImportCVDDataFlag && !ExportCVDDataFlag)) && BarsInProgress == 2 && !DataSetValidation[2])
+            if (!ImportCVDDataFlag && BarsInProgress == 2 && !DataSetValidation[2])
             {
                 DataSetValidation[2] = true;
                 PrintInfo("[DATASET_VALIDATION] Third series validated.");
@@ -190,17 +192,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             // Update the CVD
-            if ((IsLive || ExportCVDDataFlag || (!IsLive && !ImportCVDDataFlag && !ExportCVDDataFlag)) && BarsInProgress == 2)
+            if (!ImportCVDDataFlag && BarsInProgress == 2)
             {
                 OrderFlowCVDIndicator.Update(OrderFlowCVDIndicator.BarsArray[1].Count - 1, 1);
-
                 return;
             }
 
             if (BarsInProgress != 0)
                 return;
 
-            if ((IsLive || ExportCVDDataFlag || (!IsLive && !ImportCVDDataFlag && !ExportCVDDataFlag)) && OrderFlowCVDIndicator.CurrentBar >= 0)
+            if (!ImportCVDDataFlag && OrderFlowCVDIndicator.CurrentBar >= 0)
                 CVDSeries[0] = OrderFlowCVDIndicator.DeltaClose[0];
 
             if (ExportCVDDataFlag)
@@ -403,8 +404,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     return;
                 }
 
-                //var cvdEma = IsLive ? CVDEmaIndicator[0] : ImportCVDDataFlag ? CvdEmaImport[Time[0]] : CVDEmaIndicator[0];
-                //var cvdDeltaClose = IsLive ? OrderFlowCVDIndicator.DeltaClose[0] : ImportCVDDataFlag ? CvdDeltaCloseImport[Time[0]] : OrderFlowCVDIndicator.DeltaClose[0];
                 if (CurrentTrade.CVD_EMA == 0 || CurrentTrade.CVD == 0)
                 {
                     TradingHalted = true;

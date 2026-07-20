@@ -25,7 +25,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Algo PO3 CVD Asia v1.3";
+                Name = "Algo PO3 CVD Asia v1.4";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -33,7 +33,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 IsOverlay = true;
 
                 PO3 = 81;
-                Risk = 400;
+                Risk = 300;
 
                 SkipMonths = "0";
 
@@ -49,26 +49,38 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
             else if (State == State.Configure)
             {
-                AddDataSeries(BarsPeriodType.Tick, 1);
-
                 Ranges = [];
 
                 Events = NewsEvents.Events();
 
                 TokyoZone = TimeZoneInfo.FindSystemTimeZoneById("Tokyo Standard Time");
 
-                DataSetValidation = new Dictionary<int, bool> { { 0, false }, { 1, false } };
+                if (ImportCVDDataFlag)
+                {
+                    DataSetValidation = new Dictionary<int, bool> { { 0, false } };
+                }
+                else
+                {
+                    AddDataSeries(BarsPeriodType.Tick, 1);
+                    DataSetValidation = new Dictionary<int, bool> { { 0, false }, { 1, false } };
+                }
             }
             else if (State == State.DataLoaded)
             {
                 FractalManager = new FractalManager(this);
 
-                OrderFlowCVDIndicator = OrderFlowCumulativeDelta(CumulativeDeltaType.BidAsk, CumulativeDeltaPeriod.Session, 1);
+                if (!ImportCVDDataFlag)
+                {
+                    OrderFlowCVDIndicator = OrderFlowCumulativeDelta(CumulativeDeltaType.BidAsk, CumulativeDeltaPeriod.Session, 1);
+                    CVDSeries = new Series<double>(this);
+                    CVDEmaIndicator = EMA(CVDSeries, 20);
+                }
 
-                CVDSeries = new Series<double>(this);
-                CvdSlopeSeries = new Series<double>(this);
-
-                CVDEmaIndicator = EMA(CVDSeries, 20);
+                if (ImportCVDDataFlag)
+                {
+                    ImportCVDData("EMA", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\CVDEma_20260719.csv");
+                    ImportCVDData("DeltaClose", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\CVDDeltaClose_20260719.csv");
+                }
             }
             else if (State == State.Terminated)
             {
@@ -76,6 +88,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     ExportTradeLogs(
                         "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD,CVD_EMA,CVD_TradeType",
                         $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{Name.Replace(" ", "_").Replace(".", "_")}_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+
+                if (ExportCVDDataFlag)
+                {
+                    ExportCVD(CvdEmaExport, $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\CVDEma_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                    ExportCVD(CvdDeltaCloseExport, $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\CVDDeltaClose_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                }
             }
         }
 
@@ -89,7 +107,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PerformCleanupBeforeSessionStart();
 
                 DataSetValidation[0] = false;
-                DataSetValidation[1] = false;
+
+                if (!ImportCVDDataFlag)
+                    DataSetValidation[1] = false;
             }
 
             if (TradingHalted)
@@ -101,7 +121,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PrintInfo("[DATASET_VALIDATION] Primary series validated.");
             }
 
-            if (BarsInProgress == 1 && !DataSetValidation[1])
+            if (!ImportCVDDataFlag && BarsInProgress == 1 && !DataSetValidation[1])
             {
                 DataSetValidation[1] = true;
                 PrintInfo("[DATASET_VALIDATION] Secondary series validated.");
@@ -141,7 +161,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             // Update the CVD
             if (BarsInProgress == 1)
             {
-                OrderFlowCVDIndicator.Update(OrderFlowCVDIndicator.BarsArray[1].Count - 1, 1);
+                if (!ImportCVDDataFlag)
+                    OrderFlowCVDIndicator.Update(OrderFlowCVDIndicator.BarsArray[1].Count - 1, 1);
 
                 ProcessVirtualTrade();
 
@@ -156,8 +177,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             FractalManager.DetectFractalThreeBar(1);
             FractalManager.DetectFractalFiveBar(1);
 
-            if (OrderFlowCVDIndicator.CurrentBar >= 0)
+            if (!ImportCVDDataFlag && OrderFlowCVDIndicator.CurrentBar >= 0)
                 CVDSeries[0] = OrderFlowCVDIndicator.DeltaClose[0];
+
+            if (ExportCVDDataFlag)
+            {
+                CvdDeltaCloseExport.Add((Time[0].ToString(), OrderFlowCVDIndicator.DeltaClose[0]));
+                CvdEmaExport.Add((Time[0].ToString(), CVDEmaIndicator[0]));
+            }
 
             /* 
              * ----- STRATEGY START TIME ANCHORED TO TOKYO-----
@@ -293,9 +320,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (CurrentTrade.Bias == TradeBias.Long)
             {
-                if (CVDEmaIndicator[0] > OrderFlowCVDIndicator.DeltaClose[0])
+                if (CurrentTrade.CVD_EMA > CurrentTrade.CVD)
                 {
-                    PrintDebug($"[CVD_BIAS_FAIL_LONG] EMA {Math.Round(CVDEmaIndicator[0])} > CVD {OrderFlowCVDIndicator.DeltaClose[0]}");
+                    PrintDebug($"[CVD_BIAS_FAIL_LONG] EMA {Math.Round(CurrentTrade.CVD_EMA)} > CVD {CurrentTrade.CVD}");
                     return;
                 }
 
@@ -307,7 +334,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (!CVD_EMA_DistanceCheck)
                 {
                     PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
-                    PrintInfo($"[VIRTUAL_POSITION_OPENED] {CurrentTrade.Bias}");
                     CurrentTrade.IsVirtual = true;
                     CurrentTrade.Entry = Close[0];
                 }
@@ -315,9 +341,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (CurrentTrade.Bias == TradeBias.Short)
             {
-                if (CVDEmaIndicator[0] < OrderFlowCVDIndicator.DeltaClose[0])
+                if (CurrentTrade.CVD_EMA < CurrentTrade.CVD)
                 {
-                    PrintDebug($"[CVD_BIAS_FAIL_SHORT] EMA {Math.Round(CVDEmaIndicator[0])} < CVD {OrderFlowCVDIndicator.DeltaClose[0]}");
+                    PrintDebug($"[CVD_BIAS_FAIL_SHORT] EMA {Math.Round(CurrentTrade.CVD_EMA)} < CVD {CurrentTrade.CVD}");
                     return;
                 }
 
@@ -329,7 +355,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (!CVD_EMA_DistanceCheck)
                 {
                     PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
-                    PrintInfo($"[VIRTUAL_POSITION_OPENED] {CurrentTrade.Bias}");
                     CurrentTrade.IsVirtual = true;
                     CurrentTrade.Entry = Close[0];
                 }
@@ -349,7 +374,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 CurrentTrade.PositionSize = CalculatePositionSizeWithEdge(Close[0] - CurrentTrade.StopLoss, Risk);
                 if (CurrentTrade.IsVirtual)
+                {
+                    PrintInfo($"[VIRTUAL_POSITION_OPENED] {CurrentTrade.Bias}");
                     return;
+                }
 
                 EnterLong(0, CurrentTrade.PositionSize, LONG_TRADE);
                 PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} stop {CurrentTrade.StopLoss}");
@@ -373,7 +401,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 CurrentTrade.PositionSize = CalculatePositionSizeWithEdge(CurrentTrade.StopLoss - Close[0], Risk);
                 if (CurrentTrade.IsVirtual)
+                {
+                    PrintInfo($"[VIRTUAL_POSITION_OPENED] {CurrentTrade.Bias}");
                     return;
+                }
 
                 EnterShort(0, CurrentTrade.PositionSize, SHORT_TRADE);
                 PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} stop {CurrentTrade.StopLoss}");
