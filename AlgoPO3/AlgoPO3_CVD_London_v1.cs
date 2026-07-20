@@ -464,9 +464,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.CVD},{CurrentTrade.CVD_EMA},{CurrentTrade.CVD_TradeType}";
-            PrintTrade(tradeCSV);
+            var tradeCSV = $"{CurrentTrade.EntryTime},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.CVD},{CurrentTrade.CVD_EMA},{CurrentTrade.CVD_TradeType}";
             TradeLogs.Add(tradeCSV);
+
+            PrintTrade(tradeCSV);
 
             UpdateCVDTradeType(trade.ProfitCurrency > 0);
         }
