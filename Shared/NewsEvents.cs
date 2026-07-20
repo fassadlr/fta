@@ -136,11 +136,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 new(new DateTime(2025, 04, 03, 13, 30, 0)),
                 NewsEvent.CreateNFPEvent(new DateTime(2025, 04, 04, 08, 30, 00)),    // NFP
                 NewsEvent.CreateCPIEvent(new DateTime(2025, 04, 10, 08, 30, 00)),    // CPI
-                new(new DateTime(2025, 04, 11, 13, 30, 0)),
-                new(new DateTime(2025, 04, 16, 13, 30, 0)),
-                new(new DateTime(2025, 04, 17, 13, 30, 0)),
+                
+                NewsEvent.CreateAllDay(new DateTime(2025, 04, 14)),                 // EASTER WEEK BREAK
+                NewsEvent.CreateAllDay(new DateTime(2025, 04, 15)),                 // EASTER WEEK BREAK
+                NewsEvent.CreateAllDay(new DateTime(2025, 04, 16)),                 // EASTER WEEK BREAK
+                NewsEvent.CreateAllDay(new DateTime(2025, 04, 17)),                 // EASTER WEEK BREAK
                 NewsEvent.CreateAllDay(new DateTime(2025, 04, 18)),                 // EASTER
                 NewsEvent.CreateAllDay(new DateTime(2025, 04, 21)),                 // EASTER
+                
                 new(new DateTime(2025, 04, 24, 13, 30, 0)),
                 new(new DateTime(2025, 04, 30, 13, 30, 0)),
 
@@ -157,7 +160,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 // June 2025
                 new(new DateTime(2025, 06, 04, 13, 15, 0)),
                 new(new DateTime(2025, 06, 05, 13, 30, 0)),
-                NewsEvent.CreateNFPEvent(new DateTime(2025, 06, 06, 08, 30, 00)),    // NFP			
+                NewsEvent.CreateNFPEvent(new DateTime(2025, 06, 06, 08, 30, 00)),   // NFP			
                 NewsEvent.CreateCPIEvent(new DateTime(2025, 06, 11, 08, 30, 00)),   // CPI
                 new(new DateTime(2025, 06, 12, 13, 30, 0)),
                 new(new DateTime(2025, 06, 17, 13, 30, 0)),
@@ -168,9 +171,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                                                                     
                 // July 2025                                        
                 new(new DateTime(2025, 07, 02, 13, 15, 0)),
-                NewsEvent.CreateNFPEvent(new DateTime(2025, 07, 03, 08, 30, 00)),    // NFP
+                NewsEvent.CreateNFPEvent(new DateTime(2025, 07, 03, 08, 30, 00)),   // NFP
+                NewsEvent.CreateAllDay(new DateTime(2026, 07, 04)),                 // US BANK Holiday - Not classed as bank holiday as July 4 is total shutdown, the whole day.
                 new(new DateTime(2025, 07, 10, 13, 30, 0)),
-                NewsEvent.CreateCPIEvent(new DateTime(2025, 07, 15, 08, 30, 00)),    // CPI
+                NewsEvent.CreateCPIEvent(new DateTime(2025, 07, 15, 08, 30, 00)),   // CPI
                 new(new DateTime(2025, 07, 16, 13, 30, 0)),
                 new(new DateTime(2025, 07, 17, 13, 30, 0)),
                 new(new DateTime(2025, 07, 24, 13, 30, 0)),
@@ -246,8 +250,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
                 // April 2026
                 new(new DateTime(2026, 4, 01, 13, 30, 0)),
                 NewsEvent.CreateNFPEvent(new DateTime(2026, 4, 02, 08, 30, 00)),    // NFP
-                NewsEvent.CreateAllDay(new DateTime(2026, 4, 03)),                  // Easter Friday and Monday
-                NewsEvent.CreateAllDay(new DateTime(2026, 4, 06)),                  // Easter Friday and Monday
+
+                NewsEvent.CreateAllDay(new DateTime(2026, 04, 03)),                 // Easter Friday and Monday
+                NewsEvent.CreateAllDay(new DateTime(2026, 04, 06)),                 // Easter Friday and Monday
+                NewsEvent.CreateAllDay(new DateTime(2026, 04, 07)),                 // EASTER WEEK BREAK
+                NewsEvent.CreateAllDay(new DateTime(2026, 04, 08)),                 // EASTER WEEK BREAK
+                NewsEvent.CreateAllDay(new DateTime(2026, 04, 09)),                 // EASTER WEEK BREAK
+                NewsEvent.CreateAllDay(new DateTime(2026, 04, 10)),                 // EASTER WEEK BREAK
+
                 NewsEvent.CreateCPIEvent(new DateTime(2026, 04, 10, 08, 30, 00)),   // CPI
                 NewsEvent.CreateFOMCEvent(new DateTime(2026, 04, 29, 14, 00, 0)),   // FOMC
 

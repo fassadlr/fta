@@ -31,7 +31,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Algo PO3 CVD London v1.0";
+                Name = "Algo PO3 CVD London v1.1";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -440,6 +440,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 IsConnected = false;
                 Print("[DISCONNECTED]");
+            }
+        }
+
+        protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
+        {
+            if ((execution.Order.Name == LONG_TRADE || execution.Order.Name == SHORT_TRADE) &&
+                execution.Order.OrderState == OrderState.Filled && Position.MarketPosition != MarketPosition.Flat)
+            {
+                CurrentTrade.EntryTime = new DateTime(time.Year, time.Month, time.Day, time.Hour, time.Minute, 0);
             }
         }
 
