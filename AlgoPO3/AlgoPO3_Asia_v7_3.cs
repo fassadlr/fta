@@ -32,7 +32,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Algo PO3 Asia v7.3.4";
+                Name = "Algo PO3 Asia v7.3.5";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -89,8 +89,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 if (ImportCVDDataFlag)
                 {
-                    ImportCVDData("EMA", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\CVDEma_20260719.csv");
-                    ImportCVDData("DeltaClose", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\CVDDeltaClose_20260719.csv");
+                    ImportCVDData("EMA", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\AlgoPO3_Asia_CVDEma_20260721.csv");
+                    ImportCVDData("DeltaClose", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\AlgoPO3_Asia_CVDDeltaClose_20260721.csv");
                 }
             }
             else if (State == State.Terminated)
@@ -99,7 +99,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 {
                     ExportTradeLogs(
                         "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD,CVD_EMA,CVD_EMA_Alignment,Atr",
-                        $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\{Name.Replace(" ", "_")}_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                        $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\{Name.Replace(" ", "_")}_{DateTime.Now:yyyyMMdd}.csv");
                 }
 
                 if (ExportCVDDataFlag)
@@ -445,7 +445,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     CurrentTrade.OrderType = OrderType.Limit;
                     CurrentTrade.PendingOrder = EnterLongLimit(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, LONG_TRADE);
                 }
-                else
+                else if (Close[0] < CurrentTrade.Entry)
                 {
                     if (CurrentTrade.VWAPDistance < 20)
                     {
@@ -456,6 +456,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias} at {CurrentTrade.Entry}, {Close[0]}, atr {atrCurrent}");
                     CurrentTrade.OrderType = OrderType.StopMarket;
                     CurrentTrade.PendingOrder = EnterLongStopMarket(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, LONG_TRADE);
+                }
+                else
+                {
+                    PrintDebug($"[LONG_SKIPPED_PRICE_AT_CLOSE] at {CurrentTrade.Entry}, {Close[0]}");
+                    rangeBreakDetected = false;
+                    return;
                 }
 
                 SetStopLoss(LONG_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, false);
@@ -480,7 +486,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     CurrentTrade.OrderType = OrderType.Limit;
                     CurrentTrade.PendingOrder = EnterShortLimit(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, SHORT_TRADE);
                 }
-                else
+                else if (Close[0] > CurrentTrade.Entry)
                 {
                     if (CurrentTrade.VWAPDistance < 20)
                     {
@@ -491,6 +497,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias} at {CurrentTrade.Entry}, {Close[0]}, atr {atrCurrent}");
                     CurrentTrade.OrderType = OrderType.StopMarket;
                     CurrentTrade.PendingOrder = EnterShortStopMarket(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, SHORT_TRADE);
+                }
+                else
+                {
+                    PrintDebug($"[SHORT_SKIPPED_PRICE_AT_CLOSE] at {CurrentTrade.Entry}, {Close[0]}");
+                    rangeBreakDetected = false;
+                    return;
                 }
 
                 SetStopLoss(SHORT_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, false);

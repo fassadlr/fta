@@ -82,6 +82,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     ExportTradeLogs(
                         "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD,CVD_EMA,CVD_TradeType",
                         $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{Name.Replace(" ", "_").Replace(".", "_")}_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+
+                if (ExportCVDDataFlag)
+                {
+                    ExportCVD(CvdEmaExport, $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Algo_PO3_CVD_London_EMA_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                    ExportCVD(CvdDeltaCloseExport, $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Algo_PO3_CVD_London_DeltaClose_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                }
             }
         }
 
@@ -164,6 +170,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (OrderFlowCVDIndicator.CurrentBar >= 0)
                 CVDSeries[0] = OrderFlowCVDIndicator.DeltaClose[0];
+
+            if (ExportCVDDataFlag)
+            {
+                CvdDeltaCloseExport.Add((Time[0].ToString(), OrderFlowCVDIndicator.DeltaClose[0]));
+                CvdEmaExport.Add((Time[0].ToString(), CVDEmaIndicator[0]));
+            }
 
             /* 
              * ----- STRATEGY START TIME ANCHORED TO LONDON-----
