@@ -31,7 +31,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         [NinjaScriptProperty]
         [Display(Name = "Import Tick and CVD", Order = 4, GroupName = "Parameters")]
-        public bool ImportTickAndCVDFlag { get; set; }
+        public bool ImportTickAndCvdEnabled { get; set; }
 
         [NinjaScriptProperty]
         [Display(Name = "Export Tick and CVD", Order = 5, GroupName = "Parameters")]
@@ -118,25 +118,33 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         #region Tick Data
 
-        internal List<(long unix, double price)> TickDataSeriesExport { get; set; }
-        internal (long unix, double price)[] TickDataSeriesImport { get; set; }
+        internal List<(long Ticks, double Price)> TickDataSeriesExport { get; set; }
+        internal (long Ticks, double Price)[] TickDataSeriesImport { get; set; }
 
         internal void ImportTickData(string fileName)
         {
-            List<(long unix, double price)> ticks = [];
-            using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read))
-            using (var br = new BinaryReader(fs))
+            Print($"{DateTime.Now} Reading tick data from {fileName}.");
+
+            using var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.Read, 1024 * 1024);   // 1MB buffer
             {
-                while (fs.Position < fs.Length)
+                long recordCount = fs.Length / 16;
+
+                TickDataSeriesImport = new (long Ticks, double Price)[recordCount];
+
+                using var br = new BinaryReader(fs);
+
+                for (long i = 0; i < recordCount; i++)
                 {
-                    ticks.Add((br.ReadInt64(), br.ReadDouble()));
+                    TickDataSeriesImport[i] =
+                    (
+                        br.ReadInt64(),
+                        br.ReadDouble()
+                    );
                 }
             }
 
-            TickDataSeriesImport = [.. ticks];
-
-            Print($"Tick Data read from {fileName}.");
-            Print($"Loaded {TickDataSeriesImport.Length:N0} ticks.");
+            Print($"{DateTime.Now} Tick Data read from {fileName}.");
+            Print($"{DateTime.Now} Loaded {TickDataSeriesImport.Length:N0} ticks.");
         }
 
         internal void ExportTickData(string fileName)
@@ -147,16 +155,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             using var fs = new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.None);
             using var bw = new BinaryWriter(fs);
 
-            foreach (var (unix, price) in TickDataSeriesExport)
+            foreach (var (Ticks, Price) in TickDataSeriesExport)
             {
-                bw.Write(unix);
-                bw.Write(price);
+                bw.Write(Ticks);
+                bw.Write(Price);
             }
 
             Print($"Tick data written to {fileName}");
         }
 
-        internal int FindTickIndex(long unix)
+        internal int FindTickIndex(long timestamp)
         {
             int low = 0;
             int high = TickDataSeriesImport.Length - 1;
@@ -165,13 +173,26 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             {
                 int mid = (low + high) >> 1;
 
-                if (TickDataSeriesImport[mid].unix < unix)
+                if (TickDataSeriesImport[mid].Ticks < timestamp)
                     low = mid + 1;
                 else
                     high = mid - 1;
             }
 
             return low;
+        }
+
+        internal (int NewIndex, (long Timestamp, double Price)? Tick) GetNextTick(int currentTickIndex, long nextBarTicks)
+        {
+            if (currentTickIndex >= TickDataSeriesImport.Length)
+                return (currentTickIndex, null);
+
+            var tick = TickDataSeriesImport[currentTickIndex];
+
+            if (tick.Ticks >= nextBarTicks)
+                return (currentTickIndex, null);
+
+            return (currentTickIndex + 1, tick);
         }
 
         #endregion
@@ -815,7 +836,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             //CurrentTrade.BarVolume = Volume[0];
             //CurrentTrade.BarVolumeDelta = PreviousBarDelta;
 
-            if (!ImportTickAndCVDFlag)
+            if (!ImportTickAndCvdEnabled)
             {
                 CurrentTrade.CVD = Math.Round(OrderFlowCVDIndicator.DeltaClose[0]);
                 CurrentTrade.CVD_EMA = Math.Round(CVDEmaIndicator[0]);
@@ -842,7 +863,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                     BullishBOSDetected = true;
                     BOSPrice = lastFractalHigh.Price;
 
-                    PrintDebug($"[BULLISH_BOS] at {Close[0]}, fractal {lastFractalHigh.Price}");
+                    //PrintDebug($"[BULLISH_BOS] at {Close[0]}, fractal {lastFractalHigh.Price}");
 
                     return TradeBias.Long;
                 }
@@ -857,7 +878,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                     BullishBOSDetected = false;
                     BOSPrice = lastFractalLow.Price;
 
-                    PrintDebug($"[BEARISH_BOS] at {Close[0]}, fractal {lastFractalLow.Price}");
+                    //PrintDebug($"[BEARISH_BOS] at {Close[0]}, fractal {lastFractalLow.Price}");
 
                     return TradeBias.Short;
                 }

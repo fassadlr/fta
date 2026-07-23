@@ -57,7 +57,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 AddDataSeries(BarsPeriodType.Minute, 5);
 
-                if (ImportTickAndCVDFlag)
+                if (ImportTickAndCvdEnabled)
                 {
                     DataSetValidation = new Dictionary<int, bool> { { 0, false }, { 1, false } };
                 }
@@ -80,14 +80,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 VWAP = OrderFlowVWAP(VWAPResolution.Standard, Bars.TradingHours, VWAPStandardDeviations.One, 1, 2, 3);
 
-                if (!ImportTickAndCVDFlag)
+                if (!ImportTickAndCvdEnabled)
                 {
                     OrderFlowCVDIndicator = OrderFlowCumulativeDelta(CumulativeDeltaType.BidAsk, CumulativeDeltaPeriod.Session, 1);
                     CVDSeries = new Series<double>(this);
                     CVDEmaIndicator = EMA(CVDSeries, 20);
                 }
 
-                if (ImportTickAndCVDFlag)
+                if (ImportTickAndCvdEnabled)
                 {
                     ImportCVDData("EMA", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\AlgoPO3_Asia_CVDEma_20260721.csv");
                     ImportCVDData("DeltaClose", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\AlgoPO3_Asia_CVDDeltaClose_20260721.csv");
@@ -121,7 +121,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 DataSetValidation[0] = false;
                 DataSetValidation[1] = false;
 
-                if (!ImportTickAndCVDFlag)
+                if (!ImportTickAndCvdEnabled)
                     DataSetValidation[2] = false;
             }
 
@@ -140,7 +140,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PrintInfo("[DATASET_VALIDATION] Secondary series validated.");
             }
 
-            if (!ImportTickAndCVDFlag && BarsInProgress == 2 && !DataSetValidation[2])
+            if (!ImportTickAndCvdEnabled && BarsInProgress == 2 && !DataSetValidation[2])
             {
                 DataSetValidation[2] = true;
                 PrintInfo("[DATASET_VALIDATION] Third series validated.");
@@ -192,7 +192,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             // Update the CVD
-            if (!ImportTickAndCVDFlag && BarsInProgress == 2)
+            if (!ImportTickAndCvdEnabled && BarsInProgress == 2)
             {
                 OrderFlowCVDIndicator.Update(OrderFlowCVDIndicator.BarsArray[1].Count - 1, 1);
                 return;
@@ -201,7 +201,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (BarsInProgress != 0)
                 return;
 
-            if (!ImportTickAndCVDFlag && OrderFlowCVDIndicator.CurrentBar >= 0)
+            if (!ImportTickAndCvdEnabled && OrderFlowCVDIndicator.CurrentBar >= 0)
                 CVDSeries[0] = OrderFlowCVDIndicator.DeltaClose[0];
 
             if (ExportTickAndCVDFlag)

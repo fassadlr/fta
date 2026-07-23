@@ -55,7 +55,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 TokyoZone = TimeZoneInfo.FindSystemTimeZoneById("Tokyo Standard Time");
 
-                if (ImportTickAndCVDFlag)
+                if (ImportTickAndCvdEnabled)
                 {
                     DataSetValidation = new Dictionary<int, bool> { { 0, false } };
                 }
@@ -69,14 +69,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 FractalManager = new FractalManager(this);
 
-                if (!ImportTickAndCVDFlag)
+                if (!ImportTickAndCvdEnabled)
                 {
                     OrderFlowCVDIndicator = OrderFlowCumulativeDelta(CumulativeDeltaType.BidAsk, CumulativeDeltaPeriod.Session, 1);
                     CVDSeries = new Series<double>(this);
                     CVDEmaIndicator = EMA(CVDSeries, 20);
                 }
 
-                if (ImportTickAndCVDFlag)
+                if (ImportTickAndCvdEnabled)
                 {
                     ImportCVDData("EMA", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\CVDEma_20260719.csv");
                     ImportCVDData("DeltaClose", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\CVDDeltaClose_20260719.csv");
@@ -108,7 +108,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 DataSetValidation[0] = false;
 
-                if (!ImportTickAndCVDFlag)
+                if (!ImportTickAndCvdEnabled)
                     DataSetValidation[1] = false;
             }
 
@@ -121,7 +121,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PrintInfo("[DATASET_VALIDATION] Primary series validated.");
             }
 
-            if (!ImportTickAndCVDFlag && BarsInProgress == 1 && !DataSetValidation[1])
+            if (!ImportTickAndCvdEnabled && BarsInProgress == 1 && !DataSetValidation[1])
             {
                 DataSetValidation[1] = true;
                 PrintInfo("[DATASET_VALIDATION] Secondary series validated.");
@@ -151,7 +151,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             BaseCandleVolatilityChecks();
 
             // If the session has ended stop processing.
-            if (TokyoTime().Hour >= SessionEndHour && (Position.MarketPosition == MarketPosition.Flat || (CurrentTrade != null && !CurrentTrade.IsVirtual)))
+            if (TokyoTime().Hour >= SessionEndHour && (Position.MarketPosition == MarketPosition.Flat || (CurrentTrade != null && !CurrentTrade.Virtual)))
             {
                 PrintInfo($"Trading session ended.");
                 TradingHalted = true;
@@ -161,7 +161,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             // Update the CVD
             if (BarsInProgress == 1)
             {
-                if (!ImportTickAndCVDFlag)
+                if (!ImportTickAndCvdEnabled)
                     OrderFlowCVDIndicator.Update(OrderFlowCVDIndicator.BarsArray[1].Count - 1, 1);
 
                 ProcessVirtualTrade();
@@ -177,7 +177,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             FractalManager.DetectFractalThreeBar(1);
             FractalManager.DetectFractalFiveBar(1);
 
-            if (!ImportTickAndCVDFlag && OrderFlowCVDIndicator.CurrentBar >= 0)
+            if (!ImportTickAndCvdEnabled && OrderFlowCVDIndicator.CurrentBar >= 0)
                 CVDSeries[0] = OrderFlowCVDIndicator.DeltaClose[0];
 
             if (ExportTickAndCVDFlag)
@@ -244,7 +244,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
 
             /* ----- WE ARE IN A VIRTUAL POSITION  ----- */
-            if (CurrentTrade != null && CurrentTrade.IsVirtual)
+            if (CurrentTrade != null && CurrentTrade.Virtual)
                 return;
 
             /* ----- WE ARE WAITING FOR AN ENTRY ----- */
@@ -334,7 +334,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (!CVD_EMA_DistanceCheck)
                 {
                     PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
-                    CurrentTrade.IsVirtual = true;
+                    CurrentTrade.Virtual = true;
                     CurrentTrade.Entry = Close[0];
                 }
             }
@@ -355,7 +355,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (!CVD_EMA_DistanceCheck)
                 {
                     PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
-                    CurrentTrade.IsVirtual = true;
+                    CurrentTrade.Virtual = true;
                     CurrentTrade.Entry = Close[0];
                 }
             }
@@ -368,15 +368,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 {
                     PrintDebug($"[RISK_REWARD_BELOW_THRESHOLD_LONG] {rr}");
                     rangeBreakDetected = false;
-                    CurrentTrade.IsVirtual = false;
+                    CurrentTrade.Virtual = false;
                     return;
                 }
 
                 CurrentTrade.PositionSize = CalculatePositionSizeWithEdge(Close[0] - CurrentTrade.StopLoss, Risk);
-                if (CurrentTrade.IsVirtual)
+                if (CurrentTrade.Virtual)
                 {
                     PrintInfo($"[VIRTUAL_POSITION_OPENED] {CurrentTrade.Bias}");
-                    CurrentTrade.IsVirtualOpen = true;
+                    CurrentTrade.VirtualOpen = true;
                     return;
                 }
 
@@ -396,15 +396,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 {
                     PrintDebug($"[RISK_REWARD_BELOW_THRESHOLD_SHORT] {rr}");
                     rangeBreakDetected = false;
-                    CurrentTrade.IsVirtual = false;
+                    CurrentTrade.Virtual = false;
                     return;
                 }
 
                 CurrentTrade.PositionSize = CalculatePositionSizeWithEdge(CurrentTrade.StopLoss - Close[0], Risk);
-                if (CurrentTrade.IsVirtual)
+                if (CurrentTrade.Virtual)
                 {
                     PrintInfo($"[VIRTUAL_POSITION_OPENED] {CurrentTrade.Bias}");
-                    CurrentTrade.IsVirtualOpen = true;
+                    CurrentTrade.VirtualOpen = true;
                     return;
                 }
 

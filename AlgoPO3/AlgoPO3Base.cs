@@ -41,12 +41,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         internal void CancelLimitOrder()
         {
-            if (CurrentTrade?.PendingOrder != null)
-                CancelOrder(CurrentTrade?.PendingOrder);
+            if (CurrentTrade == null)
+                return;
+
+            if (CurrentTrade.PendingOrder != null)
+            {
+                CancelOrder(CurrentTrade.PendingOrder);
+                PrintDebug("[CANCEL_LIMIT_ORDER]");
+            }
 
             CurrentTrade = null;
-
-            PrintDebug("[CANCEL_LIMIT_ORDER]");
         }
 
         internal bool DetectAndCheckInvalidRange()
@@ -89,33 +93,48 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         internal void ProcessVirtualTrade()
         {
-            if (CurrentTrade == null) return;
+            if (CurrentTrade == null || (CurrentTrade?.Virtual == false)) return;
 
-            if (!CurrentTrade.IsVirtual) return;
-
-            double tickPrice = Close[0];
-            if (ImportTickAndCVDFlag)
+            if (!ImportTickAndCvdEnabled)
             {
-                int idx = FindTickIndex(Time[0].Ticks);
-                tickPrice = TickDataSeriesImport[idx].price;
-                PrintDebug($"{tickPrice}");
-            }
-
-            if (!CurrentTrade.IsVirtualOpen && (CurrentTrade.OrderType == OrderType.Limit || CurrentTrade.OrderType == OrderType.StopMarket) && tickPrice == CurrentTrade.Entry)
-            {
-                CurrentTrade.IsVirtualOpen = true;
-                PrintInfo($"[VIRTUAL_POSITION] triggered at {tickPrice}");
+                ProcessVirtualTradeInternal(Close[0]);
                 return;
             }
 
-            if (!CurrentTrade.IsVirtualOpen) return;
+            // Process the 1min bar's ticks via the imported data.
+            long nextBarTicks = Time[0].AddMinutes(1).Ticks;
+            //PrintDebug($"{CurrentTrade.VirtualTickIndex} {new DateTime(TickDataSeriesImport[CurrentTrade.VirtualTickIndex].Ticks)} {new DateTime(nextBarTicks)}");
+            while (CurrentTrade.Virtual)
+            {
+                var (NewIndex, Tick) = GetNextTick(CurrentTrade.VirtualTickIndex, nextBarTicks);
+
+                if (Tick == null)
+                    break;
+
+                CurrentTrade.VirtualTickIndex = NewIndex;
+
+                ProcessVirtualTradeInternal(Tick.Value.Price);
+            }
+        }
+
+        private void ProcessVirtualTradeInternal(double tickPrice)
+        {
+            if (!CurrentTrade.VirtualOpen && (CurrentTrade.OrderType == OrderType.Limit || CurrentTrade.OrderType == OrderType.StopMarket) && tickPrice == CurrentTrade.Entry)
+            {
+                CurrentTrade.VirtualOpen = true;
+                PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} triggered at {tickPrice}");
+                return;
+            }
+
+            if (!CurrentTrade.VirtualOpen) return;
 
             var contractTickValue = Instrument.MasterInstrument.PointValue * CurrentTrade.PositionSize;
 
             if (CurrentTrade.Bias == TradeBias.Short &&
                 (tickPrice <= CurrentTrade.TakeProfit || tickPrice >= CurrentTrade.StopLoss))
             {
-                CurrentTrade.IsVirtual = false;
+                CurrentTrade.Virtual = false;
+                CurrentTrade.VirtualOpen = false;
 
                 UpdateCVDTradeType(tickPrice <= CurrentTrade.TakeProfit);
 
@@ -131,7 +150,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (CurrentTrade.Bias == TradeBias.Long &&
                 (tickPrice >= CurrentTrade.TakeProfit || tickPrice <= CurrentTrade.StopLoss))
             {
-                CurrentTrade.IsVirtual = false;
+                CurrentTrade.Virtual = false;
+                CurrentTrade.VirtualOpen = false;
 
                 UpdateCVDTradeType(tickPrice >= CurrentTrade.TakeProfit);
 
