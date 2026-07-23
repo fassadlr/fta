@@ -213,11 +213,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (BarsInProgress != 0)
                     return;
 
-                // If we are on the 1min and we are importing tick and CVD data 
-                // then we need to process the virtual trade here.
-                if (ImportTickAndCvdEnabled)
-                    ProcessVirtualTrade();
-
                 if (!ImportTickAndCvdEnabled && OrderFlowCVDIndicator.CurrentBar >= 0)
                     CVDSeries[0] = OrderFlowCVDIndicator.DeltaClose[0];
 
@@ -268,7 +263,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 /* ----- WE ARE IN A VIRTUAL POSITION  ----- */
                 if (CurrentTrade != null && CurrentTrade.Virtual && CurrentTrade.VirtualOpen)
+                {
+                    ProcessVirtualTrade();
                     return;
+                }
 
                 /*
                  ### From here we are flat or waiting on a pending order to execute ###
@@ -292,7 +290,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 // Always return as we are waiting for the PendingOrder to fill or be cancelled.
                 //
                 // If the pending order is virtual also do the same processing.
-                if (CurrentTrade != null && (CurrentTrade.PendingOrder != null || (CurrentTrade.Virtual && !CurrentTrade.VirtualOpen)))
+                if (CurrentTrade != null && (CurrentTrade.PendingOrder != null || CurrentTrade.Virtual))
                 {
                     var shouldCancel = false;
                     if (CurrentTrade.Bias != TradeBias)
@@ -315,6 +313,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         CancelLimitOrder();
                         RangeBias = RangeBias.Neutral;
                     }
+
+                    // If we are on the 1min and we are importing tick and CVD data 
+                    // then we need to process the virtual trade here.
+                    if (ImportTickAndCvdEnabled)
+                        ProcessVirtualTrade();
 
                     return;
                 }
@@ -375,17 +378,21 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     if (CurrentTrade.Bias == TradeBias.Long)
                     {
                         CurrentTrade.Entry = CurrentRange.OBCE2 + TickSize;
-                        CurrentTrade.StopLoss = CurrentRange.BR4 - StopGrace;
+                        CurrentTrade.StopLoss = atrCurrent >= 19 ? CurrentTrade.Entry - Math.Round(atrCurrent) : CurrentRange.BR4 - StopGrace;
                         CurrentTrade.TradeMissedThreshold = PreviousRange.BR3;
                         CurrentTrade.TakeProfit = PreviousRange.MBCE1;
+
+                        CurrentTrade.OrderType = Close[0] < CurrentTrade.Entry ? OrderType.StopMarket : OrderType.Limit;
                     }
 
                     if (CurrentTrade.Bias == TradeBias.Short)
                     {
                         CurrentTrade.Entry = CurrentRange.ExtensionHighCE - TickSize;
-                        CurrentTrade.StopLoss = PreviousRange.BR1 + StopGrace;
+                        CurrentTrade.StopLoss = atrCurrent >= 19 ? CurrentTrade.Entry + Math.Round(atrCurrent) : PreviousRange.BR1 + StopGrace;
                         CurrentTrade.TradeMissedThreshold = CurrentRange.BR2;
                         CurrentTrade.TakeProfit = CurrentRange.MBCE2;
+
+                        CurrentTrade.OrderType = Close[0] > CurrentTrade.Entry ? OrderType.StopMarket : OrderType.Limit;
                     }
                 }
 
@@ -394,17 +401,21 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     if (TradeBias == TradeBias.Long)
                     {
                         CurrentTrade.Entry = CurrentRange.ExtensionLowCE + TickSize;
-                        CurrentTrade.StopLoss = PreviousRange.BR4 - StopGrace;
+                        CurrentTrade.StopLoss = atrCurrent >= 19 ? CurrentTrade.Entry - Math.Round(atrCurrent) : PreviousRange.BR4 - StopGrace;
                         CurrentTrade.TradeMissedThreshold = CurrentRange.BR3;
                         CurrentTrade.TakeProfit = CurrentRange.MBCE1;
+
+                        CurrentTrade.OrderType = Close[0] < CurrentTrade.Entry ? OrderType.StopMarket : OrderType.Limit;
                     }
 
                     if (TradeBias == TradeBias.Short)
                     {
                         CurrentTrade.Entry = CurrentRange.OBCE1 - TickSize;
-                        CurrentTrade.StopLoss = CurrentRange.BR1 + StopGrace;
+                        CurrentTrade.StopLoss = atrCurrent >= 19 ? CurrentTrade.Entry + Math.Round(atrCurrent) : CurrentRange.BR1 + StopGrace;
                         CurrentTrade.TradeMissedThreshold = PreviousRange.BR2;
                         CurrentTrade.TakeProfit = PreviousRange.MBCE2;
+
+                        CurrentTrade.OrderType = Close[0] > CurrentTrade.Entry ? OrderType.StopMarket : OrderType.Limit;
                     }
                 }
 
@@ -416,7 +427,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 CollectStatistics();
 
-                /***** TRADE INSPECTION BEFORE PLACEMENT *****/
+                /* ---------------------------------- */
+
+                /* ----- TRADE INSPECTION BEFORE PLACEMENT ----- */
 
                 if (CurrentTrade.CVD_EMA == 0 || CurrentTrade.CVD == 0)
                 {
@@ -481,17 +494,36 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     }
                 }
 
+                /* Bias independant */
+
                 CalculateTakeProfitBasedOnMaxDailyProfit();
+
+                CurrentTrade.PositionSize = CalculatePositionSize(Math.Abs(CurrentTrade.Entry - CurrentTrade.StopLoss), Risk);
+
+                ApplyEdgeToPosition();
+
+                if (Close[0] == CurrentTrade.Entry)
+                {
+                    PrintDebug($"[TRADE_SKIPPED_AS_PRICE_EQ_TO_ENTRY] {CurrentTrade.Bias} at {CurrentTrade.Entry}");
+
+                    CurrentTrade.Virtual = false;
+                    rangeBreakDetected = false;
+
+                    return;
+                }
+
+                if (CurrentTrade.OrderType == OrderType.StopMarket && CurrentTrade.VWAPDistance < 20)
+                {
+                    PrintDebug($"[STOP_MARKET_ORDER_SKIPPED_VWAP] {CurrentTrade.Bias} at {CurrentTrade.Entry}, distance {CurrentTrade.VWAPDistance}");
+                    CurrentTrade.Virtual = false;
+
+                    return;
+                }
+
+                /* ---------------- */
 
                 if (CurrentTrade.Bias == TradeBias.Long)
                 {
-                    if (atrCurrent >= 19)
-                        CurrentTrade.StopLoss = CurrentTrade.Entry - Math.Round(atrCurrent);
-
-                    CurrentTrade.PositionSize = CalculatePositionSize(Math.Abs(CurrentTrade.Entry - CurrentTrade.StopLoss), Risk);
-
-                    ApplyEdgeToPosition();
-
                     if (atrCurrent < 5 || (atrCurrent >= 35 && atrCurrent < 40))
                     {
                         PrintDebug($"[ATR_INVALID] {atrCurrent}");
@@ -499,119 +531,52 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                         if (ImportTickAndCvdEnabled)
                             CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
+                    }
+
+                    if (CurrentTrade.Virtual)
+                    {
+                        PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} {CurrentTrade.OrderType} submittted at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
+                        return;
                     }
 
                     if (Close[0] > CurrentTrade.Entry)
                     {
-                        CurrentTrade.OrderType = OrderType.Limit;
-
-                        if (CurrentTrade.Virtual)
-                        {
-                            PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} {CurrentTrade.OrderType} submittted at {CurrentTrade.Entry}");
-                            return;
-                        }
-
                         PrintDebug($"[PLACE_TRADE_LIMIT] {CurrentTrade.Bias}, {CurrentTrade.Entry}, atr {atrCurrent}");
                         CurrentTrade.PendingOrder = EnterLongLimit(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, LONG_TRADE);
-                    }
-                    else if (Close[0] < CurrentTrade.Entry)
-                    {
-                        CurrentTrade.OrderType = OrderType.StopMarket;
-
-                        if (CurrentTrade.VWAPDistance < 20)
-                        {
-                            PrintDebug($"[LONG_STOP_ORDER_SKIPPED_VWAP] at {CurrentTrade.Entry}, distance from VWAP {CurrentTrade.VWAPDistance}");
-                            return;
-                        }
-
-                        if (CurrentTrade.Virtual)
-                        {
-                            PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} {CurrentTrade.OrderType} submittted at {CurrentTrade.Entry}");
-                            return;
-                        }
-
-                        PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias} at {CurrentTrade.Entry}, {Close[0]}, atr {atrCurrent}");
-                        CurrentTrade.PendingOrder = EnterLongStopMarket(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, LONG_TRADE);
-                    }
-                    else
-                    {
-                        PrintDebug($"[LONG_SKIPPED_PRICE_AT_CLOSE] at {CurrentTrade.Entry}, {Close[0]}");
-                        CurrentTrade.Virtual = false;
-                        rangeBreakDetected = false;
-                        return;
-                    }
-
-                    SetStopLoss(LONG_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, false);
-                    PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
-                    SetProfitTarget(LONG_TRADE, CalculationMode.Price, CurrentTrade.TakeProfit);
-
-                    return;
-                }
-
-                if (CurrentTrade.Bias == TradeBias.Short)
-                {
-                    if (atrCurrent >= 19)
-                        CurrentTrade.StopLoss = CurrentTrade.Entry + Math.Round(atrCurrent);
-
-                    CurrentTrade.PositionSize = CalculatePositionSize(Math.Abs(CurrentTrade.Entry - CurrentTrade.StopLoss), Risk);
-
-                    ApplyEdgeToPosition();
-
-                    if (atrCurrent < 5 || (atrCurrent >= 35 && atrCurrent < 40))
-                    {
-                        PrintDebug($"[ATR_INVALID] {atrCurrent}");
-                        CurrentTrade.Virtual = true;
-
-                        if (ImportTickAndCvdEnabled)
-                            CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
                     }
 
                     if (Close[0] < CurrentTrade.Entry)
                     {
-                        CurrentTrade.OrderType = OrderType.Limit;
-
-                        if (CurrentTrade.Virtual)
-                        {
-                            PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} {CurrentTrade.OrderType} submittted at {CurrentTrade.Entry}");
-                            return;
-                        }
-
-                        PrintDebug($"[PLACE_TRADE_LIMIT] {CurrentTrade.Bias}, {CurrentTrade.Entry}, atr {atrCurrent}");
-                        CurrentTrade.PendingOrder = EnterShortLimit(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, SHORT_TRADE);
-                    }
-                    else if (Close[0] > CurrentTrade.Entry)
-                    {
-                        CurrentTrade.OrderType = OrderType.StopMarket;
-
-                        if (CurrentTrade.VWAPDistance < 20)
-                        {
-                            PrintDebug($"[SHORT_STOP_ORDER_SKIPPED_VWAP] at {CurrentTrade.Entry}, distance from VWAP {CurrentTrade.VWAPDistance}");
-                            return;
-                        }
-
-                        if (CurrentTrade.Virtual)
-                        {
-                            PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} {CurrentTrade.OrderType} submittted at {CurrentTrade.Entry}");
-                            return;
-                        }
-
                         PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias} at {CurrentTrade.Entry}, {Close[0]}, atr {atrCurrent}");
-                        CurrentTrade.PendingOrder = EnterShortStopMarket(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, SHORT_TRADE);
+                        CurrentTrade.PendingOrder = EnterLongStopMarket(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, LONG_TRADE);
                     }
-                    else
+                }
+
+                if (CurrentTrade.Bias == TradeBias.Short)
+                {
+                    if (CurrentTrade.Virtual)
                     {
-                        PrintDebug($"[SHORT_SKIPPED_PRICE_AT_CLOSE] at {CurrentTrade.Entry}, {Close[0]}");
-                        CurrentTrade.Virtual = false;
-                        rangeBreakDetected = false;
+                        PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} {CurrentTrade.OrderType} submittted at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
                         return;
                     }
 
-                    SetStopLoss(SHORT_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, false);
-                    PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
-                    SetProfitTarget(SHORT_TRADE, CalculationMode.Price, CurrentTrade.TakeProfit);
+                    if (Close[0] < CurrentTrade.Entry)
+                    {
+                        PrintDebug($"[PLACE_TRADE_LIMIT] {CurrentTrade.Bias}, {CurrentTrade.Entry}, atr {atrCurrent}");
+                        CurrentTrade.PendingOrder = EnterShortLimit(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, SHORT_TRADE);
+                    }
 
-                    return;
+                    if (Close[0] > CurrentTrade.Entry)
+                    {
+                        PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias} at {CurrentTrade.Entry}, {Close[0]}, atr {atrCurrent}");
+                        CurrentTrade.PendingOrder = EnterShortStopMarket(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, SHORT_TRADE);
+                    }
                 }
+
+                var signal = CurrentTrade.Bias == TradeBias.Short ? SHORT_TRADE : LONG_TRADE;
+                SetStopLoss(signal, CalculationMode.Price, CurrentTrade.StopLoss, false);
+                PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
+                SetProfitTarget(signal, CalculationMode.Price, CurrentTrade.TakeProfit);
             }
             catch (Exception ex)
             {
