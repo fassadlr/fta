@@ -92,6 +92,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         public bool IsVirtual { get; internal set; }
         public double CVD { get; internal set; }
         public double CVD_EMA { get; internal set; }
+        public bool IsVirtualOpen { get; internal set; }
 
         public override string ToString()
         {

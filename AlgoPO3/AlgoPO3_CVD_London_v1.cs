@@ -31,7 +31,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Algo PO3 CVD London v1.1";
+                Name = "Algo PO3 CVD London v1.2";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -83,7 +83,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD,CVD_EMA,CVD_TradeType",
                         $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{Name.Replace(" ", "_").Replace(".", "_")}_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
 
-                if (ExportCVDDataFlag)
+                if (ExportTickAndCVDFlag)
                 {
                     ExportCVD(CvdEmaExport, $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Algo_PO3_CVD_London_EMA_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
                     ExportCVD(CvdDeltaCloseExport, $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Algo_PO3_CVD_London_DeltaClose_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
@@ -171,7 +171,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (OrderFlowCVDIndicator.CurrentBar >= 0)
                 CVDSeries[0] = OrderFlowCVDIndicator.DeltaClose[0];
 
-            if (ExportCVDDataFlag)
+            if (ExportTickAndCVDFlag)
             {
                 CvdDeltaCloseExport.Add((Time[0].ToString(), OrderFlowCVDIndicator.DeltaClose[0]));
                 CvdEmaExport.Add((Time[0].ToString(), CVDEmaIndicator[0]));
@@ -221,14 +221,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
 
             /* ----- SET TRADE BIAS  ----- */
-            if (CurrentRange.Low == PreviousRange.High)
+            if (CurrentRange.Low == PreviousRange.High && RangeBias != RangeBias.Bullish)
             {
                 RangeBias = RangeBias.Bullish;
                 TradeBias = TradeBias.Long;
                 PrintDebug($"Range bias {RangeBias}: Trade bias {TradeBias}");
             }
 
-            if (CurrentRange.High == PreviousRange.Low)
+            if (CurrentRange.High == PreviousRange.Low && RangeBias != RangeBias.Bearish)
             {
                 RangeBias = RangeBias.Bearish;
                 TradeBias = TradeBias.Short;
@@ -330,17 +330,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         (CurrentTrade.CVD_EMA_Distance >= 200 && CurrentTrade.CVD_EMA_Distance < 800);
                 }
 
-                //if (SessionStartHour == 11)
-                //{
-
-                //}
-
                 if (!CVD_EMA_DistanceCheck)
                 {
                     PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
-                    PrintInfo($"[VIRTUAL_POSITION_OPENED] {CurrentTrade.Bias}");
                     CurrentTrade.IsVirtual = true;
-                    CurrentTrade.Entry = Close[0];
                 }
             }
 
@@ -361,17 +354,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         (CurrentTrade.CVD_EMA_Distance >= 400 && CurrentTrade.CVD_EMA_Distance < 600);
                 }
 
-                //if (SessionStartHour == 11)
-                //{
-
-                //}
-
                 if (!CVD_EMA_DistanceCheck)
                 {
                     PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
-                    PrintInfo($"[VIRTUAL_POSITION_OPENED] {CurrentTrade.Bias}");
                     CurrentTrade.IsVirtual = true;
-                    CurrentTrade.Entry = Close[0];
                 }
             }
 
@@ -388,8 +374,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 }
 
                 CurrentTrade.PositionSize = CalculatePositionSizeWithEdge(Close[0] - CurrentTrade.StopLoss, Risk);
+
                 if (CurrentTrade.IsVirtual)
+                {
+                    PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} opened at {Close[0]}");
+                    CurrentTrade.Entry = Close[0];
+                    CurrentTrade.IsVirtualOpen = true;
                     return;
+                }
 
                 EnterLong(0, CurrentTrade.PositionSize, LONG_TRADE);
                 PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} stop {CurrentTrade.StopLoss}");
@@ -412,8 +404,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 }
 
                 CurrentTrade.PositionSize = CalculatePositionSizeWithEdge(CurrentTrade.StopLoss - Close[0], Risk);
+
                 if (CurrentTrade.IsVirtual)
+                {
+                    PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} opened at {Close[0]}");
+                    CurrentTrade.Entry = Close[0];
+                    CurrentTrade.IsVirtualOpen = true;
                     return;
+                }
 
                 EnterShort(0, CurrentTrade.PositionSize, SHORT_TRADE);
                 PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} stop {CurrentTrade.StopLoss}");

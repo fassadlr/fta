@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using NinjaTrader.Cbi;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
@@ -40,10 +41,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         internal void CancelLimitOrder()
         {
-            if (CurrentTrade?.PendingOrder == null)
-                return;
-
-            CancelOrder(CurrentTrade?.PendingOrder);
+            if (CurrentTrade?.PendingOrder != null)
+                CancelOrder(CurrentTrade?.PendingOrder);
 
             CurrentTrade = null;
 
@@ -90,42 +89,59 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         internal void ProcessVirtualTrade()
         {
-            // Virtual trades MUST be closed on the tick series.
-            if (CurrentTrade != null && CurrentTrade.IsVirtual)
+            if (CurrentTrade == null) return;
+
+            if (!CurrentTrade.IsVirtual) return;
+
+            double tickPrice = Close[0];
+            if (ImportTickAndCVDFlag)
             {
-                var contractTickValue = Instrument.MasterInstrument.PointValue * CurrentTrade.PositionSize;
+                int idx = FindTickIndex(Time[0].Ticks);
+                tickPrice = TickDataSeriesImport[idx].price;
+                PrintDebug($"{tickPrice}");
+            }
 
-                if (CurrentTrade.Bias == TradeBias.Short &&
-                    (Low[0] <= CurrentTrade.TakeProfit || High[0] >= CurrentTrade.StopLoss))
-                {
-                    CurrentTrade.IsVirtual = false;
+            if (!CurrentTrade.IsVirtualOpen && (CurrentTrade.OrderType == OrderType.Limit || CurrentTrade.OrderType == OrderType.StopMarket) && tickPrice == CurrentTrade.Entry)
+            {
+                CurrentTrade.IsVirtualOpen = true;
+                PrintInfo($"[VIRTUAL_POSITION] triggered at {tickPrice}");
+                return;
+            }
 
-                    UpdateCVDTradeType(Low[0] <= CurrentTrade.TakeProfit);
+            if (!CurrentTrade.IsVirtualOpen) return;
 
-                    if (Low[0] <= CurrentTrade.TakeProfit)
-                        DayPnLVirtual += (CurrentTrade.Entry - CurrentTrade.TakeProfit) * contractTickValue;
+            var contractTickValue = Instrument.MasterInstrument.PointValue * CurrentTrade.PositionSize;
 
-                    if (High[0] >= CurrentTrade.StopLoss)
-                        DayPnLVirtual -= (CurrentTrade.StopLoss - CurrentTrade.Entry) * contractTickValue;
+            if (CurrentTrade.Bias == TradeBias.Short &&
+                (tickPrice <= CurrentTrade.TakeProfit || tickPrice >= CurrentTrade.StopLoss))
+            {
+                CurrentTrade.IsVirtual = false;
 
-                    PrintInfo($"[VIRTUAL_POSITION_CLOSED] {CurrentTrade.Bias} Virtual Day Pnl {DayPnLVirtual}");
-                }
+                UpdateCVDTradeType(tickPrice <= CurrentTrade.TakeProfit);
 
-                if (CurrentTrade.Bias == TradeBias.Long &&
-                    (High[0] >= CurrentTrade.TakeProfit || Low[0] <= CurrentTrade.StopLoss))
-                {
-                    CurrentTrade.IsVirtual = false;
+                if (tickPrice <= CurrentTrade.TakeProfit)
+                    DayPnLVirtual += (CurrentTrade.Entry - CurrentTrade.TakeProfit) * contractTickValue;
 
-                    UpdateCVDTradeType(High[0] >= CurrentTrade.TakeProfit);
+                if (tickPrice >= CurrentTrade.StopLoss)
+                    DayPnLVirtual -= (CurrentTrade.StopLoss - CurrentTrade.Entry) * contractTickValue;
 
-                    if (High[0] >= CurrentTrade.TakeProfit)
-                        DayPnLVirtual += (CurrentTrade.TakeProfit - CurrentTrade.Entry) * contractTickValue;
+                PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} closed at {tickPrice} Virtual Day Pnl {DayPnLVirtual}");
+            }
 
-                    if (Low[0] <= CurrentTrade.StopLoss)
-                        DayPnLVirtual -= (CurrentTrade.Entry - CurrentTrade.StopLoss) * contractTickValue;
+            if (CurrentTrade.Bias == TradeBias.Long &&
+                (tickPrice >= CurrentTrade.TakeProfit || tickPrice <= CurrentTrade.StopLoss))
+            {
+                CurrentTrade.IsVirtual = false;
 
-                    PrintInfo($"[VIRTUAL_POSITION_CLOSED] {CurrentTrade.Bias} Virtual Day Pnl {DayPnLVirtual}");
-                }
+                UpdateCVDTradeType(tickPrice >= CurrentTrade.TakeProfit);
+
+                if (tickPrice >= CurrentTrade.TakeProfit)
+                    DayPnLVirtual += (CurrentTrade.TakeProfit - CurrentTrade.Entry) * contractTickValue;
+
+                if (tickPrice <= CurrentTrade.StopLoss)
+                    DayPnLVirtual -= (CurrentTrade.Entry - CurrentTrade.StopLoss) * contractTickValue;
+
+                PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} closed at {tickPrice} Virtual Day Pnl {DayPnLVirtual}");
             }
         }
 
