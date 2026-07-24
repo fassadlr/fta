@@ -149,7 +149,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (!DataSetValidation.All(v => v.Value))
                 return;
 
-            BasePnlChecks();
+            if (!CheckDailyPnlLimits())
+                return;
 
             if (SkipMonths.Split(',').Contains(Time[0].Month.ToString()))
             {
@@ -169,7 +170,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             // Stop trading when the last candle is disproportionally big.
-            BaseCandleVolatilityChecks();
+            if (!CheckCandleVolatility())
+                return;
 
             // If the session has ended stop processing.
             if (TokyoTime().Hour >= SessionEndHour &&

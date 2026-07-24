@@ -126,7 +126,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (LondonTime().TimeOfDay < new TimeSpan(7, 0, 0))
                 return;
 
-            BasePnlChecks();
+            if (!CheckDailyPnlLimits())
+                return;
 
             // Skip all day events (easter etc).
             var eventForToday = GetNewsEventForToday();
@@ -140,7 +141,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             // Stop trading when the last candle is disproportionally big.
-            BaseCandleVolatilityChecks();
+            if (!CheckCandleVolatility())
+                return;
 
             // If the session has ended stop processing.
             if (sessionStarted && LondonTime().TimeOfDay >= new TimeSpan(SessionEndHour, 0, 0) && (Position.MarketPosition == MarketPosition.Flat || (CurrentTrade != null && !CurrentTrade.Virtual)))

@@ -76,520 +76,488 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
             else if (State == State.DataLoaded)
             {
-                FractalManager = new FractalManager(this);
-
                 VWAP = OrderFlowVWAP(VWAPResolution.Standard, Bars.TradingHours, VWAPStandardDeviations.One, 1, 2, 3);
 
-                if (!ImportTickAndCvdEnabled)
-                {
-                    OrderFlowCVDIndicator = OrderFlowCumulativeDelta(CumulativeDeltaType.BidAsk, CumulativeDeltaPeriod.Session, 1);
-                    CVDSeries = new Series<double>(this);
-                    CVDEmaIndicator = EMA(CVDSeries, 20);
-                }
-
-                if (ImportTickAndCvdEnabled)
-                {
-                    TickDataSeriesExport = [];
-
-                    ImportCVDData("EMA", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\AlgoPO3_Asia_CVDEma_20260724.csv");
-                    ImportCVDData("DeltaClose", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\AlgoPO3_Asia_CVDDeltaClose_20260724.csv");
-                    ImportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\MNQ_Ticks_Data_20260724.bin");
-                }
-
-                if (ExportTickAndCVDFlag)
-                    TickDataSeriesExport = [];
+                OnDataLoadedBase("Asia_Alpha");
             }
             else if (State == State.Terminated)
             {
-                if (ExportTradeLogsEnabled)
-                {
-                    ExportTradeLogs(
-                        "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD,CVD_EMA,CVD_EMA_Alignment,Atr",
-                        $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{Name.Replace(" ", "_")}_{DateTime.Now:yyyyMMdd}.csv");
-                }
-
-                if (ExportTickAndCVDFlag)
-                {
-                    ExportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\MNQ_Ticks_Data_{DateTime.Now:yyyyMMdd}.bin");
-                    ExportCVD(CvdEmaExport, $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\AlgoPO3_Asia_CVDEma_{DateTime.Now:yyyyMMdd}.csv");
-                    ExportCVD(CvdDeltaCloseExport, $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\AlgoPO3_Asia_CVDDeltaClose_{DateTime.Now:yyyyMMdd}.csv");
-                }
+                OnTerminatedBase("Asia_Alpha");
             }
         }
 
         protected override void OnBarUpdate()
         {
-            try
+            //try
+            //{
+            if (BarsInProgress == 0 && Bars.IsFirstBarOfSession)
             {
-                if (BarsInProgress == 0 && Bars.IsFirstBarOfSession)
-                {
-                    PerformCleanupBeforeSessionStart();
+                PerformCleanupBeforeSessionStart();
 
-                    DataSetValidation[0] = false;
-                    DataSetValidation[1] = false;
+                DataSetValidation[0] = false;
+                DataSetValidation[1] = false;
 
-                    if (!ImportTickAndCvdEnabled)
-                        DataSetValidation[2] = false;
-                }
+                if (!ImportTickAndCvdEnabled)
+                    DataSetValidation[2] = false;
+            }
 
-                if (TradingHalted)
-                    return;
+            if (TradingHalted)
+                return;
 
-                if (BarsInProgress == 0 && !DataSetValidation[0])
-                {
-                    DataSetValidation[0] = true;
-                    PrintInfo("[DATASET_VALIDATION] Primary series validated.");
-                }
+            if (BarsInProgress == 0 && !DataSetValidation[0])
+            {
+                DataSetValidation[0] = true;
+                PrintInfo("[DATASET_VALIDATION] Primary series validated.");
+            }
 
-                if (BarsInProgress == 1 && !DataSetValidation[1])
-                {
-                    DataSetValidation[1] = true;
-                    PrintInfo("[DATASET_VALIDATION] Secondary series validated.");
-                }
+            if (BarsInProgress == 1 && !DataSetValidation[1])
+            {
+                DataSetValidation[1] = true;
+                PrintInfo("[DATASET_VALIDATION] Secondary series validated.");
+            }
 
-                if (!ImportTickAndCvdEnabled && BarsInProgress == 2 && !DataSetValidation[2])
-                {
-                    DataSetValidation[2] = true;
-                    PrintInfo("[DATASET_VALIDATION] Third series validated.");
-                }
+            if (!ImportTickAndCvdEnabled && BarsInProgress == 2 && !DataSetValidation[2])
+            {
+                DataSetValidation[2] = true;
+                PrintInfo("[DATASET_VALIDATION] Third series validated.");
+            }
 
-                if (!DataSetValidation.All(v => v.Value))
-                    return;
+            if (!DataSetValidation.All(v => v.Value))
+                return;
 
-                BasePnlChecks();
+            if (!CheckDailyPnlLimits())
+                return;
 
-                if (SkipMonths.Split(',').Contains(Time[0].Month.ToString()))
-                {
-                    TradingHalted = true;
-                    return;
-                }
+            if (SkipMonths.Split(',').Contains(Time[0].Month.ToString()))
+            {
+                TradingHalted = true;
+                return;
+            }
 
-                // Skip all day events (easter etc).
-                var eventForToday = GetNewsEventForToday();
-                if (eventForToday != null &&
-                    eventForToday.EventTime.Date == Time[0].Date &&
-                    eventForToday.AllDay && Position.MarketPosition == MarketPosition.Flat)
-                {
-                    TradingHalted = true;
-                    PrintInfo($"Trading skipped for day due to all day event {eventForToday.EventTime}");
-                    return;
-                }
+            // Skip all day events (easter etc).
+            var eventForToday = GetNewsEventForToday();
+            if (eventForToday != null &&
+                eventForToday.EventTime.Date == Time[0].Date &&
+                eventForToday.AllDay && Position.MarketPosition == MarketPosition.Flat)
+            {
+                TradingHalted = true;
+                PrintInfo($"Trading skipped for day due to all day event {eventForToday.EventTime}");
+                return;
+            }
 
-                // Stop trading when the last candle is disproportionally big.
-                BaseCandleVolatilityChecks();
+            // Stop trading when the last candle is disproportionally big.
+            if (!CheckCandleVolatility())
+                return;
 
-                // If the session has ended stop processing.
-                if (TokyoTime().Hour >= SessionEndHour && (Position.MarketPosition == MarketPosition.Flat || (CurrentTrade != null && CurrentTrade.Virtual && !CurrentTrade.VirtualOpen)))
-                {
-                    CancelLimitOrder();
-                    PrintInfo($"Trading session ended.");
-                    TradingHalted = true;
-                    return;
-                }
+            // If the session has ended stop processing.
+            if (TokyoTime().Hour >= SessionEndHour && (Position.MarketPosition == MarketPosition.Flat || (CurrentTrade != null && CurrentTrade.Virtual && !CurrentTrade.VirtualOpen)))
+            {
+                CancelLimitOrder();
+                PrintInfo($"Trading session ended.");
+                TradingHalted = true;
+                return;
+            }
 
-                // Always process fractal and BOS detection.
-                if (BarsInProgress == 1)
-                {
-                    dailyAtr.Calculate(High[0], Low[0], Close[0]);
+            // Always process fractal and BOS detection.
+            if (BarsInProgress == 1)
+            {
+                dailyAtr.Calculate(High[0], Low[0], Close[0]);
 
-                    FractalManager.DetectFractalThreeBarWithPlatos(5);
+                FractalManager.DetectFractalThreeBarWithPlatos(5);
 
-                    TradeBias = DetectBOS(5) ?? TradeBias;
-                }
+                TradeBias = DetectBOS(5) ?? TradeBias;
+            }
 
-                // If a BIP 2 exists that means the tick series was added so process them.
-                if (BarsInProgress == 2)
-                {
-                    if (ExportTickAndCVDFlag)
-                        TickDataSeriesExport.Add((Time[0].Ticks, Close[0]));
-
-                    OrderFlowCVDIndicator.Update(OrderFlowCVDIndicator.BarsArray[1].Count - 1, 1);
-
-                    ProcessVirtualTrade();
-
-                    return;
-                }
-
-                if (BarsInProgress != 0)
-                    return;
-
-                if (!ImportTickAndCvdEnabled && OrderFlowCVDIndicator.CurrentBar >= 0)
-                    CVDSeries[0] = OrderFlowCVDIndicator.DeltaClose[0];
-
+            // If a BIP 2 exists that means the tick series was added so process them.
+            if (BarsInProgress == 2)
+            {
                 if (ExportTickAndCVDFlag)
+                    TickDataSeriesExport.Add((Time[0].Ticks, Close[0]));
+
+                OrderFlowCVDIndicator.Update(OrderFlowCVDIndicator.BarsArray[1].Count - 1, 1);
+
+                ProcessVirtualTrade();
+
+                return;
+            }
+
+            if (BarsInProgress != 0)
+                return;
+
+            if (!ImportTickAndCvdEnabled && OrderFlowCVDIndicator.CurrentBar >= 0)
+                CVDSeries[0] = OrderFlowCVDIndicator.DeltaClose[0];
+
+            if (ExportTickAndCVDFlag)
+            {
+                CvdDeltaCloseExport.Add((Time[0].ToString(), OrderFlowCVDIndicator.DeltaClose[0]));
+                CvdEmaExport.Add((Time[0].ToString(), CVDEmaIndicator[0]));
+            }
+
+            atrCurrent = dailyAtr.Atr;
+
+            // Create the initial dealing range, this will only happen once per session.
+            if (CurrentRange == null)
+            {
+                CurrentRange = CreateDealingRange();
+                return;
+            }
+
+            // Determine if we are still in the same dealing range.
+            var found = Ranges.FirstOrDefault(r => r.IsInRange(Close[0])) ?? CreateDealingRange();
+
+            // Always process range breaks
+            if (found != CurrentRange)
+            {
+                if (PreviousRange != CurrentRange)
                 {
-                    CvdDeltaCloseExport.Add((Time[0].ToString(), OrderFlowCVDIndicator.DeltaClose[0]));
-                    CvdEmaExport.Add((Time[0].ToString(), CVDEmaIndicator[0]));
+                    // Update Current Range's coverage as a candle could ahve open and closed into a new range.
+                    CurrentRange.UpdateCoverage(Close[0]);
+
+                    PreviousRange = CurrentRange;
+
+                    CurrentRange = found;
+
+                    rangeBreakDetected = true;
+                    PrintDebug($"[RANGE_BREAK_DETECTED] {CurrentRange}");
                 }
+            }
 
-                atrCurrent = dailyAtr.Atr;
+            CurrentRange.UpdateCoverage(Close[0]);
 
-                // Create the initial dealing range, this will only happen once per session.
-                if (CurrentRange == null)
+            /* ----- STRATEGY START TIME ANCHORED TO TOKYO-----*/
+            if (TokyoTime().TimeOfDay < new TimeSpan(9, 0, 0))
+                return;
+
+            /* ----- WE ARE IN A POSITION  ----- */
+            if (Position.MarketPosition != MarketPosition.Flat)
+                return;
+
+            /* ----- WE ARE IN A VIRTUAL POSITION  ----- */
+            if (CurrentTrade != null && CurrentTrade.Virtual && CurrentTrade.VirtualOpen)
+            {
+                ProcessVirtualTrade();
+                return;
+            }
+
+            /*
+             ### From here we are flat or waiting on a pending order to execute ###
+            */
+
+            if (DetectAndCheckInvalidRange())
+                return;
+
+            // Cancel limit orders close to end of sessions blocks.
+            // TODO: Test this properly with Python.
+            if (TokyoTime().Hour == 11 && Time[0].Minute >= 45)
+            {
+                CancelLimitOrder();
+                return;
+            }
+
+            if (!rangeBreakDetected)
+                return;
+
+            // If we set a limit order and price gets to TP we need to clear the limit order
+            // Always return as we are waiting for the PendingOrder to fill or be cancelled.
+            //
+            // If the pending order is virtual also do the same processing.
+            if (CurrentTrade != null && (CurrentTrade.PendingOrder != null || CurrentTrade.Virtual))
+            {
+                var shouldCancel = false;
+                if (CurrentTrade.Bias != TradeBias)
                 {
-                    CurrentRange = CreateDealingRange();
-                    return;
+                    shouldCancel = true;
+                    PrintDebug($"[LIMIT_ORDER_CANCEL] Trade bias changed from {CurrentTrade.Bias} to {TradeBias}.");
                 }
-
-                // Determine if we are still in the same dealing range.
-                var found = Ranges.FirstOrDefault(r => r.IsInRange(Close[0])) ?? CreateDealingRange();
-
-                // Always process range breaks
-                if (found != CurrentRange)
+                else
                 {
-                    if (PreviousRange != CurrentRange)
+                    if ((CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.TradeMissedThreshold) ||
+                       (CurrentTrade.Bias == TradeBias.Short && Low[0] <= CurrentTrade.TradeMissedThreshold))
                     {
-                        // Update Current Range's coverage as a candle could ahve open and closed into a new range.
-                        CurrentRange.UpdateCoverage(Close[0]);
-
-                        PreviousRange = CurrentRange;
-
-                        CurrentRange = found;
-
-                        rangeBreakDetected = true;
-                        PrintDebug($"[RANGE_BREAK_DETECTED] {CurrentRange}");
+                        PrintDebug($"[LIMIT_ORDER_CANCEL] {CurrentTrade.Bias} price went to TP threshold {CurrentTrade.TradeMissedThreshold}.");
+                        shouldCancel = true;
                     }
                 }
 
-                CurrentRange.UpdateCoverage(Close[0]);
-
-                /* ----- STRATEGY START TIME ANCHORED TO TOKYO-----*/
-                if (TokyoTime().TimeOfDay < new TimeSpan(9, 0, 0))
-                    return;
-
-                /* ----- WE ARE IN A POSITION  ----- */
-                if (Position.MarketPosition != MarketPosition.Flat)
-                    return;
-
-                /* ----- WE ARE IN A VIRTUAL POSITION  ----- */
-                if (CurrentTrade != null && CurrentTrade.Virtual && CurrentTrade.VirtualOpen)
-                {
-                    ProcessVirtualTrade();
-                    return;
-                }
-
-                /*
-                 ### From here we are flat or waiting on a pending order to execute ###
-                */
-
-                if (DetectAndCheckInvalidRange())
-                    return;
-
-                // Cancel limit orders close to end of sessions blocks.
-                // TODO: Test this properly with Python.
-                if (TokyoTime().Hour == 11 && Time[0].Minute >= 45)
+                if (shouldCancel)
                 {
                     CancelLimitOrder();
-                    return;
+                    RangeBias = RangeBias.Neutral;
                 }
 
-                if (!rangeBreakDetected)
-                    return;
+                // If we are on the 1min and we are importing tick and CVD data 
+                // then we need to process the virtual trade here.
+                if (ImportTickAndCvdEnabled)
+                    ProcessVirtualTrade();
 
-                // If we set a limit order and price gets to TP we need to clear the limit order
-                // Always return as we are waiting for the PendingOrder to fill or be cancelled.
-                //
-                // If the pending order is virtual also do the same processing.
-                if (CurrentTrade != null && (CurrentTrade.PendingOrder != null || CurrentTrade.Virtual))
-                {
-                    var shouldCancel = false;
-                    if (CurrentTrade.Bias != TradeBias)
-                    {
-                        shouldCancel = true;
-                        PrintDebug($"[LIMIT_ORDER_CANCEL] Trade bias changed from {CurrentTrade.Bias} to {TradeBias}.");
-                    }
-                    else
-                    {
-                        if ((CurrentTrade.Bias == TradeBias.Long && High[0] >= CurrentTrade.TradeMissedThreshold) ||
-                           (CurrentTrade.Bias == TradeBias.Short && Low[0] <= CurrentTrade.TradeMissedThreshold))
-                        {
-                            PrintDebug($"[LIMIT_ORDER_CANCEL] {CurrentTrade.Bias} price went to TP threshold {CurrentTrade.TradeMissedThreshold}.");
-                            shouldCancel = true;
-                        }
-                    }
-
-                    if (shouldCancel)
-                    {
-                        CancelLimitOrder();
-                        RangeBias = RangeBias.Neutral;
-                    }
-
-                    // If we are on the 1min and we are importing tick and CVD data 
-                    // then we need to process the virtual trade here.
-                    if (ImportTickAndCvdEnabled)
-                        ProcessVirtualTrade();
-
-                    return;
-                }
-
-                if (BullishBOSDetected && CurrentRange.Low == PreviousRange.High)
-                {
-                    RangeBias = RangeBias.Bullish;
-                    PrintDebug($"Range bias {RangeBias}: Trade bias {TradeBias}");
-                }
-
-                if (BullishBOSDetected && CurrentRange.High == PreviousRange.Low)
-                {
-                    RangeBias = RangeBias.Bearish;
-                    PrintDebug($"Range bias {RangeBias}: Trade bias {TradeBias}");
-                }
-
-                if (BearishBOSDetected && CurrentRange.High == PreviousRange.Low)
-                {
-                    RangeBias = RangeBias.Bearish;
-                    PrintDebug($"Range bias {RangeBias}: Trade bias {TradeBias}");
-                }
-
-                if (BearishBOSDetected && CurrentRange.Low == PreviousRange.High)
-                {
-                    RangeBias = RangeBias.Bullish;
-                    PrintDebug($"Range bias {RangeBias}: Trade bias {TradeBias}");
-                }
-
-                if (RangeBias == RangeBias.Neutral)
-                    return;
-
-                if (IsLive && State != State.Realtime)
-                    return;
-
-                if (IsLive && !IsConnected)
-                    return;
-
-                if (atrCurrent > 50)
-                {
-                    PrintDebug($"[EXCESSIVE_ATR] skipping trade, ATR {atrCurrent}");
-                    return;
-                }
-
-                if (atrCurrent == 0)
-                {
-                    PrintDebug($"[INITIAL_ATR] skipping trade, ATR {atrCurrent}");
-                    return;
-                }
-
-                CurrentTrade = new TradeDetails()
-                {
-                    Atr = atrCurrent,
-                    Bias = TradeBias,
-                };
-
-                if (RangeBias == RangeBias.Bearish)
-                {
-                    if (CurrentTrade.Bias == TradeBias.Long)
-                    {
-                        CurrentTrade.Entry = CurrentRange.OBCE2 + TickSize;
-                        CurrentTrade.StopLoss = atrCurrent >= 19 ? CurrentTrade.Entry - Math.Round(atrCurrent) : CurrentRange.BR4 - StopGrace;
-                        CurrentTrade.TradeMissedThreshold = PreviousRange.BR3;
-                        CurrentTrade.TakeProfit = PreviousRange.MBCE1;
-
-                        CurrentTrade.OrderType = Close[0] < CurrentTrade.Entry ? OrderType.StopMarket : OrderType.Limit;
-                    }
-
-                    if (CurrentTrade.Bias == TradeBias.Short)
-                    {
-                        CurrentTrade.Entry = CurrentRange.ExtensionHighCE - TickSize;
-                        CurrentTrade.StopLoss = atrCurrent >= 19 ? CurrentTrade.Entry + Math.Round(atrCurrent) : PreviousRange.BR1 + StopGrace;
-                        CurrentTrade.TradeMissedThreshold = CurrentRange.BR2;
-                        CurrentTrade.TakeProfit = CurrentRange.MBCE2;
-
-                        CurrentTrade.OrderType = Close[0] > CurrentTrade.Entry ? OrderType.StopMarket : OrderType.Limit;
-                    }
-                }
-
-                if (RangeBias == RangeBias.Bullish)
-                {
-                    if (TradeBias == TradeBias.Long)
-                    {
-                        CurrentTrade.Entry = CurrentRange.ExtensionLowCE + TickSize;
-                        CurrentTrade.StopLoss = atrCurrent >= 19 ? CurrentTrade.Entry - Math.Round(atrCurrent) : PreviousRange.BR4 - StopGrace;
-                        CurrentTrade.TradeMissedThreshold = CurrentRange.BR3;
-                        CurrentTrade.TakeProfit = CurrentRange.MBCE1;
-
-                        CurrentTrade.OrderType = Close[0] < CurrentTrade.Entry ? OrderType.StopMarket : OrderType.Limit;
-                    }
-
-                    if (TradeBias == TradeBias.Short)
-                    {
-                        CurrentTrade.Entry = CurrentRange.OBCE1 - TickSize;
-                        CurrentTrade.StopLoss = atrCurrent >= 19 ? CurrentTrade.Entry + Math.Round(atrCurrent) : CurrentRange.BR1 + StopGrace;
-                        CurrentTrade.TradeMissedThreshold = PreviousRange.BR2;
-                        CurrentTrade.TakeProfit = PreviousRange.MBCE2;
-
-                        CurrentTrade.OrderType = Close[0] > CurrentTrade.Entry ? OrderType.StopMarket : OrderType.Limit;
-                    }
-                }
-
-                CurrentTrade.Entry = Math.Round(CurrentTrade.Entry / 0.25) * 0.25;
-
-                /* ----- COLLECT ANY STATISTICS ----- */
-
-                CalculateVWAPDistance();
-
-                CollectStatistics();
-
-                /* ---------------------------------- */
-
-                /* ----- TRADE INSPECTION BEFORE PLACEMENT ----- */
-
-                if (CurrentTrade.CVD_EMA == 0 || CurrentTrade.CVD == 0)
-                {
-                    TradingHalted = true;
-                    PrintInfo($"[DATA_ERROR] cvdEma {CurrentTrade.CVD_EMA} | cvdDeltaClose {CurrentTrade.CVD}");
-                    return;
-                }
-
-                if (CurrentTrade.Bias == TradeBias.Long)
-                {
-                    // If the entry is below/above the trade missed threshold then skip.
-                    if (Close[0] > CurrentTrade.TradeMissedThreshold)
-                    {
-                        PrintDebug($"[TRADE_SKIPPED] {CurrentTrade.Bias}, entry {CurrentTrade.Entry} above threshold {CurrentTrade.TradeMissedThreshold}");
-                        return;
-                    }
-
-                    if (CurrentTrade.CVD_EMA > CurrentTrade.CVD)
-                    {
-                        PrintDebug($"[CVD_BIAS_FAIL_LONG] EMA {Math.Round(CurrentTrade.CVD_EMA)} > CVD {CurrentTrade.CVD}");
-                        return;
-                    }
-
-                    var CVD_EMA_DistanceCheck = CurrentTrade.CVD_EMA_Distance < 1000;
-                    if (!CVD_EMA_DistanceCheck)
-                    {
-                        PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
-                        CurrentTrade.Virtual = true;
-
-                        if (ImportTickAndCvdEnabled)
-                        {
-                            CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
-                            //PrintDebug($"[IMPORT_TICK_INDEX] {CurrentTrade.VirtualTickIndex}");
-                        }
-                    }
-                }
-
-                if (CurrentTrade.Bias == TradeBias.Short)
-                {
-                    // If the entry is below/above the trade missed threshold then skip.
-                    if (Close[0] < CurrentTrade.TradeMissedThreshold)
-                    {
-                        PrintDebug($"[TRADE_SKIPPED] {CurrentTrade.Bias}, entry {CurrentTrade.Entry} below threshold {CurrentTrade.TradeMissedThreshold}");
-                        return;
-                    }
-
-                    var CVD_EMA_DistanceCheck =
-                        (CurrentTrade.CVD_EMA_Distance < 1000) ||
-                        (CurrentTrade.CVD_EMA_Distance >= 1200 & CurrentTrade.CVD_EMA_Distance < 1600) ||
-                        (CurrentTrade.CVD_EMA_Distance >= 1800);
-
-                    if (!CVD_EMA_DistanceCheck)
-                    {
-                        PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
-                        CurrentTrade.Virtual = true;
-
-                        if (ImportTickAndCvdEnabled)
-                        {
-                            CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
-                            //PrintDebug($"[IMPORT_TICK_INDEX] {CurrentTrade.VirtualTickIndex}");
-                        }
-                    }
-                }
-
-                /* Bias independant */
-
-                CalculateTakeProfitBasedOnMaxDailyProfit();
-
-                CurrentTrade.PositionSize = CalculatePositionSize(Math.Abs(CurrentTrade.Entry - CurrentTrade.StopLoss), Risk);
-
-                ApplyEdgeToPosition();
-
-                if (Close[0] == CurrentTrade.Entry)
-                {
-                    PrintDebug($"[TRADE_SKIPPED_AS_PRICE_EQ_TO_ENTRY] {CurrentTrade.Bias} at {CurrentTrade.Entry}");
-
-                    CurrentTrade.Virtual = false;
-                    rangeBreakDetected = false;
-
-                    return;
-                }
-
-                if (CurrentTrade.OrderType == OrderType.StopMarket && CurrentTrade.VWAPDistance < 20)
-                {
-                    PrintDebug($"[STOP_MARKET_ORDER_SKIPPED_VWAP] {CurrentTrade.Bias} at {CurrentTrade.Entry}, distance {CurrentTrade.VWAPDistance}");
-                    CurrentTrade.Virtual = false;
-
-                    return;
-                }
-
-                /* ---------------- */
-
-                if (CurrentTrade.Bias == TradeBias.Long)
-                {
-                    if (atrCurrent < 5 || (atrCurrent >= 35 && atrCurrent < 40))
-                    {
-                        PrintDebug($"[ATR_INVALID] {atrCurrent}");
-                        CurrentTrade.Virtual = true;
-
-                        if (ImportTickAndCvdEnabled)
-                            CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
-                    }
-
-                    if (CurrentTrade.Virtual)
-                    {
-                        PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} {CurrentTrade.OrderType} submittted at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
-
-                        // Process trade immediately as it could have triggered within this minute.
-                        ProcessVirtualTrade();
-
-                        return;
-                    }
-
-                    if (Close[0] > CurrentTrade.Entry)
-                    {
-                        PrintDebug($"[PLACE_TRADE_LIMIT] {CurrentTrade.Bias}, {CurrentTrade.Entry}, atr {atrCurrent}");
-                        CurrentTrade.PendingOrder = EnterLongLimit(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, LONG_TRADE);
-                    }
-
-                    if (Close[0] < CurrentTrade.Entry)
-                    {
-                        PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias} at {CurrentTrade.Entry}, {Close[0]}, atr {atrCurrent}");
-                        CurrentTrade.PendingOrder = EnterLongStopMarket(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, LONG_TRADE);
-                    }
-                }
-
-                if (CurrentTrade.Bias == TradeBias.Short)
-                {
-                    if (CurrentTrade.Virtual)
-                    {
-                        PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} {CurrentTrade.OrderType} submittted at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
-
-                        // Process trade immediately as it could have triggered within this minute.
-                        ProcessVirtualTrade();
-
-                        return;
-                    }
-
-                    if (Close[0] < CurrentTrade.Entry)
-                    {
-                        PrintDebug($"[PLACE_TRADE_LIMIT] {CurrentTrade.Bias}, {CurrentTrade.Entry}, atr {atrCurrent}");
-                        CurrentTrade.PendingOrder = EnterShortLimit(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, SHORT_TRADE);
-                    }
-
-                    if (Close[0] > CurrentTrade.Entry)
-                    {
-                        PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias} at {CurrentTrade.Entry}, {Close[0]}, atr {atrCurrent}");
-                        CurrentTrade.PendingOrder = EnterShortStopMarket(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, SHORT_TRADE);
-                    }
-                }
-
-                var signal = CurrentTrade.Bias == TradeBias.Short ? SHORT_TRADE : LONG_TRADE;
-                SetStopLoss(signal, CalculationMode.Price, CurrentTrade.StopLoss, false);
-                PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
-                SetProfitTarget(signal, CalculationMode.Price, CurrentTrade.TakeProfit);
+                return;
             }
-            catch (Exception ex)
+
+            if (BullishBOSDetected && CurrentRange.Low == PreviousRange.High)
             {
-                Print(ex);
+                RangeBias = RangeBias.Bullish;
+                PrintDebug($"Range bias {RangeBias}: Trade bias {TradeBias}");
             }
+
+            if (BullishBOSDetected && CurrentRange.High == PreviousRange.Low)
+            {
+                RangeBias = RangeBias.Bearish;
+                PrintDebug($"Range bias {RangeBias}: Trade bias {TradeBias}");
+            }
+
+            if (BearishBOSDetected && CurrentRange.High == PreviousRange.Low)
+            {
+                RangeBias = RangeBias.Bearish;
+                PrintDebug($"Range bias {RangeBias}: Trade bias {TradeBias}");
+            }
+
+            if (BearishBOSDetected && CurrentRange.Low == PreviousRange.High)
+            {
+                RangeBias = RangeBias.Bullish;
+                PrintDebug($"Range bias {RangeBias}: Trade bias {TradeBias}");
+            }
+
+            if (RangeBias == RangeBias.Neutral)
+                return;
+
+            if (IsLive && State != State.Realtime)
+                return;
+
+            if (IsLive && !IsConnected)
+                return;
+
+            if (atrCurrent > 50)
+            {
+                PrintDebug($"[EXCESSIVE_ATR] skipping trade, ATR {atrCurrent}");
+                return;
+            }
+
+            if (atrCurrent == 0)
+            {
+                PrintDebug($"[INITIAL_ATR] skipping trade, ATR {atrCurrent}");
+                return;
+            }
+
+            CurrentTrade = new TradeDetails()
+            {
+                Atr = atrCurrent,
+                Bias = TradeBias,
+            };
+
+            if (RangeBias == RangeBias.Bearish)
+            {
+                if (CurrentTrade.Bias == TradeBias.Long)
+                {
+                    CurrentTrade.Entry = CurrentRange.OBCE2 + TickSize;
+                    CurrentTrade.StopLoss = atrCurrent >= 19 ? CurrentTrade.Entry - Math.Round(atrCurrent) : CurrentRange.BR4 - StopGrace;
+                    CurrentTrade.TradeMissedThreshold = PreviousRange.BR3;
+                    CurrentTrade.TakeProfit = PreviousRange.MBCE1;
+
+                    CurrentTrade.OrderType = Close[0] < CurrentTrade.Entry ? OrderType.StopMarket : OrderType.Limit;
+                }
+
+                if (CurrentTrade.Bias == TradeBias.Short)
+                {
+                    CurrentTrade.Entry = CurrentRange.ExtensionHighCE - TickSize;
+                    CurrentTrade.StopLoss = atrCurrent >= 19 ? CurrentTrade.Entry + Math.Round(atrCurrent) : PreviousRange.BR1 + StopGrace;
+                    CurrentTrade.TradeMissedThreshold = CurrentRange.BR2;
+                    CurrentTrade.TakeProfit = CurrentRange.MBCE2;
+
+                    CurrentTrade.OrderType = Close[0] > CurrentTrade.Entry ? OrderType.StopMarket : OrderType.Limit;
+                }
+            }
+
+            if (RangeBias == RangeBias.Bullish)
+            {
+                if (TradeBias == TradeBias.Long)
+                {
+                    CurrentTrade.Entry = CurrentRange.ExtensionLowCE + TickSize;
+                    CurrentTrade.StopLoss = atrCurrent >= 19 ? CurrentTrade.Entry - Math.Round(atrCurrent) : PreviousRange.BR4 - StopGrace;
+                    CurrentTrade.TradeMissedThreshold = CurrentRange.BR3;
+                    CurrentTrade.TakeProfit = CurrentRange.MBCE1;
+
+                    CurrentTrade.OrderType = Close[0] < CurrentTrade.Entry ? OrderType.StopMarket : OrderType.Limit;
+                }
+
+                if (TradeBias == TradeBias.Short)
+                {
+                    CurrentTrade.Entry = CurrentRange.OBCE1 - TickSize;
+                    CurrentTrade.StopLoss = atrCurrent >= 19 ? CurrentTrade.Entry + Math.Round(atrCurrent) : CurrentRange.BR1 + StopGrace;
+                    CurrentTrade.TradeMissedThreshold = PreviousRange.BR2;
+                    CurrentTrade.TakeProfit = PreviousRange.MBCE2;
+
+                    CurrentTrade.OrderType = Close[0] > CurrentTrade.Entry ? OrderType.StopMarket : OrderType.Limit;
+                }
+            }
+
+            CurrentTrade.Entry = Math.Round(CurrentTrade.Entry / 0.25) * 0.25;
+
+            /* ----- COLLECT ANY STATISTICS ----- */
+
+            CalculateVWAPDistance();
+
+            CollectStatistics();
+
+            /* ---------------------------------- */
+
+            /* ----- TRADE INSPECTION BEFORE PLACEMENT ----- */
+
+            if (CurrentTrade.CVD_EMA == 0 || CurrentTrade.CVD == 0)
+            {
+                TradingHalted = true;
+                PrintInfo($"[DATA_ERROR] cvdEma {CurrentTrade.CVD_EMA} | cvdDeltaClose {CurrentTrade.CVD}");
+                return;
+            }
+
+            if (CurrentTrade.Bias == TradeBias.Long)
+            {
+                // If the entry is below/above the trade missed threshold then skip.
+                if (Close[0] > CurrentTrade.TradeMissedThreshold)
+                {
+                    PrintDebug($"[TRADE_SKIPPED] {CurrentTrade.Bias}, entry {CurrentTrade.Entry} above threshold {CurrentTrade.TradeMissedThreshold}");
+                    return;
+                }
+
+                if (CurrentTrade.CVD_EMA > CurrentTrade.CVD)
+                {
+                    PrintDebug($"[CVD_BIAS_FAIL_LONG] EMA {Math.Round(CurrentTrade.CVD_EMA)} > CVD {CurrentTrade.CVD}");
+                    return;
+                }
+
+                var CVD_EMA_DistanceCheck = CurrentTrade.CVD_EMA_Distance < 1000;
+                if (!CVD_EMA_DistanceCheck)
+                {
+                    PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
+                    CurrentTrade.Virtual = true;
+
+                    if (ImportTickAndCvdEnabled)
+                    {
+                        CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
+                    }
+                }
+            }
+
+            if (CurrentTrade.Bias == TradeBias.Short)
+            {
+                // If the entry is below/above the trade missed threshold then skip.
+                if (Close[0] < CurrentTrade.TradeMissedThreshold)
+                {
+                    PrintDebug($"[TRADE_SKIPPED] {CurrentTrade.Bias}, entry {CurrentTrade.Entry} below threshold {CurrentTrade.TradeMissedThreshold}");
+                    return;
+                }
+
+                var CVD_EMA_DistanceCheck =
+                    (CurrentTrade.CVD_EMA_Distance < 1000) ||
+                    (CurrentTrade.CVD_EMA_Distance >= 1200 & CurrentTrade.CVD_EMA_Distance < 1600) ||
+                    (CurrentTrade.CVD_EMA_Distance >= 1800);
+
+                if (!CVD_EMA_DistanceCheck)
+                {
+                    PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
+                    CurrentTrade.Virtual = true;
+
+                    if (ImportTickAndCvdEnabled)
+                    {
+                        CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
+                    }
+                }
+            }
+
+            /* Bias independant */
+
+            CalculateTakeProfitBasedOnMaxDailyProfit();
+
+            CurrentTrade.PositionSize = CalculatePositionSize(Math.Abs(CurrentTrade.Entry - CurrentTrade.StopLoss), Risk);
+
+            ApplyEdgeToPosition();
+
+            if (Close[0] == CurrentTrade.Entry)
+            {
+                PrintDebug($"[TRADE_SKIPPED_AS_PRICE_EQ_TO_ENTRY] {CurrentTrade.Bias} at {CurrentTrade.Entry}");
+
+                CurrentTrade.Virtual = false;
+                rangeBreakDetected = false;
+
+                return;
+            }
+
+            if (CurrentTrade.OrderType == OrderType.StopMarket && CurrentTrade.VWAPDistance < 20)
+            {
+                PrintDebug($"[STOP_MARKET_ORDER_SKIPPED_VWAP] {CurrentTrade.Bias} at {CurrentTrade.Entry}, distance {CurrentTrade.VWAPDistance}");
+                CurrentTrade.Virtual = false;
+
+                return;
+            }
+
+            /* ---------------- */
+
+            if (CurrentTrade.Bias == TradeBias.Long)
+            {
+                if (atrCurrent < 5 || (atrCurrent >= 35 && atrCurrent < 40))
+                {
+                    PrintDebug($"[ATR_INVALID] {atrCurrent}");
+                    CurrentTrade.Virtual = true;
+
+                    if (ImportTickAndCvdEnabled)
+                        CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
+                }
+
+                if (CurrentTrade.Virtual)
+                {
+                    PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} {CurrentTrade.OrderType} submittted at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
+
+                    // Process trade immediately as it could have triggered within this minute.
+                    ProcessVirtualTrade();
+
+                    return;
+                }
+
+                if (Close[0] > CurrentTrade.Entry)
+                {
+                    PrintDebug($"[PLACE_TRADE_LIMIT] {CurrentTrade.Bias}, {CurrentTrade.Entry}, atr {atrCurrent}");
+                    CurrentTrade.PendingOrder = EnterLongLimit(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, LONG_TRADE);
+                }
+
+                if (Close[0] < CurrentTrade.Entry)
+                {
+                    PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias} at {CurrentTrade.Entry}, {Close[0]}, atr {atrCurrent}");
+                    CurrentTrade.PendingOrder = EnterLongStopMarket(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, LONG_TRADE);
+                }
+            }
+
+            if (CurrentTrade.Bias == TradeBias.Short)
+            {
+                if (CurrentTrade.Virtual)
+                {
+                    PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} {CurrentTrade.OrderType} submittted at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
+
+                    // Process trade immediately as it could have triggered within this minute.
+                    ProcessVirtualTrade();
+
+                    return;
+                }
+
+                if (Close[0] < CurrentTrade.Entry)
+                {
+                    PrintDebug($"[PLACE_TRADE_LIMIT] {CurrentTrade.Bias}, {CurrentTrade.Entry}, atr {atrCurrent}");
+                    CurrentTrade.PendingOrder = EnterShortLimit(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, SHORT_TRADE);
+                }
+
+                if (Close[0] > CurrentTrade.Entry)
+                {
+                    PrintDebug($"[PLACE_TRADE_STOP_MARKET] {CurrentTrade.Bias} at {CurrentTrade.Entry}, {Close[0]}, atr {atrCurrent}");
+                    CurrentTrade.PendingOrder = EnterShortStopMarket(0, true, CurrentTrade.PositionSize, CurrentTrade.Entry, SHORT_TRADE);
+                }
+            }
+
+            var signal = CurrentTrade.Bias == TradeBias.Short ? SHORT_TRADE : LONG_TRADE;
+            SetStopLoss(signal, CalculationMode.Price, CurrentTrade.StopLoss, false);
+            PrintDebug($"[STOP_LOSS] {CurrentTrade.StopLoss}");
+            SetProfitTarget(signal, CalculationMode.Price, CurrentTrade.TakeProfit);
+            //}
+            //    catch (Exception ex)
+            //    {
+            //        Print(ex);
         }
 
         private void CalculateTakeProfitBasedOnMaxDailyProfit()

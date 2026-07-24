@@ -93,6 +93,51 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         internal Dictionary<int, bool> DataSetValidation { get; set; }
 
+        #region OnStateChange
+
+        internal void OnDataLoadedBase(string algoName)
+        {
+            FractalManager = new FractalManager(this);
+
+            if (!ImportTickAndCvdEnabled)
+            {
+                OrderFlowCVDIndicator = OrderFlowCumulativeDelta(CumulativeDeltaType.BidAsk, CumulativeDeltaPeriod.Session, 1);
+                CVDSeries = new Series<double>(this);
+                CVDEmaIndicator = EMA(CVDSeries, 20);
+            }
+
+            if (ImportTickAndCvdEnabled)
+            {
+                TickDataSeriesExport = [];
+
+                ImportCVDData("EMA", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_CVDEma_20260724.csv");
+                ImportCVDData("DeltaClose", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_CVDDeltaClose_20260724.csv");
+                ImportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_MNQ_Ticks_Data_20260724.bin");
+            }
+
+            if (ExportTickAndCVDFlag)
+                TickDataSeriesExport = [];
+        }
+
+        internal void OnTerminatedBase(string algoName)
+        {
+            if (ExportTradeLogsEnabled)
+            {
+                ExportTradeLogs(
+                    "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD,CVD_EMA,CVD_EMA_Alignment,Atr",
+                    $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_{DateTime.Now:yyyyMMdd}.csv");
+            }
+
+            if (ExportTickAndCVDFlag)
+            {
+                ExportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_MNQ_Ticks_Data_{DateTime.Now:yyyyMMdd}.bin");
+                ExportCVD(CvdEmaExport, $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_CVDEma_{DateTime.Now:yyyyMMdd}.csv");
+                ExportCVD(CvdDeltaCloseExport, $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_CVDDeltaClose_{DateTime.Now:yyyyMMdd}.csv");
+            }
+        }
+
+        #endregion
+
         #region Constants
 
         public string LONG_TRADE = "long";
@@ -210,51 +255,23 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             }
         }
 
-        internal void BasePnlChecks()
+        internal bool CheckDailyPnlLimits()
         {
             if (DailyMaxProfit != 0 && (DayPnL) >= DailyMaxProfit)
             {
                 TradingHalted = true;
                 PrintInfo($"[TRADING_HALTED] Max Profit reached {DayPnL}");
-                return;
+                return false;
             }
 
             if (DailyMaxLoss != 0 && (DayPnL) <= DailyMaxLoss)
             {
                 TradingHalted = true;
                 PrintInfo($"[TRADING_HALTED] Max Loss reached {DayPnL}");
-                return;
+                return false;
             }
-        }
 
-        internal void BasePnlChecksTickLevel(double price)
-        {
-            if (DailyMaxProfit != 0)
-            {
-                var contractTickValue = Instrument.MasterInstrument.PointValue * CurrentTrade.PositionSize;
-
-                if (CurrentTrade.Bias == TradeBias.Short)
-                {
-                    var tradePnl = (CurrentTrade.Entry - price) * contractTickValue;
-                    //PrintDebug($"{tradePnl + DayPnL}");
-                    if (tradePnl + DayPnL > DailyMaxProfit)
-                    {
-                        ExitShort();
-                        PrintInfo($"[MAX_PROFIT_THRESHOLD_SHORT] Day Pnl {DayPnL}");
-                    }
-                }
-
-                if (CurrentTrade.Bias == TradeBias.Long)
-                {
-                    var tradePnl = (price - CurrentTrade.Entry) * contractTickValue;
-                    //PrintDebug($"{tradePnl + DayPnL}");
-                    if (tradePnl + DayPnL > DailyMaxProfit)
-                    {
-                        ExitLong();
-                        PrintInfo($"[MAX_PROFIT_THRESHOLD_LONG] Day Pnl {DayPnL}");
-                    }
-                }
-            }
+            return true;
         }
 
         #endregion
@@ -477,14 +494,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             return TimeZoneInfo.ConvertTime(Time[0], TokyoZone);
         }
 
-        public void BaseCandleVolatilityChecks()
+        public bool CheckCandleVolatility()
         {
             if (CandleBodyRange(0) > 300)
             {
                 TradingHalted = true;
                 PrintInfo($"Trading halted as last candle was {CandleBodyRange(0)} points.");
-                return;
+                return false;
             }
+
+            return true;
         }
 
         public void BreakEvenTrade()
