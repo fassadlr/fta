@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using NinjaTrader.Cbi;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
@@ -144,7 +145,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (tickPrice >= CurrentTrade.StopLoss)
                     DayPnLVirtual -= (CurrentTrade.StopLoss - CurrentTrade.Entry) * contractTickValue;
 
-                PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} closed at {tickPrice} Virtual Day Pnl {DayPnLVirtual}");
+                PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} closed at {tickPrice} Virtual Day Pnl {Math.Round(DayPnLVirtual)}");
             }
 
             if (CurrentTrade.Bias == TradeBias.Long &&
@@ -161,7 +162,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (tickPrice <= CurrentTrade.StopLoss)
                     DayPnLVirtual -= (CurrentTrade.Entry - CurrentTrade.StopLoss) * contractTickValue;
 
-                PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} closed at {tickPrice} Virtual Day Pnl {DayPnLVirtual}");
+                PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} closed at {tickPrice} Virtual Day Pnl {Math.Round(DayPnLVirtual)}");
             }
         }
 

@@ -32,21 +32,21 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Algo PO3 Asia v7.4";
+                Name = "Asia Alpha v7.4";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
                 ConnectionLossHandling = ConnectionLossHandling.KeepRunning;
 
                 PO3 = 81;
-                Risk = 200;             // 250
+                Risk = 200;
 
-                EdgeMultiplier = 1.4;   // 1.25
+                EdgeMultiplier = 1.35;
                 SkipMonths = "0";
                 StopGrace = 10;
 
-                DailyMaxLoss = -600;    // -800
-                DailyMaxProfit = 800;   // 1000
+                DailyMaxLoss = -600;
+                DailyMaxProfit = 800;
 
                 // Tokyo Time
                 SessionEndHour = 12;
@@ -91,9 +91,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 {
                     TickDataSeriesExport = [];
 
-                    ImportCVDData("EMA", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\AlgoPO3_Asia_CVDEma_20260723.csv");
-                    ImportCVDData("DeltaClose", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\AlgoPO3_Asia_CVDDeltaClose_20260723.csv");
-                    ImportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\MNQ_Ticks_Data_20260723.bin");
+                    ImportCVDData("EMA", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\AlgoPO3_Asia_CVDEma_20260724.csv");
+                    ImportCVDData("DeltaClose", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\AlgoPO3_Asia_CVDDeltaClose_20260724.csv");
+                    ImportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\MNQ_Ticks_Data_20260724.bin");
                 }
 
                 if (ExportTickAndCVDFlag)
@@ -536,6 +536,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     if (CurrentTrade.Virtual)
                     {
                         PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} {CurrentTrade.OrderType} submittted at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
+
+                        // Process trade immediately as it could have triggered within this minute.
+                        ProcessVirtualTrade();
+
                         return;
                     }
 
@@ -557,6 +561,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     if (CurrentTrade.Virtual)
                     {
                         PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} {CurrentTrade.OrderType} submittted at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
+
+                        // Process trade immediately as it could have triggered within this minute.
+                        ProcessVirtualTrade();
+
                         return;
                     }
 

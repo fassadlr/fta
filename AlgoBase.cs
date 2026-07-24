@@ -212,17 +212,17 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         internal void BasePnlChecks()
         {
-            if (DailyMaxProfit != 0 && (DayPnL + DayPnLVirtual) >= DailyMaxProfit)
+            if (DailyMaxProfit != 0 && (DayPnL) >= DailyMaxProfit)
             {
                 TradingHalted = true;
-                PrintInfo($"[TRADING_HALTED] Max Profit reached {DayPnL + DayPnLVirtual}");
+                PrintInfo($"[TRADING_HALTED] Max Profit reached {DayPnL}");
                 return;
             }
 
-            if (DailyMaxLoss != 0 && (DayPnL + DayPnLVirtual) <= DailyMaxLoss)
+            if (DailyMaxLoss != 0 && (DayPnL) <= DailyMaxLoss)
             {
                 TradingHalted = true;
-                PrintInfo($"[TRADING_HALTED] Max Loss reached {DayPnL + DayPnLVirtual}");
+                PrintInfo($"[TRADING_HALTED] Max Loss reached {DayPnL}");
                 return;
             }
         }
