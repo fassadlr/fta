@@ -322,21 +322,21 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     return;
                 }
 
-                //var CVD_EMA_DistanceCheck =
-                //    (CurrentTrade.CVD_EMA_Distance >= 50 && CurrentTrade.CVD_EMA_Distance < 150) ||
-                //    (CurrentTrade.CVD_EMA_Distance >= 200 && CurrentTrade.CVD_EMA_Distance < 800);
+                var CVD_EMA_DistanceCheck =
+                    (CurrentTrade.CVD_EMA_Distance >= 50 && CurrentTrade.CVD_EMA_Distance < 150) ||
+                    (CurrentTrade.CVD_EMA_Distance >= 200 && CurrentTrade.CVD_EMA_Distance < 800);
 
-                //if (!CVD_EMA_DistanceCheck)
-                //{
-                //    PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
-                //    CurrentTrade.Virtual = true;
-                //    CurrentTrade.Entry = Close[0];
+                if (!CVD_EMA_DistanceCheck)
+                {
+                    PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
+                    CurrentTrade.Virtual = true;
+                    CurrentTrade.Entry = Close[0];
 
-                //    if (ImportTickAndCvdEnabled)
-                //    {
-                //        CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
-                //    }
-                //}
+                    if (ImportTickAndCvdEnabled)
+                    {
+                        CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
+                    }
+                }
             }
 
             if (CurrentTrade.Bias == TradeBias.Short)
@@ -347,21 +347,21 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     return;
                 }
 
-                //var CVD_EMA_DistanceCheck =
-                //    (CurrentTrade.CVD_EMA_Distance >= 150 && CurrentTrade.CVD_EMA_Distance < 200) ||
-                //    (CurrentTrade.CVD_EMA_Distance >= 400 && CurrentTrade.CVD_EMA_Distance < 600);
+                var CVD_EMA_DistanceCheck =
+                    (CurrentTrade.CVD_EMA_Distance >= 150 && CurrentTrade.CVD_EMA_Distance < 200) ||
+                    (CurrentTrade.CVD_EMA_Distance >= 400 && CurrentTrade.CVD_EMA_Distance < 600);
 
-                //if (!CVD_EMA_DistanceCheck)
-                //{
-                //    PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
-                //    CurrentTrade.Virtual = true;
-                //    CurrentTrade.Entry = Close[0];
+                if (!CVD_EMA_DistanceCheck)
+                {
+                    PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
+                    CurrentTrade.Virtual = true;
+                    CurrentTrade.Entry = Close[0];
 
-                //    if (ImportTickAndCvdEnabled)
-                //    {
-                //        CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
-                //    }
-                //}
+                    if (ImportTickAndCvdEnabled)
+                    {
+                        CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
+                    }
+                }
             }
 
             /* ----- PLACE THE TRADE ----- */
@@ -424,11 +424,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             var positionSize = CalculatePositionSize(stopDistance, risk);
 
-            //if (CurrentTrade.Bias == TradeBias.Long && CurrentTrade.CVD_EMA_Distance >= 200 && CurrentTrade.CVD_EMA_Distance < 400)
-            //    positionSize = (int)(positionSize * EdgeMultiplier);
+            if (CurrentTrade.Bias == TradeBias.Long && CurrentTrade.CVD_EMA_Distance >= 200 && CurrentTrade.CVD_EMA_Distance < 400)
+                positionSize = (int)(positionSize * EdgeMultiplier);
 
-            //if (CurrentTrade.Bias == TradeBias.Short && CurrentTrade.CVD_EMA_Distance >= 400 && CurrentTrade.CVD_EMA_Distance < 600)
-            //    positionSize = (int)(positionSize * EdgeMultiplier);
+            if (CurrentTrade.Bias == TradeBias.Short && CurrentTrade.CVD_EMA_Distance >= 400 && CurrentTrade.CVD_EMA_Distance < 600)
+                positionSize = (int)(positionSize * EdgeMultiplier);
 
             return positionSize;
         }
