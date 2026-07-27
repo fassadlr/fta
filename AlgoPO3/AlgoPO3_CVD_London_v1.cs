@@ -324,7 +324,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 var CVD_EMA_DistanceCheck =
                     (CurrentTrade.CVD_EMA_Distance >= 50 && CurrentTrade.CVD_EMA_Distance < 150) ||
-                    (CurrentTrade.CVD_EMA_Distance >= 200 && CurrentTrade.CVD_EMA_Distance < 800);
+                    (CurrentTrade.CVD_EMA_Distance >= 200 && CurrentTrade.CVD_EMA_Distance < 500) ||
+                    (CurrentTrade.CVD_EMA_Distance >= 600 && CurrentTrade.CVD_EMA_Distance < 900);
 
                 if (!CVD_EMA_DistanceCheck)
                 {
@@ -348,8 +349,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 }
 
                 var CVD_EMA_DistanceCheck =
-                    (CurrentTrade.CVD_EMA_Distance >= 150 && CurrentTrade.CVD_EMA_Distance < 200) ||
-                    (CurrentTrade.CVD_EMA_Distance >= 400 && CurrentTrade.CVD_EMA_Distance < 600);
+                    (CurrentTrade.CVD_EMA_Distance >= 0 && CurrentTrade.CVD_EMA_Distance < 100) ||
+                    (CurrentTrade.CVD_EMA_Distance >= 150 && CurrentTrade.CVD_EMA_Distance < 300) ||
+                    (CurrentTrade.CVD_EMA_Distance >= 500 && CurrentTrade.CVD_EMA_Distance < 600) ||
+                    (CurrentTrade.CVD_EMA_Distance >= 700 && CurrentTrade.CVD_EMA_Distance < 800);
 
                 if (!CVD_EMA_DistanceCheck)
                 {
