@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.IO;
@@ -110,9 +110,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             {
                 TickDataSeriesExport = [];
 
-                ImportCVDData("EMA", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_CVDEma_20260724.csv");
-                ImportCVDData("DeltaClose", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_CVDDeltaClose_20260724.csv");
-                ImportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_MNQ_Ticks_Data_20260724.bin");
+                ImportCVDData("EMA", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_CVDEma_20260727.csv");
+                ImportCVDData("DeltaClose", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_CVDDeltaClose_20260727.csv");
+                ImportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_MNQ_Ticks_Data_20260727.bin");
             }
 
             if (ExportTickAndCVDFlag)
