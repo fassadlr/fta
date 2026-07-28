@@ -24,7 +24,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Asia CVD v1.4";
+                Name = "Asia CVD v1.5";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -38,7 +38,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 DailyMaxLoss = -500;
                 DailyMaxProfit = 1400;
 
-                EdgeMultiplier = 1.4;
+                EdgeMultiplier = 1.3;
 
                 // Tokyo Time
                 SessionEndHour = 11;
@@ -318,6 +318,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 {
                     PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
                     CurrentTrade.Virtual = true;
+                    CurrentTrade.VirtualOpen = true;
+
                     CurrentTrade.Entry = Close[0];
 
                     if (ImportTickAndCvdEnabled)
@@ -343,8 +345,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (!CVD_EMA_DistanceCheck)
                 {
                     PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
-                    CurrentTrade.Virtual = true;
                     CurrentTrade.Entry = Close[0];
+
+                    CurrentTrade.Virtual = true;
+                    CurrentTrade.VirtualOpen = true;
 
                     if (ImportTickAndCvdEnabled)
                     {
@@ -359,11 +363,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (CurrentTrade.Virtual)
             {
-                PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} {CurrentTrade.OrderType} submittted at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
-
-                // Process trade immediately as it could have triggered within this minute.
-                ProcessVirtualTrade();
-
+                PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} triggered at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
                 return;
             }
 
@@ -379,7 +379,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 }
 
                 EnterLong(0, CurrentTrade.PositionSize, LONG_TRADE);
-                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} stop {CurrentTrade.StopLoss}");
+                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType}, stop {CurrentTrade.StopLoss}");
 
                 SetStopLoss(LONG_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, false);
                 SetProfitTarget(LONG_TRADE, CalculationMode.Price, CurrentTrade.TakeProfit);
@@ -399,7 +399,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 }
 
                 EnterShort(0, CurrentTrade.PositionSize, SHORT_TRADE);
-                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} stop {CurrentTrade.StopLoss}");
+                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType}, stop {CurrentTrade.StopLoss}");
 
                 SetStopLoss(SHORT_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, false);
                 SetProfitTarget(SHORT_TRADE, CalculationMode.Price, CurrentTrade.TakeProfit);
@@ -461,46 +461,50 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private double CalculateStopLoss()
         {
-            var candidates = new List<double>();
+            var candidates = new List<(string, double)>();
 
             if (TradeBias == TradeBias.Short)
             {
+                if (ImbalanceFormed(TradeBias.Short, out double imbalanceStart))
+                    if (imbalanceStart > CurrentRange.ExtHigh)
+                        return imbalanceStart;
+
                 if (FractalManager.Fractals.TryGetValue((1, FractalType.HighThreeBar), out var threeBarFractal))
-                    if (threeBarFractal.Price > CurrentRange.ExtHigh) candidates.Add(threeBarFractal.Price);
+                    if (threeBarFractal.Price > CurrentRange.ExtHigh) candidates.Add(("3 Bar Fractal", threeBarFractal.Price));
 
                 if (FractalManager.Fractals.TryGetValue((1, FractalType.HighFiveBar), out var fiveBarFractal))
-                    if (fiveBarFractal.Price > CurrentRange.ExtHigh) candidates.Add(fiveBarFractal.Price);
+                    if (fiveBarFractal.Price > CurrentRange.ExtHigh) candidates.Add(("5 Bar Fractal", fiveBarFractal.Price));
 
                 if (High[0] > Math.Round(CurrentRange.ExtHigh))
-                    candidates.Add(High[0]);
+                    candidates.Add(("High Above Ext", High[0]));
 
-                if (ImbalanceFormed(TradeBias.Short, out double imbalanceStart))
-                    if (imbalanceStart > CurrentRange.ExtHigh) candidates.Add(imbalanceStart);
+                candidates.ForEach(x => PrintDebug($"{x}"));
 
                 // which one is the closest to the ext high 
                 if (candidates.Any())
-                    return candidates.Min();
+                    return candidates.Select(c => c.Item2).Min();
 
                 return CurrentRange.ExtLow;
             }
 
             if (TradeBias == TradeBias.Long)
             {
+                if (ImbalanceFormed(TradeBias.Long, out double imbalanceStart))
+                    if (imbalanceStart < CurrentRange.ExtLow)
+                        return imbalanceStart;
+
                 if (FractalManager.Fractals.TryGetValue((1, FractalType.LowThreeBar), out var threeBarFractal))
-                    if (threeBarFractal.Price < CurrentRange.ExtLow) candidates.Add(threeBarFractal.Price);
+                    if (threeBarFractal.Price < CurrentRange.ExtLow) candidates.Add(("3 Bar Fractal", threeBarFractal.Price));
 
                 if (FractalManager.Fractals.TryGetValue((1, FractalType.LowFiveBar), out var fiveBarFractal))
-                    if (fiveBarFractal.Price < CurrentRange.ExtLow) candidates.Add(fiveBarFractal.Price);
+                    if (fiveBarFractal.Price < CurrentRange.ExtLow) candidates.Add(("5 Bar Fractal", fiveBarFractal.Price));
 
                 if (Low[0] < Math.Round(CurrentRange.ExtLow))
-                    candidates.Add(Low[0]);
-
-                if (ImbalanceFormed(TradeBias.Long, out double imbalanceStart))
-                    if (imbalanceStart < CurrentRange.ExtLow) candidates.Add(imbalanceStart);
+                    candidates.Add(("Low Below Ext", Low[0]));
 
                 // which one is the closest to the ext low
                 if (candidates.Any())
-                    return candidates.Max();
+                    return candidates.Select(x => x.Item2).Max();
 
                 return CurrentRange.ExtLow;
             }
