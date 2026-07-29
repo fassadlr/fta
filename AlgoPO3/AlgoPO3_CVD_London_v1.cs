@@ -330,13 +330,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (!CVD_EMA_DistanceCheck)
                 {
                     PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
-                    CurrentTrade.Virtual = true;
                     CurrentTrade.Entry = Close[0];
+
+                    CurrentTrade.Virtual = true;
+                    CurrentTrade.VirtualOpen = true;
 
                     if (ImportTickAndCvdEnabled)
                     {
                         CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
                     }
+
                 }
             }
 
@@ -357,13 +360,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (!CVD_EMA_DistanceCheck)
                 {
                     PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
-                    CurrentTrade.Virtual = true;
                     CurrentTrade.Entry = Close[0];
+
+                    CurrentTrade.Virtual = true;
+                    CurrentTrade.VirtualOpen = true;
 
                     if (ImportTickAndCvdEnabled)
                     {
                         CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
                     }
+
                 }
             }
 
@@ -373,10 +379,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (CurrentTrade.Virtual)
             {
                 PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} {CurrentTrade.OrderType} submittted at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
-
-                // Process trade immediately as it could have triggered within this minute.
-                ProcessVirtualTrade();
-
                 return;
             }
 
