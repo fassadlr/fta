@@ -275,7 +275,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 CurrentTrade = new TradeDetails()
                 {
                     Bias = TradeBias.Short,
-                    StopLoss = CalculateStopLoss(),
+                    StopLoss = CalculateStopLossForCVDAlgos(),
                     TakeProfit = CurrentRange.Eq,
                     BreakEvenThreshold = CurrentRange.BR3,
                 };
@@ -294,7 +294,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 CurrentTrade = new TradeDetails()
                 {
                     Bias = TradeBias.Long,
-                    StopLoss = CalculateStopLoss(),
+                    StopLoss = CalculateStopLossForCVDAlgos(),
                     TakeProfit = CurrentRange.Eq,
                     BreakEvenThreshold = CurrentRange.BR2,
                 };
@@ -479,55 +479,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             PrintTrade(tradeCSV);
 
             UpdateCVDTradeType(trade.ProfitCurrency > 0);
-        }
-
-        private double CalculateStopLoss()
-        {
-            var candidates = new List<double>();
-
-            if (TradeBias == TradeBias.Short)
-            {
-                if (FractalManager.Fractals.TryGetValue((1, FractalType.HighThreeBar), out var threeBarFractal))
-                    if (threeBarFractal.Price > CurrentRange.ExtHigh) candidates.Add(threeBarFractal.Price);
-
-                if (FractalManager.Fractals.TryGetValue((1, FractalType.HighFiveBar), out var fiveBarFractal))
-                    if (fiveBarFractal.Price > CurrentRange.ExtHigh) candidates.Add(fiveBarFractal.Price);
-
-                if (High[0] > Math.Round(CurrentRange.ExtHigh))
-                    candidates.Add(High[0]);
-
-                if (ImbalanceFormed(TradeBias.Short, out double imbalanceStart))
-                    if (imbalanceStart > CurrentRange.ExtHigh) candidates.Add(imbalanceStart);
-
-                // which one is the closest to the ext high 
-                if (candidates.Any())
-                    return candidates.Min();
-
-                return CurrentRange.ExtLow;
-            }
-
-            if (TradeBias == TradeBias.Long)
-            {
-                if (FractalManager.Fractals.TryGetValue((1, FractalType.LowThreeBar), out var threeBarFractal))
-                    if (threeBarFractal.Price < CurrentRange.ExtLow) candidates.Add(threeBarFractal.Price);
-
-                if (FractalManager.Fractals.TryGetValue((1, FractalType.LowFiveBar), out var fiveBarFractal))
-                    if (fiveBarFractal.Price < CurrentRange.ExtLow) candidates.Add(fiveBarFractal.Price);
-
-                if (Low[0] < Math.Round(CurrentRange.ExtLow))
-                    candidates.Add(Low[0]);
-
-                if (ImbalanceFormed(TradeBias.Long, out double imbalanceStart))
-                    if (imbalanceStart < CurrentRange.ExtLow) candidates.Add(imbalanceStart);
-
-                // which one is the closest to the ext low
-                if (candidates.Any())
-                    return candidates.Max();
-
-                return CurrentRange.ExtLow;
-            }
-
-            return 0;
         }
 
         private void PerformCleanupBeforeSessionStart()

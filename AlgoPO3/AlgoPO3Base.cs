@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Linq;
 using NinjaTrader.Cbi;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
@@ -20,6 +21,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         [NinjaScriptProperty]
         [Display(Name = "Edge Multiplier", Order = 12, GroupName = "Parameters")]
         public double EdgeMultiplier { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Stop Grace", Order = 13, GroupName = "Parameters")]
+        public int StopGrace { get; set; }
 
         internal int[] BlockEndHoursParsed;
         internal int[] EdgeHoursParsed;
@@ -164,6 +169,65 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} closed at {tickPrice} Virtual Day Pnl {Math.Round(DayPnLVirtual)}");
             }
+        }
+
+        internal double CalculateStopLossForCVDAlgos()
+        {
+            var candidates = new List<(string, double)>();
+
+            if (TradeBias == TradeBias.Short)
+            {
+                if (ImbalanceFormed(TradeBias.Short, out double imbalanceStart))
+                    if (imbalanceStart > CurrentRange.ExtHigh)
+                    {
+                        PrintDebug($"[STOP_LOSS_IMB] {imbalanceStart} {CurrentRange.ExtHigh}");
+                        return imbalanceStart;
+                    }
+
+                if (FractalManager.Fractals.TryGetValue((1, FractalType.HighThreeBar), out var threeBarFractal))
+                    if (threeBarFractal.Price > CurrentRange.ExtHigh) candidates.Add(("3 Bar Fractal", threeBarFractal.Price));
+
+                if (FractalManager.Fractals.TryGetValue((1, FractalType.HighFiveBar), out var fiveBarFractal))
+                    if (fiveBarFractal.Price > CurrentRange.ExtHigh) candidates.Add(("5 Bar Fractal", fiveBarFractal.Price));
+
+                if (High[0] > Math.Round(CurrentRange.ExtHigh))
+                    candidates.Add(("High Above Ext", High[0]));
+
+                candidates.ForEach(x => PrintDebug($"{x}"));
+
+                // which one is the closest to the ext high 
+                if (candidates.Any())
+                    return candidates.Min(c => c.Item2);
+
+                return CurrentRange.ExtHigh + StopGrace;
+            }
+
+            if (TradeBias == TradeBias.Long)
+            {
+                if (ImbalanceFormed(TradeBias.Long, out double imbalanceStart))
+                    if (imbalanceStart < CurrentRange.ExtLow)
+                    {
+                        PrintDebug($"[STOP_LOSS_IMB] {imbalanceStart} {CurrentRange.ExtLow}");
+                        return imbalanceStart;
+                    }
+
+                if (FractalManager.Fractals.TryGetValue((1, FractalType.LowThreeBar), out var threeBarFractal))
+                    if (threeBarFractal.Price < CurrentRange.ExtLow) candidates.Add(("3 Bar Fractal", threeBarFractal.Price));
+
+                if (FractalManager.Fractals.TryGetValue((1, FractalType.LowFiveBar), out var fiveBarFractal))
+                    if (fiveBarFractal.Price < CurrentRange.ExtLow) candidates.Add(("5 Bar Fractal", fiveBarFractal.Price));
+
+                if (Low[0] < Math.Round(CurrentRange.ExtLow))
+                    candidates.Add(("Low Below Ext", Low[0]));
+
+                // which one is the closest to the ext low
+                if (candidates.Any())
+                    return candidates.Select(x => x.Item2).Max();
+
+                return CurrentRange.ExtLow - StopGrace;
+            }
+
+            return 0;
         }
 
         internal DealingRange CreateDealingRange()
