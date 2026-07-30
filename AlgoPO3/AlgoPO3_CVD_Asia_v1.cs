@@ -38,7 +38,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 DailyMaxLoss = -500;
                 DailyMaxProfit = 1400;
 
-                EdgeMultiplier = 1.3;
+                LongEdgeMultiplier = 1.2;
+                ShortEdgeMultiplier = 1.2;
 
                 // Tokyo Time
                 SessionEndHour = 11;
@@ -265,19 +266,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 CurrentTrade = new TradeDetails()
                 {
                     Bias = TradeBias.Short,
-                    StopLoss = CalculateStopLossForCVDAlgos(),
-                    TakeProfit = CurrentRange.Eq,
-                    BreakEvenThreshold = CurrentRange.BR3,
                 };
 
                 var rangePosition = CurrentRange.GetPositionInRange(RangeBias, Close[0]);
-                if (rangePosition == DealingRangePosition.Premium)
+                if (rangePosition == DealingRangePosition.Discount)
+                {
+                    CurrentTrade.StopLoss = CalculateStopLossForCVDAlgos();
+                    CurrentTrade.TakeProfit = CurrentRange.Eq;
+                }
+                else
                 {
                     CurrentTrade.StopLoss = CurrentRange.High;
                     CurrentTrade.TakeProfit = CurrentRange.Low;
-                    CurrentTrade.BreakEvenThreshold = CurrentRange.OBCE1;
-
-                    PrintDebug($"[RANGE_POSITION_PREMIUM] SL: {CurrentTrade.StopLoss}, TP: {CurrentTrade.TakeProfit}");
                 }
             }
 
@@ -286,20 +286,30 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 CurrentTrade = new TradeDetails()
                 {
                     Bias = TradeBias.Long,
-                    StopLoss = CalculateStopLossForCVDAlgos(),
-                    TakeProfit = CurrentRange.Eq,
-                    BreakEvenThreshold = CurrentRange.BR2,
                 };
 
                 var rangePosition = CurrentRange.GetPositionInRange(RangeBias, Close[0]);
-                if (rangePosition == DealingRangePosition.Premium)
+                if (rangePosition == DealingRangePosition.Discount)
+                {
+                    CurrentTrade.StopLoss = CalculateStopLossForCVDAlgos();
+                    CurrentTrade.TakeProfit = CurrentRange.Eq;
+                }
+                else
                 {
                     CurrentTrade.StopLoss = CurrentRange.Low;
                     CurrentTrade.TakeProfit = CurrentRange.High;
-                    CurrentTrade.BreakEvenThreshold = CurrentRange.OBCE2;
-
-                    PrintDebug($"[RANGE_POSITION_PREMIUM] SL: {CurrentTrade.StopLoss}, TP: {CurrentTrade.TakeProfit}");
                 }
+            }
+
+            if (CurrentTrade.StopLoss == 0)
+            {
+                PrintDebug($"[STOP_INVALID]");
+
+                CurrentTrade.Virtual = false;
+                CurrentTrade.VirtualOpen = false;
+                CurrentTrade.VirtualTickIndex = 0;
+
+                return;
             }
 
             /* ----- COLLECT ANY STATISTICS ----- */
@@ -317,12 +327,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     return;
                 }
 
+                //11am
                 var CVD_EMA_DistanceCheck =
-                    (CurrentTrade.CVD_EMA_Distance < 150) ||
-                    (CurrentTrade.CVD_EMA_Distance >= 200 && CurrentTrade.CVD_EMA_Distance < 300) ||
-                    (CurrentTrade.CVD_EMA_Distance >= 400 && CurrentTrade.CVD_EMA_Distance < 500) ||
+                    (CurrentTrade.CVD_EMA_Distance >= 100 && CurrentTrade.CVD_EMA_Distance < 500) ||
                     (CurrentTrade.CVD_EMA_Distance >= 600 && CurrentTrade.CVD_EMA_Distance < 800) ||
-                    (CurrentTrade.CVD_EMA_Distance >= 900 && CurrentTrade.CVD_EMA_Distance < 1000);
+                    (CurrentTrade.CVD_EMA_Distance >= 900 && CurrentTrade.CVD_EMA_Distance < 1000) ||
+                    (CurrentTrade.CVD_EMA_Distance >= 1100 && CurrentTrade.CVD_EMA_Distance < 1200);
 
                 if (!CVD_EMA_DistanceCheck)
                 {
@@ -348,8 +358,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 }
 
                 var CVD_EMA_DistanceCheck =
-                    (CurrentTrade.CVD_EMA_Distance >= 100 & CurrentTrade.CVD_EMA_Distance < 200) ||
-                    (CurrentTrade.CVD_EMA_Distance >= 300 & CurrentTrade.CVD_EMA_Distance < 1000) ||
+                    (CurrentTrade.CVD_EMA_Distance >= 100 & CurrentTrade.CVD_EMA_Distance < 700) ||
+                    (CurrentTrade.CVD_EMA_Distance >= 800 & CurrentTrade.CVD_EMA_Distance < 1000) ||
                     (CurrentTrade.CVD_EMA_Distance >= 1200 & CurrentTrade.CVD_EMA_Distance < 1600);
 
                 if (!CVD_EMA_DistanceCheck)
@@ -427,11 +437,17 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             var positionSize = CalculatePositionSize(stopDistance, risk);
 
-            if (CurrentTrade.Bias == TradeBias.Long && CurrentTrade.CVD_EMA_Distance >= 200 && CurrentTrade.CVD_EMA_Distance < 400)
-                positionSize = (int)(positionSize * EdgeMultiplier);
+            if (CurrentTrade.Bias == TradeBias.Long &&
+                (
+                    (CurrentTrade.CVD_EMA_Distance >= 200 && CurrentTrade.CVD_EMA_Distance < 300) ||
+                    (CurrentTrade.CVD_EMA_Distance >= 400 && CurrentTrade.CVD_EMA_Distance < 500) ||
+                    (CurrentTrade.CVD_EMA_Distance >= 700 && CurrentTrade.CVD_EMA_Distance < 800))
+                )
+                positionSize = (int)(positionSize * LongEdgeMultiplier);
 
-            if (CurrentTrade.Bias == TradeBias.Short && CurrentTrade.CVD_EMA_Distance >= 400 && CurrentTrade.CVD_EMA_Distance < 600)
-                positionSize = (int)(positionSize * EdgeMultiplier);
+            if (CurrentTrade.Bias == TradeBias.Short &&
+                CurrentTrade.CVD_EMA_Distance >= 400 && CurrentTrade.CVD_EMA_Distance < 600)
+                positionSize = (int)(positionSize * ShortEdgeMultiplier);
 
             return positionSize;
         }

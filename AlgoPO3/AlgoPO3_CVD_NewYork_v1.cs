@@ -46,7 +46,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 DailyMaxLoss = 0;
                 DailyMaxProfit = 1000;
 
-                EdgeMultiplier = 1;
+                LongEdgeMultiplier = 1;
+                ShortEdgeMultiplier = 1;
 
                 // New York Time
                 SessionStartHour = 9;
@@ -421,11 +422,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             var positionSize = CalculatePositionSize(stopDistance, risk);
 
-            if (CurrentTrade.Bias == TradeBias.Long && CurrentTrade.CVD_EMA_Distance >= 200 && CurrentTrade.CVD_EMA_Distance < 400)
-                positionSize = (int)(positionSize * EdgeMultiplier);
-
-            if (CurrentTrade.Bias == TradeBias.Short && CurrentTrade.CVD_EMA_Distance >= 400 && CurrentTrade.CVD_EMA_Distance < 600)
-                positionSize = (int)(positionSize * EdgeMultiplier);
+            // TODO
 
             return positionSize;
         }

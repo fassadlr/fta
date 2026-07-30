@@ -41,7 +41,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PO3 = 81;
                 Risk = 200;
 
-                EdgeMultiplier = 1.35;
+                LongEdgeMultiplier = 1.35;
+                ShortEdgeMultiplier = 1.35;
                 SkipMonths = "0";
                 StopGrace = 10;
 
@@ -700,7 +701,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (atrCurrent >= 10 && atrCurrent < 15 || atrCurrent >= 20 && atrCurrent < 25)
             {
-                CurrentTrade.PositionSize = (int)(CurrentTrade.PositionSize * EdgeMultiplier);
+                CurrentTrade.PositionSize = (int)(CurrentTrade.PositionSize * LongEdgeMultiplier);
                 PrintDebug($"[POSITION_ADJUSTED_EDGE] new position {CurrentTrade.PositionSize} atr {atrCurrent}");
             }
         }

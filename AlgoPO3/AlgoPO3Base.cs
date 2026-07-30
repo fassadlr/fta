@@ -19,12 +19,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         internal HashSet<int> SkipMonthsSet { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Edge Multiplier", Order = 12, GroupName = "Parameters")]
-        public double EdgeMultiplier { get; set; }
+        [Display(Name = "Long Edge X", Order = 12, GroupName = "Parameters")]
+        public double LongEdgeMultiplier { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Stop Grace", Order = 13, GroupName = "Parameters")]
-        public int StopGrace { get; set; }
+        [Display(Name = "Short Edge X", Order = 13, GroupName = "Parameters")]
+        public double ShortEdgeMultiplier { get; set; }
 
         internal int[] BlockEndHoursParsed;
         internal int[] EdgeHoursParsed;
@@ -199,7 +199,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (candidates.Any())
                     return candidates.Min(c => c.Item2);
 
-                return CurrentRange.ExtHigh + StopGrace;
+                //return CurrentRange.ExtLow;
             }
 
             if (TradeBias == TradeBias.Long)
@@ -224,7 +224,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (candidates.Any())
                     return candidates.Select(x => x.Item2).Max();
 
-                return CurrentRange.ExtLow - StopGrace;
+                //return CurrentRange.ExtLow;
             }
 
             return 0;
