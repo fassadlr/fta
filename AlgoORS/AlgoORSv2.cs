@@ -108,7 +108,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             }
             else if (State == State.Terminated)
             {
-                if (ExportTradeLogsEnabled)
+                if (ExportTradesCSVEnabled)
                     ExportTradeLogs("", $@"C:\GitHub\fassadlr\propfirmsimulator\TradeLog_AlgoORSv2{DateTime.Now:yyyyMMdd_HHmmss}.csv");
             }
         }
@@ -293,7 +293,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
             var newsForToday = GetNewsEventForToday();
             var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.VWAPDistance},{CurrentTrade.VWAPLocation},{newsForToday != null && newsForToday.IsCPI},{newsForToday != null && newsForToday.IsNFP}";
-            TradeLogs.Add(tradeCSV);
+            TradeCSVs.Add(tradeCSV);
             PrintTrade(tradeCSV);
 
             if (trade.ProfitCurrency >= 0)

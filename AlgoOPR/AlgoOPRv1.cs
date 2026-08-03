@@ -71,14 +71,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoOPR
             }
             else if (State == State.Terminated)
             {
-                if (TradeLogs.Count > 0 && ExportTradeLogsEnabled)
+                if (TradeCSVs.Count > 0 && ExportTradesCSVEnabled)
                 {
                     string path = $@"C:\Users\fassa\Documents\NinjaTrader Testing\OPRevTradeLog{DateTime.Now:yyyyMMdd_HHmmss}.csv";
 
                     using (StreamWriter sw = new(path))
                     {
                         sw.WriteLine("EntryTime,Bias,Result,Pnl,Quantity,OPDistance");
-                        foreach (string trade in TradeLogs)
+                        foreach (string trade in TradeCSVs)
                         {
                             sw.WriteLine(trade);
                         }
@@ -256,7 +256,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoOPR
 
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-            TradeLogs.Add($"{trade.Entry.Time},{CurrentTrade.Bias},{winLoss},{trade.ProfitCurrency},{CurrentTrade.Quantity},{CurrentTrade.OpeningPriceDistance}");
+            TradeCSVs.Add($"{trade.Entry.Time},{CurrentTrade.Bias},{winLoss},{trade.ProfitCurrency},{CurrentTrade.Quantity},{CurrentTrade.OpeningPriceDistance}");
             PrintTrade($"{trade.Entry.Time},{CurrentTrade.Bias},{winLoss},{trade.ProfitCurrency},{CurrentTrade.Quantity},{CurrentTrade.OpeningPriceDistance}");
 
             if (trade.ProfitCurrency < 0)

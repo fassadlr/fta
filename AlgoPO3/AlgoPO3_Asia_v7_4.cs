@@ -32,7 +32,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Asia Alpha v7.4";
+                Name = "Asia Alpha v7.5";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -141,8 +141,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 eventForToday.EventTime.Date == Time[0].Date &&
                 eventForToday.AllDay && Position.MarketPosition == MarketPosition.Flat)
             {
-                TradingHalted = true;
-                PrintInfo($"Trading skipped for day due to all day event {eventForToday.EventTime}");
+                HaltTrading($"[TRADING_HALTED] Trading skipped for day due to all day event {eventForToday.EventTime}");
                 return;
             }
 
@@ -154,8 +153,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (TokyoTime().Hour >= SessionEndHour && (Position.MarketPosition == MarketPosition.Flat || (CurrentTrade != null && CurrentTrade.Virtual && !CurrentTrade.VirtualOpen)))
             {
                 CancelLimitOrder();
-                PrintInfo($"Trading session ended.");
-                TradingHalted = true;
+                HaltTrading("[TRADING_HALTED] Session ended.");
                 return;
             }
 
@@ -649,7 +647,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
             var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.CVD},{CurrentTrade.CVD_EMA},{CurrentTrade.CVD_EMA_Alignment},{CurrentTrade.Atr}";
-            TradeLogs.Add(tradeCSV);
+            TradeCSVs.Add(tradeCSV);
 
             PrintTrade(tradeCSV);
 

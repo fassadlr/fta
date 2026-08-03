@@ -59,6 +59,51 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             CurrentTrade = null;
         }
 
+        internal void CreateCurrentTradeCVD()
+        {
+            if (RangeBias == RangeBias.Bearish && TradeBias == TradeBias.Short)
+            {
+                CurrentTrade = new TradeDetails()
+                {
+                    Bias = TradeBias.Short,
+                    Entry = Close[0] // This is set for virtual trade purposes but it is essentially a market order.
+                };
+
+                var rangePosition = CurrentRange.GetPositionInRange(RangeBias, Close[0]);
+                if (rangePosition == DealingRangePosition.Discount)
+                {
+                    CurrentTrade.StopLoss = CalculateStopLossForCVDAlgos();
+                    CurrentTrade.TakeProfit = CurrentRange.Eq;
+                }
+                else
+                {
+                    CurrentTrade.StopLoss = CurrentRange.High;
+                    CurrentTrade.TakeProfit = CurrentRange.Low;
+                }
+            }
+
+            if (RangeBias == RangeBias.Bullish && TradeBias == TradeBias.Long)
+            {
+                CurrentTrade = new TradeDetails()
+                {
+                    Bias = TradeBias.Long,
+                    Entry = Close[0] // This is set for virtual trade purposes but it is essentially a market order.
+                };
+
+                var rangePosition = CurrentRange.GetPositionInRange(RangeBias, Close[0]);
+                if (rangePosition == DealingRangePosition.Discount)
+                {
+                    CurrentTrade.StopLoss = CalculateStopLossForCVDAlgos();
+                    CurrentTrade.TakeProfit = CurrentRange.Eq;
+                }
+                else
+                {
+                    CurrentTrade.StopLoss = CurrentRange.Low;
+                    CurrentTrade.TakeProfit = CurrentRange.High;
+                }
+            }
+        }
+
         internal bool DetectAndCheckInvalidRange()
         {
             if (InvalidRange == null)

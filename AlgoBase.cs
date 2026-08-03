@@ -26,23 +26,27 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         public bool TradeLogEnabled { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Export Trade Logs", Order = 3, GroupName = "Parameters")]
-        public bool ExportTradeLogsEnabled { get; set; }
+        [Display(Name = "Export Trades CSV", Order = 3, GroupName = "Parameters")]
+        public bool ExportTradesCSVEnabled { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Import Tick and CVD", Order = 4, GroupName = "Parameters")]
+        [Display(Name = "Export Strategy Logs", Order = 4, GroupName = "Parameters")]
+        public bool ExportStrategyLogsEnabled { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Import Tick and CVD", Order = 5, GroupName = "Parameters")]
         public bool ImportTickAndCvdEnabled { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Export Tick and CVD", Order = 5, GroupName = "Parameters")]
+        [Display(Name = "Export Tick and CVD", Order = 6, GroupName = "Parameters")]
         public bool ExportTickAndCVDFlag { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Daily Max Loss", Order = 6, GroupName = "Parameters")]
+        [Display(Name = "Daily Max Loss", Order = 7, GroupName = "Parameters")]
         public double DailyMaxLoss { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Daily Max Profit", Order = 7, GroupName = "Parameters")]
+        [Display(Name = "Daily Max Profit", Order = 8, GroupName = "Parameters")]
         public double DailyMaxProfit { get; set; }
 
         internal double LastFractalHigh = 0;
@@ -70,9 +74,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         internal bool BullishBOSDetected = false;
         internal double BOSPrice = 0;
 
-        internal readonly List<string> TradeLogs = [];
-
-        internal bool TradingHalted { get; set; }
+        internal readonly List<string> TradeCSVs = [];
+        internal readonly List<string> StrategyLogs = [];
 
         internal TradeDetails CurrentTrade { get; set; }
 
@@ -93,6 +96,22 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         internal Dictionary<int, bool> DataSetValidation { get; set; }
 
+        #region Trading Halt
+
+        internal bool TradingHalted { get; set; }
+
+        internal void HaltTrading(string haltMessage)
+        {
+            PrintInfo(haltMessage);
+
+            TradingHalted = true;
+
+            if (ExportStrategyLogsEnabled)
+                ExportStrategyLogs(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "StrategyLogs", $@"{Account.Name}_{DateTime.Now:yyyyMMdd}.csv"));
+        }
+
+        #endregion
+
         #region OnStateChange
 
         internal void OnDataLoadedBase(string algoName)
@@ -110,9 +129,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             {
                 TickDataSeriesExport = [];
 
-                ImportCVDData("EMA", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_CVDEma_20260730.csv");
-                ImportCVDData("DeltaClose", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_CVDDeltaClose_20260730.csv");
-                ImportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_MNQ_Ticks_Data_20260730.bin");
+                ImportCVDData("EMA", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_CVDEma_20260803.csv");
+                ImportCVDData("DeltaClose", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_CVDDeltaClose_20260803.csv");
+                ImportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_MNQ_Ticks_Data_20260803.bin");
             }
 
             if (ExportTickAndCVDFlag)
@@ -121,10 +140,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         internal void OnTerminatedBase(string algoName)
         {
-            if (ExportTradeLogsEnabled)
+            if (ExportTradesCSVEnabled)
             {
                 ExportTradeLogs(
-                    "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD,CVD_EMA,CVD_EMA_Alignment,Atr",
+                    "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD,CVD_EMA,CVD_EMA_Alignment,CVD_TradeType,VWAP_Distance,Atr",
                     $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_{DateTime.Now:yyyyMMdd}.csv");
             }
 
@@ -259,15 +278,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         {
             if (DailyMaxProfit != 0 && (DayPnL) >= DailyMaxProfit)
             {
-                TradingHalted = true;
-                PrintInfo($"[TRADING_HALTED] Max Profit reached {DayPnL}");
+                HaltTrading($"[TRADING_HALTED] Max Profit reached {DayPnL}");
                 return false;
             }
 
             if (DailyMaxLoss != 0 && (DayPnL) <= DailyMaxLoss)
             {
-                TradingHalted = true;
-                PrintInfo($"[TRADING_HALTED] Max Loss reached {DayPnL}");
+                HaltTrading($"[TRADING_HALTED] Max Loss reached {DayPnL}");
                 return false;
             }
 
@@ -275,15 +292,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         }
 
         #endregion
-
-        internal int AdjustSessionEnd()
-        {
-            var adjustSessionEnd = AdjustedSessionEnd;
-            if (IsDSTOverlap())
-                adjustSessionEnd = AdjustedSessionEnd - 1;
-
-            return adjustSessionEnd;
-        }
 
         internal int AddMinutesToTime(int ninjaTime, int minutes)
         {
@@ -440,19 +448,29 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         public void PrintInfo(string toPrint)
         {
-            Print($"{Time[0]} {toPrint}");
+            Print($"{Account.Name}|{Time[0]} {toPrint}");
+            if (ExportStrategyLogsEnabled)
+                StrategyLogs.Add($"{Account.Name}|{Time[0]} {toPrint}");
         }
 
         public void PrintDebug(string toPrint)
         {
-            if (DebugLogEnabled)
-                Print($"{Time[0]} {toPrint}");
+            if (!DebugLogEnabled)
+                return;
+
+            Print($"{Account.Name}|{Time[0]} {toPrint}");
+            if (ExportStrategyLogsEnabled)
+                StrategyLogs.Add($"{Account.Name}|{Time[0]} {toPrint}");
         }
 
         public void PrintTrade(string toPrint)
         {
-            if (TradeLogEnabled)
-                Print($"{Time[0]} {toPrint}");
+            if (!TradeLogEnabled)
+                return;
+
+            Print($"{Account.Name}|{Time[0]} {toPrint}");
+            if (ExportStrategyLogsEnabled)
+                StrategyLogs.Add($"{Account.Name}|{Time[0]} {toPrint}");
         }
 
         public NewsEvent GetNewsEventForToday()
@@ -498,8 +516,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         {
             if (CandleBodyRange(0) > 300)
             {
-                TradingHalted = true;
-                PrintInfo($"Trading halted as last candle was {CandleBodyRange(0)} points.");
+                HaltTrading($"Trading halted as last candle was {CandleBodyRange(0)} points.");
                 return false;
             }
 
@@ -669,23 +686,41 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             return Math.Round((OrderFlowCVDIndicator.DeltaClose[0] - OrderFlowCVDIndicator.DeltaClose[lookback]) / lookback, 2);
         }
 
+        internal void ExportStrategyLogs(string fileName)
+        {
+            if (StrategyLogs.Count == 0)
+                return;
+
+            string path = fileName;
+
+            using (StreamWriter sw = new(path))
+            {
+                foreach (string trade in StrategyLogs)
+                {
+                    sw.WriteLine(trade);
+                }
+            }
+
+            Print($"Strategy log written to {path}");
+        }
+
         internal void ExportTradeLogs(string fields, string fileName)
         {
-            if (TradeLogs.Count > 0)
+            if (TradeCSVs.Count == 0)
+                return;
+
+            string path = fileName;
+
+            using (StreamWriter sw = new(path))
             {
-                string path = fileName;
-
-                using (StreamWriter sw = new(path))
+                sw.WriteLine(fields);
+                foreach (string trade in TradeCSVs)
                 {
-                    sw.WriteLine(fields);
-                    foreach (string trade in TradeLogs)
-                    {
-                        sw.WriteLine(trade);
-                    }
+                    sw.WriteLine(trade);
                 }
-
-                Print($"Trade log written to {path}");
             }
+
+            Print($"Trade CSV written to {path}");
         }
 
         internal void ExportCVD(List<(string TimeStamp, double Price)> cvdData, string fileName)
