@@ -129,9 +129,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             {
                 TickDataSeriesExport = [];
 
-                ImportCVDData("EMA", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_CVDEma_20260803.csv");
-                ImportCVDData("DeltaClose", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_CVDDeltaClose_20260803.csv");
-                ImportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_MNQ_Ticks_Data_20260803.bin");
+                ImportCVDData("EMA", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_CVDEma_{DateTime.Now:yyyyMMdd}.csv");
+                ImportCVDData("DeltaClose", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_CVDDeltaClose_{DateTime.Now:yyyyMMdd}.csv");
+                ImportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_MNQ_Ticks_Data_{DateTime.Now:yyyyMMdd}.bin");
             }
 
             if (ExportTickAndCVDFlag)
@@ -876,20 +876,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         internal void CollectStatistics()
         {
-            //CurrentTrade.DeltaMomentum = CalculateDeltaMomentum();
-
-            //var regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 5, 20);
-            //CurrentTrade.CvdSlopeFast = regressionResult.Slope;
-            //CurrentTrade.CvdRSquaredFast = regressionResult.RSquared;
-
-            //regressionResult = CalculateRegression(OrderFlowCVD.DeltaClose, 10, 20);
-            //CurrentTrade.CvdSlopeSlow = regressionResult.Slope;
-            //CurrentTrade.CvdRSquaredSlow = regressionResult.RSquared;
-            //CurrentTrade.CvdAcceleration = CurrentTrade.CvdSlopeSlow - CurrentTrade.CvdRSquaredFast;
-
-            //CurrentTrade.BarVolume = Volume[0];
-            //CurrentTrade.BarVolumeDelta = PreviousBarDelta;
-
             if (!ImportTickAndCvdEnabled)
             {
                 CurrentTrade.CVD = Math.Round(OrderFlowCVDIndicator.DeltaClose[0]);

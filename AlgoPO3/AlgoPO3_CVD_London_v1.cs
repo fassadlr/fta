@@ -117,7 +117,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
 
             /* ----- SESSION INITIALIZATION ----- */
-            if (LondonTime().TimeOfDay < new TimeSpan(7, 0, 0))
+            if (LondonTime().TimeOfDay < new TimeSpan(5, 0, 0))
                 return;
 
             if (!CheckDailyPnlLimits())
@@ -440,9 +440,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-            var tradeCSV = $"{CurrentTrade.EntryTime},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.CVD},{CurrentTrade.CVD_EMA},{CurrentTrade.CVD_EMA_Alignment},{CurrentTrade.CVD_TradeType},{CurrentTrade.VWAPDistance}";
+            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.CVD},{CurrentTrade.CVD_EMA},{CurrentTrade.CVD_EMA_Alignment},{CurrentTrade.CVD_TradeType},{CurrentTrade.VWAPDistance}";
             TradeCSVs.Add(tradeCSV);
-
             PrintTrade(tradeCSV);
 
             UpdateCVDTradeType(trade.ProfitCurrency > 0);

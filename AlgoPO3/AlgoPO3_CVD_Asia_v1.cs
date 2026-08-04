@@ -24,7 +24,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Asia CVD v1.7";
+                Name = "Asia CVD v1.8";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -287,7 +287,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     return;
                 }
 
-                //11am
                 var CVD_EMA_DistanceCheck =
                     (CurrentTrade.CVD_EMA_Distance >= 100 && CurrentTrade.CVD_EMA_Distance < 500) ||
                     (CurrentTrade.CVD_EMA_Distance >= 600 && CurrentTrade.CVD_EMA_Distance < 800) ||
@@ -299,8 +298,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
                     CurrentTrade.Virtual = true;
                     CurrentTrade.VirtualOpen = true;
-
-                    CurrentTrade.Entry = Close[0];
 
                     if (ImportTickAndCvdEnabled)
                     {
@@ -325,8 +322,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (!CVD_EMA_DistanceCheck)
                 {
                     PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
-                    CurrentTrade.Entry = Close[0];
-
                     CurrentTrade.Virtual = true;
                     CurrentTrade.VirtualOpen = true;
 
@@ -426,19 +421,39 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
         }
 
-        protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
+        protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
         {
-            if (marketPosition != MarketPosition.Flat)
+            // Ignore anything that isn't a filled execution
+            if (execution.Order.OrderState != OrderState.Filled)
                 return;
+
+            // Wait until the entire position is closed
+            if (Position.MarketPosition != MarketPosition.Flat)
+                return;
+
+            // By now all exit executions (including partial fills) have completed
+
+            BasePnlUpdates();
 
             if (SystemPerformance.AllTrades.Count == 0)
                 return;
 
-            BasePnlUpdates();
-
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
+
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-            var tradeCSV = $"{CurrentTrade.EntryTime},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.CVD},{CurrentTrade.CVD_EMA},{CurrentTrade.CVD_EMA_Alignment},{CurrentTrade.CVD_TradeType}";
+
+            var tradeCSV =
+                $"{trade.Entry.Time}," +
+                $"{CurrentTrade.Bias}," +
+                $"{CurrentTrade.OrderType}," +
+                $"{winLoss}," +
+                $"{trade.ProfitCurrency}," +
+                $"{trade.Quantity}," +
+                $"{CurrentTrade.CVD}," +
+                $"{CurrentTrade.CVD_EMA}," +
+                $"{CurrentTrade.CVD_EMA_Alignment}," +
+                $"{CurrentTrade.CVD_TradeType}";
+
             PrintTrade(tradeCSV);
             TradeCSVs.Add(tradeCSV);
 

@@ -70,7 +70,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         public int Quantity { get; internal set; }
         public double OpeningPriceDistance { get; internal set; }
         public double TradeMissedThreshold { get; internal set; }
-        public double Atr { get; internal set; }
+        public double ATR { get; internal set; }
         public double BreakEvenThreshold { get; internal set; }
 
         public double DeltaMomentum { get; internal set; }

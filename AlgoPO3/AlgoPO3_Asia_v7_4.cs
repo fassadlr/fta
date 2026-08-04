@@ -32,7 +32,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Asia Alpha v7.5";
+                Name = "Asia Alpha v7.6";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -339,7 +339,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             CurrentTrade = new TradeDetails()
             {
-                Atr = atrCurrent,
+                ATR = atrCurrent,
                 Bias = TradeBias,
             };
 
@@ -625,40 +625,62 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
         }
 
-        protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
+        protected override void OnExecutionUpdate(
+            Execution execution,
+            string executionId,
+            double price,
+            int quantity,
+            MarketPosition marketPosition,
+            string orderId,
+            DateTime time)
         {
+            // Entry filled
             if ((execution.Order.Name == LONG_TRADE || execution.Order.Name == SHORT_TRADE) &&
-                execution.Order.OrderState == OrderState.Filled && Position.MarketPosition != MarketPosition.Flat)
+                execution.Order.OrderState == OrderState.Filled &&
+                Position.MarketPosition != MarketPosition.Flat)
             {
                 CurrentTrade.EntryTime = new DateTime(time.Year, time.Month, time.Day, time.Hour, time.Minute, 0);
+                return;
             }
-        }
 
-        protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
-        {
-            if (marketPosition != MarketPosition.Flat)
-                return;
+            // Exit completed
+            if (execution.Order.OrderState == OrderState.Filled &&
+                Position.MarketPosition == MarketPosition.Flat)
+            {
+                BasePnlUpdates();
 
-            if (SystemPerformance.AllTrades.Count == 0)
-                return;
+                if (SystemPerformance.AllTrades.Count == 0)
+                    return;
 
-            BasePnlUpdates();
+                var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
 
-            var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
-            var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.CVD},{CurrentTrade.CVD_EMA},{CurrentTrade.CVD_EMA_Alignment},{CurrentTrade.Atr}";
-            TradeCSVs.Add(tradeCSV);
+                var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
 
-            PrintTrade(tradeCSV);
+                var tradeCSV =
+                    $"{trade.Entry.Time}," +
+                    $"{CurrentTrade.Bias}," +
+                    $"{CurrentTrade.OrderType}," +
+                    $"{winLoss}," +
+                    $"{trade.ProfitCurrency}," +
+                    $"{trade.Quantity}," +
+                    $"{CurrentTrade.CVD}," +
+                    $"{CurrentTrade.CVD_EMA}," +
+                    $"{CurrentTrade.CVD_EMA_Alignment}," +
+                    $"{CurrentTrade.VWAPDistance}," +
+                    $"{CurrentTrade.ATR}";
 
-            if (trade.ProfitCurrency >= 0)
-                ProcessSharedBorderRange(false);
-            else
-                ProcessSharedBorderRange(true);
+                TradeCSVs.Add(tradeCSV);
 
-            rangeBreakDetected = false;
+                PrintTrade(tradeCSV);
 
-            CurrentTrade.PendingOrder = null;
+                if (trade.ProfitCurrency >= 0)
+                    ProcessSharedBorderRange(false);
+                else
+                    ProcessSharedBorderRange(true);
+
+                rangeBreakDetected = false;
+                CurrentTrade.PendingOrder = null;
+            }
         }
 
         private void PerformCleanupBeforeSessionStart()
