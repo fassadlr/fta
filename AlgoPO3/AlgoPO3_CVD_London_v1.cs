@@ -31,7 +31,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "London CVD v1.2";
+                Name = "London CVD v1.3";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -117,7 +117,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
 
             /* ----- SESSION INITIALIZATION ----- */
-            if (LondonTime().TimeOfDay < new TimeSpan(5, 0, 0))
+            if (LondonTime().TimeOfDay < new TimeSpan(7, 0, 0))
                 return;
 
             if (!CheckDailyPnlLimits())
@@ -421,28 +421,39 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
         {
-            if ((execution.Order.Name == LONG_TRADE || execution.Order.Name == SHORT_TRADE) &&
-                execution.Order.OrderState == OrderState.Filled && Position.MarketPosition != MarketPosition.Flat)
-            {
-                CurrentTrade.EntryTime = new DateTime(time.Year, time.Month, time.Day, time.Hour, time.Minute, 0);
-            }
-        }
-
-        protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
-        {
-            if (marketPosition != MarketPosition.Flat)
+            // Ignore anything that isn't a filled execution
+            if (execution.Order.OrderState != OrderState.Filled)
                 return;
+
+            // Wait until the entire position is closed
+            if (Position.MarketPosition != MarketPosition.Flat)
+                return;
+
+            // By now all exit executions (including partial fills) have completed
+
+            BasePnlUpdates();
 
             if (SystemPerformance.AllTrades.Count == 0)
                 return;
 
-            BasePnlUpdates();
-
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
+
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-            var tradeCSV = $"{trade.Entry.Time},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.CVD},{CurrentTrade.CVD_EMA},{CurrentTrade.CVD_EMA_Alignment},{CurrentTrade.CVD_TradeType},{CurrentTrade.VWAPDistance}";
-            TradeCSVs.Add(tradeCSV);
+
+            var tradeCSV =
+                $"{trade.Entry.Time}," +
+                $"{CurrentTrade.Bias}," +
+                $"{CurrentTrade.OrderType}," +
+                $"{winLoss}," +
+                $"{trade.ProfitCurrency}," +
+                $"{trade.Quantity}," +
+                $"{CurrentTrade.CVD}," +
+                $"{CurrentTrade.CVD_EMA}," +
+                $"{CurrentTrade.CVD_EMA_Alignment}," +
+                $"{CurrentTrade.CVD_TradeType}";
+
             PrintTrade(tradeCSV);
+            TradeCSVs.Add(tradeCSV);
 
             UpdateCVDTradeType(trade.ProfitCurrency > 0);
         }
