@@ -24,7 +24,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Asia CVD v1.8";
+                Name = "Asia CVD v1.9";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -431,33 +431,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (Position.MarketPosition != MarketPosition.Flat)
                 return;
 
-            // By now all exit executions (including partial fills) have completed
+            var tradePnl = BasePnlUpdates();
 
-            BasePnlUpdates();
-
-            if (SystemPerformance.AllTrades.Count == 0)
-                return;
-
-            var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
-
-            var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-
-            var tradeCSV =
-                $"{trade.Entry.Time}," +
-                $"{CurrentTrade.Bias}," +
-                $"{CurrentTrade.OrderType}," +
-                $"{winLoss}," +
-                $"{trade.ProfitCurrency}," +
-                $"{trade.Quantity}," +
-                $"{CurrentTrade.CVD}," +
-                $"{CurrentTrade.CVD_EMA}," +
-                $"{CurrentTrade.CVD_EMA_Alignment}," +
-                $"{CurrentTrade.CVD_TradeType}";
-
-            PrintTrade(tradeCSV);
-            TradeCSVs.Add(tradeCSV);
-
-            UpdateCVDTradeType(trade.ProfitCurrency > 0);
+            UpdateCVDTradeType(tradePnl > 0);
         }
 
         private void PerformCleanupBeforeSessionStart()

@@ -26,6 +26,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         [Display(Name = "Short Edge X", Order = 13, GroupName = "Parameters")]
         public double ShortEdgeMultiplier { get; set; }
 
+        [NinjaScriptProperty]
+        [Display(Name = "Enable CVD EMA Dist Filtering ", Order = 14, GroupName = "Parameters")]
+        public bool CVDEMADistanceFilteringEnabled { get; set; }
+
         internal int[] BlockEndHoursParsed;
         internal int[] EdgeHoursParsed;
         internal int[] SkipHoursParsed;

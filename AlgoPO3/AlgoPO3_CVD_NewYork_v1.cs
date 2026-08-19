@@ -441,23 +441,19 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
         }
 
-        protected override void OnPositionUpdate(Position position, double averagePrice, int quantity, MarketPosition marketPosition)
+        protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
         {
-            if (marketPosition != MarketPosition.Flat)
+            // Ignore anything that isn't a filled execution
+            if (execution.Order.OrderState != OrderState.Filled)
                 return;
 
-            if (SystemPerformance.AllTrades.Count == 0)
+            // Wait until the entire position is closed
+            if (Position.MarketPosition != MarketPosition.Flat)
                 return;
 
-            BasePnlUpdates();
+            var tradePnl = BasePnlUpdates();
 
-            var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
-            var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-            var tradeCSV = $"{CurrentTrade.EntryTime},{CurrentTrade.Bias},{CurrentTrade.OrderType},{winLoss},{trade.ProfitCurrency},{trade.Quantity},{CurrentTrade.CVD},{CurrentTrade.CVD_EMA},{CurrentTrade.CVD_EMA_Alignment},{CurrentTrade.CVD_TradeType}";
-            PrintTrade(tradeCSV);
-            TradeCSVs.Add(tradeCSV);
-
-            UpdateCVDTradeType(trade.ProfitCurrency > 0);
+            UpdateCVDTradeType(tradePnl > 0);
         }
 
         private void PerformCleanupBeforeSessionStart()

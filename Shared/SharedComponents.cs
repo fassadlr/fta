@@ -67,7 +67,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
         public OrderType OrderType { get; set; }
         public double VWAPDistance { get; set; } = 0;
         public string VWAPLocation { get; internal set; }
-        public int Quantity { get; internal set; }
         public double OpeningPriceDistance { get; internal set; }
         public double TradeMissedThreshold { get; internal set; }
         public double ATR { get; internal set; }

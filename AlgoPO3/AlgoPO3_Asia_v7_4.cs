@@ -32,7 +32,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Asia Alpha v7.6";
+                Name = "Asia Alpha v7.7";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -625,14 +625,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
         }
 
-        protected override void OnExecutionUpdate(
-            Execution execution,
-            string executionId,
-            double price,
-            int quantity,
-            MarketPosition marketPosition,
-            string orderId,
-            DateTime time)
+        protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
         {
             // Entry filled
             if ((execution.Order.Name == LONG_TRADE || execution.Order.Name == SHORT_TRADE) &&
@@ -644,36 +637,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             // Exit completed
-            if (execution.Order.OrderState == OrderState.Filled &&
-                Position.MarketPosition == MarketPosition.Flat)
+            if (execution.Order.OrderState == OrderState.Filled && Position.MarketPosition == MarketPosition.Flat)
             {
-                BasePnlUpdates();
+                var tradePnl = BasePnlUpdates();
 
-                if (SystemPerformance.AllTrades.Count == 0)
-                    return;
-
-                var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
-
-                var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-
-                var tradeCSV =
-                    $"{trade.Entry.Time}," +
-                    $"{CurrentTrade.Bias}," +
-                    $"{CurrentTrade.OrderType}," +
-                    $"{winLoss}," +
-                    $"{trade.ProfitCurrency}," +
-                    $"{trade.Quantity}," +
-                    $"{CurrentTrade.CVD}," +
-                    $"{CurrentTrade.CVD_EMA}," +
-                    $"{CurrentTrade.CVD_EMA_Alignment}," +
-                    $"{CurrentTrade.VWAPDistance}," +
-                    $"{CurrentTrade.ATR}";
-
-                TradeCSVs.Add(tradeCSV);
-
-                PrintTrade(tradeCSV);
-
-                if (trade.ProfitCurrency >= 0)
+                if (tradePnl >= 0)
                     ProcessSharedBorderRange(false);
                 else
                     ProcessSharedBorderRange(true);

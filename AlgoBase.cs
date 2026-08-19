@@ -135,7 +135,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             }
 
             if (ExportTickAndCVDFlag)
+            {
                 TickDataSeriesExport = [];
+                OHLCDataSeriesExport = [];
+            }
         }
 
         internal void OnTerminatedBase(string algoName)
@@ -150,6 +153,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             if (ExportTickAndCVDFlag)
             {
                 ExportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_MNQ_Ticks_Data_{DateTime.Now:yyyyMMdd}.bin");
+                //ExportOHLCVData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_MNQ_1m_OHLC_Data_{DateTime.Now:yyyyMMdd}.csv");
                 ExportCVD(CvdEmaExport, $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_CVDEma_{DateTime.Now:yyyyMMdd}.csv");
                 ExportCVD(CvdDeltaCloseExport, $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_CVDDeltaClose_{DateTime.Now:yyyyMMdd}.csv");
             }
@@ -211,6 +215,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             Print($"{DateTime.Now} Loaded {TickDataSeriesImport.Length:N0} ticks.");
         }
 
+
         internal void ExportTickData(string fileName)
         {
             if (!TickDataSeriesExport.Any())
@@ -261,17 +266,93 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         #endregion
 
+        #region 1m OHLC Data
+
+        internal List<(string timestamp, double open, double high, double low, double close, long volume)> OHLCDataSeriesExport { get; set; }
+
+        internal void ExportOHLCVData(string fileName)
+        {
+            if (!OHLCDataSeriesExport.Any())
+                return;
+
+            string path = fileName;
+
+            using (StreamWriter sw = new(path))
+            {
+                foreach (var (timestamp, open, high, low, close, volume) in OHLCDataSeriesExport)
+                {
+                    sw.WriteLine($"{timestamp},{open},{high},{low},{close},{volume}");
+                }
+            }
+
+            foreach (var rollover in Bars.Instrument.MasterInstrument.RolloverCollection)
+            {
+                Print(
+                    $"{rollover.ContractMonth:MM-yy}," +
+                    $"{rollover.Date:yyyy-MM-dd}," +
+                    $"{rollover.Offset}"
+                );
+            }
+
+
+            //using var fs = new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.None);
+            //using var bw = new BinaryWriter(fs);
+
+            //foreach (var (timestamp, open, high, low, close, volume, contract) in OHLCDataSeriesExport)
+            //{
+            //    bw.Write(timestamp);
+            //    bw.Write(open);
+            //    bw.Write(high);
+            //    bw.Write(low);
+            //    bw.Write(close);
+            //    bw.Write(volume);
+            //    bw.Write(contract);
+            //}
+
+            Print($"OHLCV data written to {fileName}");
+        }
+
+        #endregion
+
+
         #region Base Pnl
 
-        internal void BasePnlUpdates()
+        internal double BasePnlUpdates()
         {
-            if (SystemPerformance.AllTrades.Count > LastTradeCount)
-            {
-                var lastTrade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
-                DayPnL += lastTrade.ProfitCurrency;
-                PrintInfo($"[PNL_UPDATE] {lastTrade.ProfitCurrency} DayPnL {DayPnL}");
-                LastTradeCount = SystemPerformance.AllTrades.Count;
-            }
+            var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
+
+            double tradePnl;
+
+            if (trade.ProfitCurrency >= 0)
+                tradePnl = Math.Abs(CurrentTrade.TakeProfit - CurrentTrade.Entry) * CurrentTrade.PositionSize * Instrument.MasterInstrument.PointValue;
+            else
+                tradePnl = -Math.Abs(CurrentTrade.Entry - CurrentTrade.StopLoss) * CurrentTrade.PositionSize * Instrument.MasterInstrument.PointValue;
+
+            tradePnl = Math.Round(tradePnl);
+
+            var winLoss = tradePnl >= 0 ? "Win" : "Loss";
+
+            var tradeCSV =
+                $"{trade.Entry.Time}," +
+                $"{CurrentTrade.Bias}," +
+                $"{CurrentTrade.OrderType}," +
+                $"{winLoss}," +
+                $"{tradePnl}," +
+                $"{CurrentTrade.PositionSize}," +
+                $"{CurrentTrade.CVD}," +
+                $"{CurrentTrade.CVD_EMA}," +
+                $"{CurrentTrade.CVD_EMA_Alignment}," +
+                $"{CurrentTrade.CVD_TradeType}";
+
+            TradeCSVs.Add(tradeCSV);
+
+            PrintTrade(tradeCSV);
+
+
+            DayPnL += tradePnl;
+            PrintInfo($"[PNL_UPDATE] {tradePnl} DayPnL {DayPnL}");
+
+            return tradePnl;
         }
 
         internal bool CheckDailyPnlLimits()

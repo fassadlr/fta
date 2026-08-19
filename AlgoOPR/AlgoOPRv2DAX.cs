@@ -220,7 +220,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoOPR
                     Entry = Position.AveragePrice,
                     StopLoss = stopPrice,
                     TakeProfit = tp,
-                    Quantity = positionSize,
+                    PositionSize = positionSize,
                     OpeningPriceDistance = sessionPriceLongTarget - Close[0],
                 };
             }
@@ -262,7 +262,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoOPR
                     Entry = Position.AveragePrice,
                     StopLoss = stopPrice,
                     TakeProfit = tp,
-                    Quantity = positionSize,
+                    PositionSize = positionSize,
                     OpeningPriceDistance = Close[0] - sessionPriceShortTarget,
                 };
             }
@@ -278,8 +278,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoOPR
 
             var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
             var winLoss = trade.ProfitCurrency >= 0 ? "Win" : "Loss";
-            TradeCSVs.Add($"{trade.Entry.Time},{CurrentTrade.Bias},{winLoss},{trade.ProfitCurrency},{CurrentTrade.Quantity},{CurrentTrade.OpeningPriceDistance}");
-            PrintTrade($"{trade.Entry.Time},{CurrentTrade.Bias},{winLoss},{trade.ProfitCurrency},{CurrentTrade.Quantity},{CurrentTrade.OpeningPriceDistance}");
+            TradeCSVs.Add($"{trade.Entry.Time},{CurrentTrade.Bias},{winLoss},{trade.ProfitCurrency},{CurrentTrade.PositionSize},{CurrentTrade.OpeningPriceDistance}");
+            PrintTrade($"{trade.Entry.Time},{CurrentTrade.Bias},{winLoss},{trade.ProfitCurrency},{CurrentTrade.PositionSize},{CurrentTrade.OpeningPriceDistance}");
 
             if (trade.ProfitCurrency < 0)
                 consecutiveLosses++;
