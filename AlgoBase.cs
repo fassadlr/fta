@@ -129,9 +129,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             {
                 TickDataSeriesExport = [];
 
-                ImportCVDData("EMA", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_CVDEma_{DateTime.Now:yyyyMMdd}.csv");
-                ImportCVDData("DeltaClose", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_CVDDeltaClose_{DateTime.Now:yyyyMMdd}.csv");
-                ImportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_MNQ_Ticks_Data_{DateTime.Now:yyyyMMdd}.bin");
+                ImportCVDData("EMA", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_{Instrument.FullName}_CVDEma_{DateTime.Now:yyyyMMdd}.csv");
+                ImportCVDData("DeltaClose", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_{Instrument.FullName}_CVDDeltaClose_{DateTime.Now:yyyyMMdd}.csv");
+                ImportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_{Instrument.FullName}_Ticks_Data_{DateTime.Now:yyyyMMdd}.bin");
             }
 
             if (ExportTickAndCVDFlag)
@@ -147,15 +147,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             {
                 ExportTradeLogs(
                     "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD,CVD_EMA,CVD_EMA_Alignment,CVD_TradeType,VWAP_Distance,Atr",
-                    $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_{DateTime.Now:yyyyMMdd}.csv");
+                    $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_{Instrument.FullName}_{DateTime.Now:yyyyMMdd}.csv");
             }
 
             if (ExportTickAndCVDFlag)
             {
-                ExportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_MNQ_Ticks_Data_{DateTime.Now:yyyyMMdd}.bin");
+                ExportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_{Instrument.FullName}_Ticks_Data_{DateTime.Now:yyyyMMdd}.bin");
                 //ExportOHLCVData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_MNQ_1m_OHLC_Data_{DateTime.Now:yyyyMMdd}.csv");
-                ExportCVD(CvdEmaExport, $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_CVDEma_{DateTime.Now:yyyyMMdd}.csv");
-                ExportCVD(CvdDeltaCloseExport, $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_CVDDeltaClose_{DateTime.Now:yyyyMMdd}.csv");
+                ExportCVD(CvdEmaExport, $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_{Instrument.FullName}_CVDEma_{DateTime.Now:yyyyMMdd}.csv");
+                ExportCVD(CvdDeltaCloseExport, $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_{Instrument.FullName}_CVDDeltaClose_{DateTime.Now:yyyyMMdd}.csv");
             }
         }
 
