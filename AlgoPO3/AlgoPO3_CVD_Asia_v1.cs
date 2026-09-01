@@ -24,7 +24,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Asia CVD v1.9";
+                Name = "Asia CVD v1.10";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -36,7 +36,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 SkipMonths = "0";
 
                 DailyMaxLoss = -500;
-                DailyMaxProfit = 1400;
+                DailyMaxProfit = 1100;
 
                 LongEdgeMultiplier = 1.2;
                 ShortEdgeMultiplier = 1.2;
@@ -322,7 +322,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (CVDEMADistanceFilteringEnabled)
                 {
                     var CVD_EMA_DistanceCheck =
-                        (CurrentTrade.CVD_EMA_Distance >= 100 & CurrentTrade.CVD_EMA_Distance < 700) ||
+                        (CurrentTrade.CVD_EMA_Distance >= 100 & CurrentTrade.CVD_EMA_Distance < 200) ||
+                        (CurrentTrade.CVD_EMA_Distance >= 250 & CurrentTrade.CVD_EMA_Distance < 300) ||
+                        (CurrentTrade.CVD_EMA_Distance >= 350 & CurrentTrade.CVD_EMA_Distance < 600) ||
                         (CurrentTrade.CVD_EMA_Distance >= 800 & CurrentTrade.CVD_EMA_Distance < 1000) ||
                         (CurrentTrade.CVD_EMA_Distance >= 1200 & CurrentTrade.CVD_EMA_Distance < 1600);
 

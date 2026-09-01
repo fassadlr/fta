@@ -423,15 +423,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     return;
                 }
 
-                var CVD_EMA_DistanceCheck = CurrentTrade.CVD_EMA_Distance < 1000;
-                if (!CVD_EMA_DistanceCheck)
+                if (CVDEMADistanceFilteringEnabled)
                 {
-                    PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
-                    CurrentTrade.Virtual = true;
-
-                    if (ImportTickAndCvdEnabled)
+                    var CVD_EMA_DistanceCheck = CurrentTrade.CVD_EMA_Distance < 1000;
+                    if (!CVD_EMA_DistanceCheck)
                     {
-                        CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
+                        PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
+                        CurrentTrade.Virtual = true;
+
+                        if (ImportTickAndCvdEnabled)
+                        {
+                            CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
+                        }
                     }
                 }
             }
@@ -445,19 +448,22 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     return;
                 }
 
-                var CVD_EMA_DistanceCheck =
-                    (CurrentTrade.CVD_EMA_Distance < 1000) ||
-                    (CurrentTrade.CVD_EMA_Distance >= 1200 & CurrentTrade.CVD_EMA_Distance < 1600) ||
-                    (CurrentTrade.CVD_EMA_Distance >= 1800);
-
-                if (!CVD_EMA_DistanceCheck)
+                if (CVDEMADistanceFilteringEnabled)
                 {
-                    PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
-                    CurrentTrade.Virtual = true;
+                    var CVD_EMA_DistanceCheck =
+                        (CurrentTrade.CVD_EMA_Distance < 1000) ||
+                        (CurrentTrade.CVD_EMA_Distance >= 1200 & CurrentTrade.CVD_EMA_Distance < 1600) ||
+                        (CurrentTrade.CVD_EMA_Distance >= 1800);
 
-                    if (ImportTickAndCvdEnabled)
+                    if (!CVD_EMA_DistanceCheck)
                     {
-                        CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
+                        PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
+                        CurrentTrade.Virtual = true;
+
+                        if (ImportTickAndCvdEnabled)
+                        {
+                            CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
+                        }
                     }
                 }
             }
