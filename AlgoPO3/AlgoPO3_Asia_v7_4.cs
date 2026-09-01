@@ -32,7 +32,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Asia Alpha v7.7";
+                Name = "Asia Alpha v7.8";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -425,7 +425,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 if (CVDEMADistanceFilteringEnabled)
                 {
-                    var CVD_EMA_DistanceCheck = CurrentTrade.CVD_EMA_Distance < 1000;
+                    var CVD_EMA_DistanceCheck =
+                        (CurrentTrade.CVD_EMA_Distance >= 0 & CurrentTrade.CVD_EMA_Distance < 500) ||
+                        (CurrentTrade.CVD_EMA_Distance >= 600 & CurrentTrade.CVD_EMA_Distance < 700) ||
+                        (CurrentTrade.CVD_EMA_Distance >= 800 & CurrentTrade.CVD_EMA_Distance < 1100);
+
                     if (!CVD_EMA_DistanceCheck)
                     {
                         PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
@@ -451,9 +455,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (CVDEMADistanceFilteringEnabled)
                 {
                     var CVD_EMA_DistanceCheck =
-                        (CurrentTrade.CVD_EMA_Distance < 1000) ||
-                        (CurrentTrade.CVD_EMA_Distance >= 1200 & CurrentTrade.CVD_EMA_Distance < 1600) ||
-                        (CurrentTrade.CVD_EMA_Distance >= 1800);
+                          (CurrentTrade.CVD_EMA_Distance >= 0 & CurrentTrade.CVD_EMA_Distance < 250) ||
+                          (CurrentTrade.CVD_EMA_Distance >= 350 & CurrentTrade.CVD_EMA_Distance < 1100) ||
+                          (CurrentTrade.CVD_EMA_Distance >= 1200 & CurrentTrade.CVD_EMA_Distance < 1500) ||
+                          (CurrentTrade.CVD_EMA_Distance >= 1800);
 
                     if (!CVD_EMA_DistanceCheck)
                     {
