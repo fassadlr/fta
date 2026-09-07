@@ -146,7 +146,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             if (ExportTradesCSVEnabled)
             {
                 ExportTradeLogs(
-                    "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD,CVD_EMA,CVD_EMA_Alignment,CVD_TradeType,VWAP_Distance,Atr",
+                    "EntryTime,ExitTime,Bias,OrderType,Result,Pnl,Quantity,CVD,CVD_EMA,CVD_EMA_Alignment,CVD_TradeType,VWAP_Distance,Atr",
                     $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_{Instrument.FullName}_{DateTime.Now:yyyyMMdd}.csv");
             }
 
@@ -214,7 +214,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             Print($"{DateTime.Now} Tick Data read from {fileName}.");
             Print($"{DateTime.Now} Loaded {TickDataSeriesImport.Length:N0} ticks.");
         }
-
 
         internal void ExportTickData(string fileName)
         {
@@ -334,6 +333,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
             var tradeCSV =
                 $"{trade.Entry.Time}," +
+                $"{trade.Exit.Time}," +
                 $"{CurrentTrade.Bias}," +
                 $"{CurrentTrade.OrderType}," +
                 $"{winLoss}," +
@@ -345,9 +345,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 $"{CurrentTrade.CVD_TradeType}";
 
             TradeCSVs.Add(tradeCSV);
-
             PrintTrade(tradeCSV);
-
 
             DayPnL += tradePnl;
             PrintInfo($"[PNL_UPDATE] {tradePnl} DayPnL {DayPnL}");

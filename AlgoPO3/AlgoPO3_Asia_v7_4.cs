@@ -39,15 +39,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 ConnectionLossHandling = ConnectionLossHandling.KeepRunning;
 
                 PO3 = 81;
-                Risk = 200;
+                Risk = 200; //$170
 
                 LongEdgeMultiplier = 1.35;
                 ShortEdgeMultiplier = 1.35;
                 SkipMonths = "0";
                 StopGrace = 10;
 
-                DailyMaxLoss = -600;
-                DailyMaxProfit = 800;
+                DailyMaxLoss = -600; // $300
+                DailyMaxProfit = 800; // $800
 
                 // Tokyo Time
                 SessionEndHour = 12;

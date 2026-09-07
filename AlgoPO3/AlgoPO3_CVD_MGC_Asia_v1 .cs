@@ -24,22 +24,22 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Asia CVD v1.9 (MGC)";
+                Name = "Asia CVD v1.10 (MGC)";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
                 ConnectionLossHandling = ConnectionLossHandling.KeepRunning;
 
                 PO3 = 27;
-                Risk = 250;
+                Risk = 250; // $220 for $1500 DD
 
                 SkipMonths = "0";
 
-                DailyMaxLoss = -400;
-                DailyMaxProfit = 1000;
+                DailyMaxLoss = -400; 
+                DailyMaxProfit = 1000; // for $1500 DD
 
-                LongEdgeMultiplier = 1.5;
-                ShortEdgeMultiplier = 1.4;
+                LongEdgeMultiplier = 1.4; // 1.3 for $1500 DD
+                ShortEdgeMultiplier = 1.4; // 1.3 for $1500 DD
 
                 CVDEMADistanceFilteringEnabled = true;
 
