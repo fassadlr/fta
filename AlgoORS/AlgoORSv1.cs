@@ -12,43 +12,43 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
     public class AlgoORSv1 : AlgoBase
     {
         [NinjaScriptProperty]
-        [Display(Name = "Risk", Order = 4, GroupName = "Parameters")]
+        [Display(Name = "Risk", Order = 10, GroupName = "Parameters")]
         public double Risk { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Session Start Time", Order = 5, GroupName = "Parameters")]
+        [Display(Name = "Session Start Time", Order = 11, GroupName = "Parameters")]
         public int SessionStartTime { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Session Start Time", Order = 6, GroupName = "Parameters")]
+        [Display(Name = "Session Start Time", Order = 12, GroupName = "Parameters")]
         public int SessionEndTime { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Session Market Open Time", Order = 5, GroupName = "Parameters")]
+        [Display(Name = "Session Market Open Time", Order = 13, GroupName = "Parameters")]
         public int SessionMarketOpen { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Stop Grace", Order = 7, GroupName = "Parameters")]
+        [Display(Name = "Stop Grace", Order = 14, GroupName = "Parameters")]
         public int StopGrace { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Max RR", Order = 8, GroupName = "Parameters")]
+        [Display(Name = "Max RR", Order = 15, GroupName = "Parameters")]
         public double MaxRR { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Max Trades", Order = 9, GroupName = "Parameters")]
+        [Display(Name = "Max Trades", Order = 16, GroupName = "Parameters")]
         public double MaxTrades { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Take Profit Multiplier", Order = 10, GroupName = "Parameters")]
+        [Display(Name = "Take Profit Multiplier", Order = 17, GroupName = "Parameters")]
         public double TPMultiplier { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Candle Body Percentage", Order = 11, GroupName = "Parameters")]
+        [Display(Name = "Candle Body Percentage", Order = 18, GroupName = "Parameters")]
         public double CandleBodyPercentage { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Entry Percentage", Order = 12, GroupName = "Parameters")]
+        [Display(Name = "Entry Percentage", Order = 19, GroupName = "Parameters")]
         public double EntryPercentage { get; set; }
 
         private bool tradingComplete;

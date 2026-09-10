@@ -375,7 +375,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 }
 
                 EnterLong(0, CurrentTrade.PositionSize, LONG_TRADE);
-                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} stop {CurrentTrade.StopLoss}");
+                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType} at {Close[0]}, stop {CurrentTrade.StopLoss}");
 
                 SetStopLoss(LONG_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, false);
                 SetProfitTarget(LONG_TRADE, CalculationMode.Price, CurrentTrade.TakeProfit);
@@ -395,7 +395,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 }
 
                 EnterShort(0, CurrentTrade.PositionSize, SHORT_TRADE);
-                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} stop {CurrentTrade.StopLoss}");
+                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType} at {Close[0]}, stop {CurrentTrade.StopLoss}");
 
                 SetStopLoss(SHORT_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, false);
                 SetProfitTarget(SHORT_TRADE, CalculationMode.Price, CurrentTrade.TakeProfit);
