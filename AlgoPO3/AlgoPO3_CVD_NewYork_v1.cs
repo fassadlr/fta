@@ -4,7 +4,6 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using NinjaTrader.Cbi;
 using NinjaTrader.Data;
-using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
@@ -27,27 +26,52 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private bool rangeBreakDetected = false;
 
+        private readonly List<(double Min, double Max)> longBuckets =
+        [
+            (0, 10),
+            (30, 50),
+            (110, 170),
+            (180, 190),
+            (210, 230),
+            (300, 350)
+        ];
+
+        private readonly List<(double Min, double Max)> shortBuckets =
+        [
+            (10, 20),
+            (60, 70),
+            (90, 110),
+            (120, 160),
+            (170, 180),
+            (190, 210),
+            (240, 275),
+            (300, 350),
+            (375, 400),
+        ];
+
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
             {
-                Name = "New York CVD  v1.2";
+                Name = "CVD New York v1.3";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
                 ConnectionLossHandling = ConnectionLossHandling.KeepRunning;
                 IsOverlay = true;
 
-                PO3 = 81;
-                Risk = 400;
+                PO3 = 729;
+                Risk = 250;
 
                 SkipMonths = "0";
 
-                DailyMaxLoss = 0;
-                DailyMaxProfit = 1000;
+                DailyMaxLoss = -500;
+                DailyMaxProfit = 1100;
 
-                LongEdgeMultiplier = 1;
-                ShortEdgeMultiplier = 1;
+                LongEdgeMultiplier = 1.2;
+                ShortEdgeMultiplier = 1.2;
+
+                CVDEMADistanceFilteringEnabled = true;
 
                 // New York Time
                 SessionStartHour = 9;
@@ -57,34 +81,35 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
             else if (State == State.Configure)
             {
-                AddDataSeries(BarsPeriodType.Tick, 1);
-
                 Ranges = [];
 
                 Events = NewsEvents.Events();
 
                 NewYorkZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
 
-                DataSetValidation = new Dictionary<int, bool> { { 0, false }, { 1, false } };
+                if (ImportTickAndCvdEnabled)
+                {
+                    DataSetValidation = new Dictionary<int, bool> { { 0, false } };
+                }
+                else
+                {
+                    AddDataSeries(BarsPeriodType.Tick, 1);
+                    DataSetValidation = new Dictionary<int, bool> { { 0, false }, { 1, false } };
+                }
             }
             else if (State == State.DataLoaded)
             {
-                FractalManager = new FractalManager(this);
-
-                if (!ImportTickAndCvdEnabled)
-                {
-                    OrderFlowCVDIndicator = OrderFlowCumulativeDelta(CumulativeDeltaType.BidAsk, CumulativeDeltaPeriod.Session, 1);
-                    CVDSeries = new Series<double>(this);
-                    CVDEmaIndicator = EMA(CVDSeries, 20);
-                }
+                OnDataLoadedBase("CVD_NY");
             }
             else if (State == State.Terminated)
             {
-                if (ExportTradesCSVEnabled)
-                    ExportTradeLogs(
-                        "EntryTime,Bias,OrderType,Result,Pnl,Quantity,CVD,CVD_EMA,CVD_TradeType",
-                        $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{Name.Replace(" ", "_").Replace(".", "_")}_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+                OnTerminatedBase("CVD_NY");
             }
+        }
+
+        private bool IsInBucket(double value, IEnumerable<(double Min, double Max)> buckets)
+        {
+            return buckets.Any(x => value >= x.Min && value < x.Max);
         }
 
         protected override void OnBarUpdate()
@@ -97,7 +122,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PerformCleanupBeforeSessionStart();
 
                 DataSetValidation[0] = false;
-                DataSetValidation[1] = false;
+
+                if (!ImportTickAndCvdEnabled)
+                    DataSetValidation[1] = false;
             }
 
             if (TradingHalted)
@@ -109,7 +136,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PrintInfo("[DATASET_VALIDATION] Primary series validated.");
             }
 
-            if (BarsInProgress == 1 && !DataSetValidation[1])
+            if (!ImportTickAndCvdEnabled && BarsInProgress == 1 && !DataSetValidation[1])
             {
                 DataSetValidation[1] = true;
                 PrintInfo("[DATASET_VALIDATION] Secondary series validated.");
@@ -129,30 +156,37 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             var eventForToday = GetNewsEventForToday();
             if (eventForToday != null &&
                 eventForToday.EventTime.Date == Time[0].Date &&
-                eventForToday.AllDay && Position.MarketPosition == MarketPosition.Flat)
+                eventForToday.AllDay &&
+                Position.MarketPosition == MarketPosition.Flat)
             {
-                TradingHalted = true;
-                PrintInfo($"Trading skipped for day due to all day event {eventForToday.EventTime}");
+                HaltTrading($"[TRADING_HALTED] Trading skipped for day due to all day event {eventForToday.EventTime}");
                 return;
             }
 
+            // TODO check this
             // Stop trading when the last candle is disproportionally big.
-            if (!CheckCandleVolatility())
-                return;
+            //if (!CheckCandleVolatility())
+            //    return;
 
             // If the session has ended stop processing.
-            if (sessionStarted && NewYorkTime().TimeOfDay >= new TimeSpan(SessionEndHour, 0, 0) && (Position.MarketPosition == MarketPosition.Flat || (CurrentTrade != null && !CurrentTrade.Virtual)))
+            if (sessionStarted &&
+                NewYorkTime().Hour >= SessionEndHour
+                &&
+                (CurrentTrade == null ||
+                 (!CurrentTrade.Virtual && Position.MarketPosition == MarketPosition.Flat) ||
+                 (CurrentTrade.Virtual && !CurrentTrade.VirtualOpen)))
             {
-                PrintInfo($"Trading session ended.");
-                TradingHalted = true;
+                HaltTrading("[TRADING_HALTED] Session ended.");
                 return;
             }
 
-            // Update the CVD
+            // If a BIP 1 exists that means the tick series was added so process them.
             if (BarsInProgress == 1)
             {
-                if (!ImportTickAndCvdEnabled)
-                    OrderFlowCVDIndicator.Update(OrderFlowCVDIndicator.BarsArray[1].Count - 1, 1);
+                if (ExportTickAndCVDFlag)
+                    TickDataSeriesExport.Add((Time[0].Ticks, Close[0]));
+
+                OrderFlowCVDIndicator.Update(OrderFlowCVDIndicator.BarsArray[1].Count - 1, 1);
 
                 ProcessVirtualTrade();
 
@@ -169,6 +203,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (!ImportTickAndCvdEnabled && OrderFlowCVDIndicator.CurrentBar >= 0)
                 CVDSeries[0] = OrderFlowCVDIndicator.DeltaClose[0];
+
+            if (ExportTickAndCVDFlag)
+            {
+                CvdDeltaCloseExport.Add((Time[0].ToString(), OrderFlowCVDIndicator.DeltaClose[0]));
+                CvdEmaExport.Add((Time[0].ToString(), CVDEmaIndicator[0]));
+            }
 
             /* 
              * ----- STRATEGY START TIME ANCHORED TO New York-----
@@ -233,8 +273,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
 
             /* ----- WE ARE IN A VIRTUAL POSITION  ----- */
-            if (CurrentTrade != null && CurrentTrade.Virtual)
+            if (CurrentTrade != null && CurrentTrade.Virtual && CurrentTrade.VirtualOpen)
+            {
+                ProcessVirtualTrade();
                 return;
+            }
 
             /* ----- WE ARE WAITING FOR AN ENTRY ----- */
             if (!rangeBreakDetected)
@@ -263,46 +306,22 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
             }
 
-            if (RangeBias == RangeBias.Bearish && TradeBias == TradeBias.Short)
+            CreateCurrentTradeCVD();
+
+            if (CurrentTrade.StopLoss == 0)
             {
-                CurrentTrade = new TradeDetails()
-                {
-                    Bias = TradeBias.Short,
-                    StopLoss = CalculateStopLossForCVDAlgos(),
-                    TakeProfit = CurrentRange.Eq,
-                    BreakEvenThreshold = CurrentRange.BR3,
-                };
+                PrintDebug($"[STOP_INVALID]");
 
-                var rangePosition = CurrentRange.GetPositionInRange(RangeBias, Close[0]);
-                if (rangePosition == DealingRangePosition.Premium)
-                {
-                    CurrentTrade.StopLoss = CurrentRange.High;
-                    CurrentTrade.TakeProfit = CurrentRange.Low;
-                    CurrentTrade.BreakEvenThreshold = CurrentRange.OBCE1;
-                }
-            }
+                CurrentTrade.Virtual = false;
+                CurrentTrade.VirtualOpen = false;
+                CurrentTrade.VirtualTickIndex = 0;
 
-            if (RangeBias == RangeBias.Bullish && TradeBias == TradeBias.Long)
-            {
-                CurrentTrade = new TradeDetails()
-                {
-                    Bias = TradeBias.Long,
-                    StopLoss = CalculateStopLossForCVDAlgos(),
-                    TakeProfit = CurrentRange.Eq,
-                    BreakEvenThreshold = CurrentRange.BR2,
-                };
-
-                var rangePosition = CurrentRange.GetPositionInRange(RangeBias, Close[0]);
-                if (rangePosition == DealingRangePosition.Premium)
-                {
-                    CurrentTrade.StopLoss = CurrentRange.Low;
-                    CurrentTrade.TakeProfit = CurrentRange.High;
-                    CurrentTrade.BreakEvenThreshold = CurrentRange.OBCE2;
-                }
+                return;
             }
 
             /* ----- COLLECT ANY STATISTICS ----- */
             CollectStatistics();
+
             CurrentTrade.CVD_TradeType = CVD_TradeType;
 
             /* ----- TRADE INSPECTION BEFORE PLACEMENT ----- */
@@ -315,21 +334,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     return;
                 }
 
-                var CVD_EMA_DistanceCheck =
-                    (CurrentTrade.CVD_EMA_Distance >= 2000 && CurrentTrade.CVD_EMA_Distance < 2500);
-
-                if (!CVD_EMA_DistanceCheck)
+                if (CVDEMADistanceFilteringEnabled)
                 {
-                    PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
-
-                    CurrentTrade.Virtual = true;
-                    CurrentTrade.VirtualOpen = true;
-
-                    CurrentTrade.Entry = Close[0];
-
-                    if (ImportTickAndCvdEnabled)
+                    if (!IsInBucket(CurrentTrade.CVD_EMA_Distance, longBuckets))
                     {
-                        CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
+                        PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
+                        CurrentTrade.Virtual = true;
+                        CurrentTrade.VirtualOpen = true;
+
+                        if (ImportTickAndCvdEnabled)
+                        {
+                            CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
+                        }
                     }
                 }
             }
@@ -342,25 +358,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     return;
                 }
 
-                var CVD_EMA_DistanceCheck =
-                    (CurrentTrade.CVD_EMA_Distance >= 0 & CurrentTrade.CVD_EMA_Distance < 500) ||
-                    (CurrentTrade.CVD_EMA_Distance >= 750 & CurrentTrade.CVD_EMA_Distance < 1500) ||
-                    (CurrentTrade.CVD_EMA_Distance >= 2000 & CurrentTrade.CVD_EMA_Distance < 2500) ||
-                    (CurrentTrade.CVD_EMA_Distance >= 3500 & CurrentTrade.CVD_EMA_Distance < 4500) ||
-                    CurrentTrade.CVD_EMA_Distance >= 5000;
-
-                if (!CVD_EMA_DistanceCheck)
+                if (CVDEMADistanceFilteringEnabled)
                 {
-                    PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
-
-                    CurrentTrade.Virtual = true;
-                    CurrentTrade.VirtualOpen = true;
-
-                    CurrentTrade.Entry = Close[0];
-
-                    if (ImportTickAndCvdEnabled)
+                    if (!IsInBucket(CurrentTrade.CVD_EMA_Distance, shortBuckets))
                     {
-                        CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
+                        PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
+                        CurrentTrade.Virtual = true;
+                        CurrentTrade.VirtualOpen = true;
+
+                        if (ImportTickAndCvdEnabled)
+                        {
+                            CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
+                        }
                     }
                 }
             }
@@ -387,7 +396,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 }
 
                 EnterLong(0, CurrentTrade.PositionSize, LONG_TRADE);
-                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} stop {CurrentTrade.StopLoss}");
+                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType}, stop {CurrentTrade.StopLoss}");
 
                 SetStopLoss(LONG_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, false);
                 SetProfitTarget(LONG_TRADE, CalculationMode.Price, CurrentTrade.TakeProfit);
@@ -407,7 +416,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 }
 
                 EnterShort(0, CurrentTrade.PositionSize, SHORT_TRADE);
-                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} stop {CurrentTrade.StopLoss}");
+                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType}, stop {CurrentTrade.StopLoss}");
 
                 SetStopLoss(SHORT_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, false);
                 SetProfitTarget(SHORT_TRADE, CalculationMode.Price, CurrentTrade.TakeProfit);
