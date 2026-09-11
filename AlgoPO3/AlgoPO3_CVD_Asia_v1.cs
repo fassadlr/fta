@@ -20,11 +20,64 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private bool rangeBreakDetected = false;
 
+        internal override List<(double Min, double Max)> LongBuckets
+        {
+            get
+            {
+                return
+                [
+                    (100, 500),
+                    (600, 800),
+                    (900, 1000),
+                    (1100, 1200),
+                ];
+            }
+        }
+
+        internal override List<(double Min, double Max)> LongEdgeBuckets
+        {
+            get
+            {
+                return
+                [
+                    (200, 300),
+                    (400, 500),
+                    (700, 800),
+                ];
+            }
+        }
+
+        internal override List<(double Min, double Max)> ShortBuckets
+        {
+            get
+            {
+                return
+                [
+                    (100, 200),
+                    (250, 300),
+                    (350, 600),
+                    (800, 1000),
+                    (1200, 1600),
+                ];
+            }
+        }
+
+        internal override List<(double Min, double Max)> ShortEdgeBuckets
+        {
+            get
+            {
+                return
+                [
+                    (400, 600),
+                ];
+            }
+        }
+
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
             {
-                Name = "Asia CVD v1.10";
+                Name = "CVD Asia v1.11 (MNQ)";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -289,13 +342,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 if (CVDEMADistanceFilteringEnabled)
                 {
-                    var CVD_EMA_DistanceCheck =
-                        (CurrentTrade.CVD_EMA_Distance >= 100 && CurrentTrade.CVD_EMA_Distance < 500) ||
-                        (CurrentTrade.CVD_EMA_Distance >= 600 && CurrentTrade.CVD_EMA_Distance < 800) ||
-                        (CurrentTrade.CVD_EMA_Distance >= 900 && CurrentTrade.CVD_EMA_Distance < 1000) ||
-                        (CurrentTrade.CVD_EMA_Distance >= 1100 && CurrentTrade.CVD_EMA_Distance < 1200);
-
-                    if (!CVD_EMA_DistanceCheck)
+                    if (!IsInBucket(CurrentTrade.CVD_EMA_Distance, LongBuckets))
                     {
                         PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
                         CurrentTrade.Virtual = true;
@@ -319,14 +366,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 if (CVDEMADistanceFilteringEnabled)
                 {
-                    var CVD_EMA_DistanceCheck =
-                        (CurrentTrade.CVD_EMA_Distance >= 100 & CurrentTrade.CVD_EMA_Distance < 200) ||
-                        (CurrentTrade.CVD_EMA_Distance >= 250 & CurrentTrade.CVD_EMA_Distance < 300) ||
-                        (CurrentTrade.CVD_EMA_Distance >= 350 & CurrentTrade.CVD_EMA_Distance < 600) ||
-                        (CurrentTrade.CVD_EMA_Distance >= 800 & CurrentTrade.CVD_EMA_Distance < 1000) ||
-                        (CurrentTrade.CVD_EMA_Distance >= 1200 & CurrentTrade.CVD_EMA_Distance < 1600);
-
-                    if (!CVD_EMA_DistanceCheck)
+                    if (!IsInBucket(CurrentTrade.CVD_EMA_Distance, ShortBuckets))
                     {
                         PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
                         CurrentTrade.Virtual = true;
@@ -344,6 +384,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             CurrentTrade.PositionSize = CalculatePositionSizeWithEdge(Math.Abs(Close[0] - CurrentTrade.StopLoss), Risk);
 
+            var rr = CalculateRiskReward(Math.Abs(Close[0] - CurrentTrade.StopLoss), Math.Abs(CurrentTrade.TakeProfit - Close[0]));
+            if (rr < 0.5)
+            {
+                PrintDebug($"[RISK_REWARD_BELOW_THRESHOLD] {CurrentTrade.Bias} {rr}");
+                rangeBreakDetected = false;
+                CurrentTrade.Virtual = false;
+                return;
+            }
+
             if (CurrentTrade.Virtual)
             {
                 PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} triggered at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
@@ -352,15 +401,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (CurrentTrade.Bias == TradeBias.Long)
             {
-                var rr = CalculateRiskReward(Close[0] - CurrentTrade.StopLoss, CurrentTrade.TakeProfit - Close[0]);
-                if (rr < 0.5)
-                {
-                    PrintDebug($"[RISK_REWARD_BELOW_THRESHOLD_LONG] {rr}");
-                    rangeBreakDetected = false;
-                    CurrentTrade.Virtual = false;
-                    return;
-                }
-
                 EnterLong(0, CurrentTrade.PositionSize, LONG_TRADE);
                 PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType}, stop {CurrentTrade.StopLoss}");
 
@@ -372,15 +412,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (CurrentTrade.Bias == TradeBias.Short)
             {
-                var rr = CalculateRiskReward(CurrentTrade.StopLoss - Close[0], Close[0] - CurrentTrade.TakeProfit);
-                if (rr < 0.5)
-                {
-                    PrintDebug($"[RISK_REWARD_BELOW_THRESHOLD_SHORT] {rr}");
-                    rangeBreakDetected = false;
-                    CurrentTrade.Virtual = false;
-                    return;
-                }
-
                 EnterShort(0, CurrentTrade.PositionSize, SHORT_TRADE);
                 PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType}, stop {CurrentTrade.StopLoss}");
 
@@ -394,25 +425,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             //{
             //    Print($"Error in OnBarUpdate: {ex}");
             //}
-        }
-
-        private int CalculatePositionSizeWithEdge(double stopDistance, int risk)
-        {
-            var positionSize = CalculatePositionSize(stopDistance, risk);
-
-            if (CurrentTrade.Bias == TradeBias.Long &&
-                (
-                    (CurrentTrade.CVD_EMA_Distance >= 200 && CurrentTrade.CVD_EMA_Distance < 300) ||
-                    (CurrentTrade.CVD_EMA_Distance >= 400 && CurrentTrade.CVD_EMA_Distance < 500) ||
-                    (CurrentTrade.CVD_EMA_Distance >= 700 && CurrentTrade.CVD_EMA_Distance < 800))
-                )
-                positionSize = (int)(positionSize * LongEdgeMultiplier);
-
-            if (CurrentTrade.Bias == TradeBias.Short &&
-                CurrentTrade.CVD_EMA_Distance >= 400 && CurrentTrade.CVD_EMA_Distance < 600)
-                positionSize = (int)(positionSize * ShortEdgeMultiplier);
-
-            return positionSize;
         }
 
         protected override void OnConnectionStatusUpdate(ConnectionStatusEventArgs e)

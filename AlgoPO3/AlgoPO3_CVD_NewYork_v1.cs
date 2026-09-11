@@ -26,44 +26,67 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private bool rangeBreakDetected = false;
 
-        private readonly List<(double Min, double Max)> longBuckets =
-        [
-            (0, 10),
-            (30, 50),
-            (110, 170),
-            (180, 190),
-            (210, 230),
-            (300, 350),
-        ];
+        internal override List<(double Min, double Max)> LongBuckets
+        {
+            get
+            {
+                return [
+                    (0, 10),
+                    (30, 50),
+                    (110, 170),
+                    (180, 190),
+                    (210, 230),
+                    (300, 350),
+                ];
+            }
+        }
 
-        private readonly List<(double Min, double Max)> longEdgeBuckets =
-        [
-            (30, 40),
-        ];
+        internal override List<(double Min, double Max)> LongEdgeBuckets
+        {
+            get
+            {
+                return
+                [
+                    (30, 40),
+                ];
+            }
+        }
 
-        private readonly List<(double Min, double Max)> shortBuckets =
-        [
-            (10, 20),
-            (60, 70),
-            (90, 110),
-            (120, 160),
-            (170, 180),
-            (190, 210),
-            (240, 325),
-            (375, 450),
-        ];
+        internal override List<(double Min, double Max)> ShortBuckets
+        {
+            get
+            {
+                return
+                [
+                    (10, 20),
+                    (60, 70),
+                    (90, 110),
+                    (120, 160),
+                    (170, 180),
+                    (190, 210),
+                    (240, 325),
+                    (375, 450),
+                ];
+            }
+        }
 
-        private readonly List<(double Min, double Max)> shortEdgeBuckets =
-        [
-            (60, 70),
-            (190, 210),
-        ];
+        internal override List<(double Min, double Max)> ShortEdgeBuckets
+        {
+            get
+            {
+                return
+                [
+                    (60, 70),
+                    (190, 210),
+                ];
+            }
+        }
 
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
             {
-                Name = "CVD New York v1.4";
+                Name = "CVD NY v1.4 (MBT)";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -112,11 +135,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 OnTerminatedBase("CVD_NY");
             }
-        }
-
-        private bool IsInBucket(double value, IEnumerable<(double Min, double Max)> buckets)
-        {
-            return buckets.Any(x => value > x.Min && value <= x.Max);
         }
 
         protected override void OnBarUpdate()
@@ -343,7 +361,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 if (CVDEMADistanceFilteringEnabled)
                 {
-                    if (!IsInBucket(CurrentTrade.CVD_EMA_Distance, longBuckets))
+                    if (!IsInBucket(CurrentTrade.CVD_EMA_Distance, LongBuckets))
                     {
                         PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
                         CurrentTrade.Virtual = true;
@@ -367,7 +385,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 if (CVDEMADistanceFilteringEnabled)
                 {
-                    if (!IsInBucket(CurrentTrade.CVD_EMA_Distance, shortBuckets))
+                    if (!IsInBucket(CurrentTrade.CVD_EMA_Distance, ShortBuckets))
                     {
                         PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
                         CurrentTrade.Virtual = true;
@@ -423,19 +441,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
             //}
             //catch (Exception ex) { Print($"Error in OnBarUpdate: {ex}"); }
-        }
-
-        private int CalculatePositionSizeWithEdge(double stopDistance, int risk)
-        {
-            var positionSize = CalculatePositionSize(stopDistance, risk);
-
-            if (CurrentTrade.Bias == TradeBias.Long && IsInBucket(CurrentTrade.CVD_EMA_Distance, longEdgeBuckets))
-                positionSize = (int)(positionSize * LongEdgeMultiplier);
-
-            if (CurrentTrade.Bias == TradeBias.Short && IsInBucket(CurrentTrade.CVD_EMA_Distance, shortEdgeBuckets))
-                positionSize = (int)(positionSize * ShortEdgeMultiplier);
-
-            return positionSize;
         }
 
         protected override void OnConnectionStatusUpdate(ConnectionStatusEventArgs e)

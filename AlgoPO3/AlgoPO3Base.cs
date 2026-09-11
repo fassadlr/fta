@@ -44,6 +44,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         internal CVD_TradeType_Enum CVD_TradeType { get; set; }
 
+        internal abstract List<(double Min, double Max)> LongBuckets { get; }
+        internal abstract List<(double Min, double Max)> LongEdgeBuckets { get; }
+        internal abstract List<(double Min, double Max)> ShortBuckets { get; }
+        internal abstract List<(double Min, double Max)> ShortEdgeBuckets { get; }
+
         internal void CancelLimitOrder()
         {
             if (CurrentTrade == null)
@@ -280,6 +285,24 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             Ranges.Add(newDealingRange);
             PrintDebug($"Creating new range: {newDealingRange}");
             return newDealingRange;
+        }
+
+        internal bool IsInBucket(double value, IEnumerable<(double Min, double Max)> buckets)
+        {
+            return buckets.Any(x => value > x.Min && value <= x.Max);
+        }
+
+        internal int CalculatePositionSizeWithEdge(double stopDistance, int risk)
+        {
+            var positionSize = CalculatePositionSize(stopDistance, risk);
+
+            if (CurrentTrade.Bias == TradeBias.Long && IsInBucket(CurrentTrade.CVD_EMA_Distance, LongEdgeBuckets))
+                positionSize = (int)(positionSize * LongEdgeMultiplier);
+
+            if (CurrentTrade.Bias == TradeBias.Short && IsInBucket(CurrentTrade.CVD_EMA_Distance, ShortEdgeBuckets))
+                positionSize = (int)(positionSize * ShortEdgeMultiplier);
+
+            return positionSize;
         }
     }
 }

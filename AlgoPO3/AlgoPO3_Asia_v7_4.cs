@@ -28,6 +28,47 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         private DailyAtr dailyAtr;
         private double atrCurrent;
 
+        internal override List<(double Min, double Max)> LongBuckets
+        {
+            get
+            {
+                return
+                [
+                ];
+            }
+        }
+
+        internal override List<(double Min, double Max)> LongEdgeBuckets
+        {
+            get
+            {
+                return
+                [
+                ];
+            }
+        }
+
+        internal override List<(double Min, double Max)> ShortBuckets
+        {
+            get
+            {
+                return
+                [
+
+                ];
+            }
+        }
+
+        internal override List<(double Min, double Max)> ShortEdgeBuckets
+        {
+            get
+            {
+                return
+                [
+                ];
+            }
+        }
+
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
