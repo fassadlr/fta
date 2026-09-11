@@ -43,7 +43,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 LongEdgeMultiplier = 1.35;
                 ShortEdgeMultiplier = 1.35;
-                SkipMonths = "0";
                 StopGrace = 10;
 
                 DailyMaxLoss = -600; // $300
@@ -128,12 +127,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (!CheckDailyPnlLimits())
                 return;
-
-            if (SkipMonths.Split(',').Contains(Time[0].Month.ToString()))
-            {
-                TradingHalted = true;
-                return;
-            }
 
             // Skip all day events (easter etc).
             var eventForToday = GetNewsEventForToday();

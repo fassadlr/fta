@@ -14,20 +14,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         public int PO3 { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Skip Months", Order = 11, GroupName = "Parameters")]
-        public string SkipMonths { get; set; }
-        internal HashSet<int> SkipMonthsSet { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Long Edge X", Order = 12, GroupName = "Parameters")]
+        [Display(Name = "Long Edge X", Order = 11, GroupName = "Parameters")]
         public double LongEdgeMultiplier { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Short Edge X", Order = 13, GroupName = "Parameters")]
+        [Display(Name = "Short Edge X", Order = 12, GroupName = "Parameters")]
         public double ShortEdgeMultiplier { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Enable CVD EMA Dist Filtering ", Order = 14, GroupName = "Parameters")]
+        [Display(Name = "Enable CVD EMA Dist Filtering ", Order = 13, GroupName = "Parameters")]
         public bool CVDEMADistanceFilteringEnabled { get; set; }
 
         internal int[] BlockEndHoursParsed;
