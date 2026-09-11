@@ -33,8 +33,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PO3 = 81;
                 Risk = 250;
 
-                SkipMonths = "0";
-
                 DailyMaxLoss = -500;
                 DailyMaxProfit = 1100;
 

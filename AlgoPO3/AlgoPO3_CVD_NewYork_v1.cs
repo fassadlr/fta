@@ -33,7 +33,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             (110, 170),
             (180, 190),
             (210, 230),
-            (300, 350)
+            (300, 350),
+        ];
+
+        private readonly List<(double Min, double Max)> longEdgeBuckets =
+        [
+            (30, 40),
         ];
 
         private readonly List<(double Min, double Max)> shortBuckets =
@@ -44,32 +49,34 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             (120, 160),
             (170, 180),
             (190, 210),
-            (240, 275),
-            (300, 350),
-            (375, 400),
+            (240, 325),
+            (375, 450),
+        ];
+
+        private readonly List<(double Min, double Max)> shortEdgeBuckets =
+        [
+            (60, 70),
+            (190, 210),
         ];
 
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
             {
-                Name = "CVD New York v1.3";
+                Name = "CVD New York v1.4";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
                 ConnectionLossHandling = ConnectionLossHandling.KeepRunning;
-                IsOverlay = true;
 
                 PO3 = 729;
                 Risk = 250;
 
-                SkipMonths = "0";
+                DailyMaxLoss = -600;
+                DailyMaxProfit = 1200;
 
-                DailyMaxLoss = -500;
-                DailyMaxProfit = 1100;
-
-                LongEdgeMultiplier = 1.2;
-                ShortEdgeMultiplier = 1.2;
+                LongEdgeMultiplier = 1.25;
+                ShortEdgeMultiplier = 1.25;
 
                 CVDEMADistanceFilteringEnabled = true;
 
@@ -109,7 +116,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private bool IsInBucket(double value, IEnumerable<(double Min, double Max)> buckets)
         {
-            return buckets.Any(x => value >= x.Min && value < x.Max);
+            return buckets.Any(x => value > x.Min && value <= x.Max);
         }
 
         protected override void OnBarUpdate()
@@ -378,6 +385,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             CurrentTrade.PositionSize = CalculatePositionSizeWithEdge(Math.Abs(Close[0] - CurrentTrade.StopLoss), Risk);
 
+            var rr = CalculateRiskReward(Math.Abs(Close[0] - CurrentTrade.StopLoss), Math.Abs(CurrentTrade.TakeProfit - Close[0]));
+            if (rr < 0.5)
+            {
+                PrintDebug($"[RISK_REWARD_BELOW_THRESHOLD] {CurrentTrade.Bias} {rr}");
+                rangeBreakDetected = false;
+                CurrentTrade.Virtual = false;
+                return;
+            }
+
             if (CurrentTrade.Virtual)
             {
                 PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} triggered at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
@@ -386,15 +402,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (CurrentTrade.Bias == TradeBias.Long)
             {
-                var rr = CalculateRiskReward(Close[0] - CurrentTrade.StopLoss, CurrentTrade.TakeProfit - Close[0]);
-                if (rr < 0.5)
-                {
-                    PrintDebug($"[RISK_REWARD_BELOW_THRESHOLD_LONG] {rr}");
-                    rangeBreakDetected = false;
-                    CurrentTrade.Virtual = false;
-                    return;
-                }
-
                 EnterLong(0, CurrentTrade.PositionSize, LONG_TRADE);
                 PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType}, stop {CurrentTrade.StopLoss}");
 
@@ -406,15 +413,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (CurrentTrade.Bias == TradeBias.Short)
             {
-                var rr = CalculateRiskReward(CurrentTrade.StopLoss - Close[0], Close[0] - CurrentTrade.TakeProfit);
-                if (rr < 0.5)
-                {
-                    PrintDebug($"[RISK_REWARD_BELOW_THRESHOLD_SHORT] {rr}");
-                    rangeBreakDetected = false;
-                    CurrentTrade.Virtual = false;
-                    return;
-                }
-
                 EnterShort(0, CurrentTrade.PositionSize, SHORT_TRADE);
                 PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType}, stop {CurrentTrade.StopLoss}");
 
@@ -431,7 +429,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             var positionSize = CalculatePositionSize(stopDistance, risk);
 
-            // TODO
+            if (CurrentTrade.Bias == TradeBias.Long && IsInBucket(CurrentTrade.CVD_EMA_Distance, longEdgeBuckets))
+                positionSize = (int)(positionSize * LongEdgeMultiplier);
+
+            if (CurrentTrade.Bias == TradeBias.Short && IsInBucket(CurrentTrade.CVD_EMA_Distance, shortEdgeBuckets))
+                positionSize = (int)(positionSize * ShortEdgeMultiplier);
 
             return positionSize;
         }
