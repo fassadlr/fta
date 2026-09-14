@@ -34,10 +34,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 return
                 [
+                    (0, 500),
+                    (600, 700),
+                    (800, 1100)
                 ];
             }
         }
 
+        // Edges are calculated on VWAP
         internal override List<(double Min, double Max)> LongEdgeBuckets
         {
             get
@@ -54,11 +58,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 return
                 [
-
+                    (0, 250),
+                    (350, 1100),
+                    (1200, 1500),
+                    (1800, 5000)
                 ];
             }
         }
 
+        // Edges are calculated on VWAP
         internal override List<(double Min, double Max)> ShortEdgeBuckets
         {
             get
@@ -166,6 +174,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (!DataSetValidation.All(v => v.Value))
                 return;
 
+            /* ----- SESSION INITIALIZATION ----- */
+            if (TokyoTime().TimeOfDay < new TimeSpan(8, 0, 0))
+                return;
+
             if (!CheckDailyPnlLimits())
                 return;
 
@@ -184,9 +196,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
 
             // If the session has ended stop processing.
-            if (TokyoTime().Hour >= SessionEndHour && (Position.MarketPosition == MarketPosition.Flat || (CurrentTrade != null && CurrentTrade.Virtual && !CurrentTrade.VirtualOpen)))
+            if (TokyoTime().Hour >= SessionEndHour
+                &&
+                (CurrentTrade == null ||
+                 (!CurrentTrade.Virtual && Position.MarketPosition == MarketPosition.Flat) ||
+                 (CurrentTrade.Virtual && !CurrentTrade.VirtualOpen)))
             {
-                CancelLimitOrder();
                 HaltTrading("[TRADING_HALTED] Session ended.");
                 return;
             }
@@ -228,6 +243,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             atrCurrent = dailyAtr.Atr;
 
+            if (TokyoTime().TimeOfDay < new TimeSpan(9, 0, 0))
+                return;
+
+            if (TokyoTime().TimeOfDay == new TimeSpan(9, 0, 0))
+                PrintInfo($"[SESSION_START]");
+
             // Create the initial dealing range, this will only happen once per session.
             if (CurrentRange == null)
             {
@@ -256,10 +277,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             CurrentRange.UpdateCoverage(Close[0]);
-
-            /* ----- STRATEGY START TIME ANCHORED TO TOKYO-----*/
-            if (TokyoTime().TimeOfDay < new TimeSpan(9, 0, 0))
-                return;
 
             /* ----- WE ARE IN A POSITION  ----- */
             if (Position.MarketPosition != MarketPosition.Flat)
@@ -459,12 +476,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 if (CVDEMADistanceFilteringEnabled)
                 {
-                    var CVD_EMA_DistanceCheck =
-                        (CurrentTrade.CVD_EMA_Distance >= 0 & CurrentTrade.CVD_EMA_Distance < 500) ||
-                        (CurrentTrade.CVD_EMA_Distance >= 600 & CurrentTrade.CVD_EMA_Distance < 700) ||
-                        (CurrentTrade.CVD_EMA_Distance >= 800 & CurrentTrade.CVD_EMA_Distance < 1100);
-
-                    if (!CVD_EMA_DistanceCheck)
+                    if (!IsInBucket(CurrentTrade.CVD_EMA_Distance, LongBuckets))
                     {
                         PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
                         CurrentTrade.Virtual = true;
@@ -488,13 +500,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 if (CVDEMADistanceFilteringEnabled)
                 {
-                    var CVD_EMA_DistanceCheck =
-                          (CurrentTrade.CVD_EMA_Distance >= 0 & CurrentTrade.CVD_EMA_Distance < 250) ||
-                          (CurrentTrade.CVD_EMA_Distance >= 350 & CurrentTrade.CVD_EMA_Distance < 1100) ||
-                          (CurrentTrade.CVD_EMA_Distance >= 1200 & CurrentTrade.CVD_EMA_Distance < 1500) ||
-                          (CurrentTrade.CVD_EMA_Distance >= 1800);
-
-                    if (!CVD_EMA_DistanceCheck)
+                    if (!IsInBucket(CurrentTrade.CVD_EMA_Distance, ShortBuckets))
                     {
                         PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
                         CurrentTrade.Virtual = true;
