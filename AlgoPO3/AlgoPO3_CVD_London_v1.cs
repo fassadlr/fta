@@ -25,8 +25,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private bool sessionStarted;
 
-        private bool rangeBreakDetected = false;
-
         internal override List<(double Min, double Max)> LongBuckets
         {
             get
@@ -90,6 +88,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 // London Time
                 SessionStartHour = 8;
                 SessionEndHour = 10;
+
+                ImportFile = string.Empty;
 
                 PrintTo = PrintTo.OutputTab2;
             }
@@ -394,64 +394,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             /* ----- PLACE THE TRADE ----- */
-            CurrentTrade.PositionSize = CalculatePositionSizeWithEdge(Math.Abs(Close[0] - CurrentTrade.StopLoss), Risk);
+            PlaceCvdTrade(Risk);
 
-            if (CurrentTrade.Virtual)
-            {
-                PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} {CurrentTrade.OrderType} submittted at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
-                return;
-            }
-
-            if (CurrentTrade.Bias == TradeBias.Long)
-            {
-                var rr = CalculateRiskReward(Close[0] - CurrentTrade.StopLoss, CurrentTrade.TakeProfit - Close[0]);
-                if (rr < 0.5)
-                {
-                    PrintDebug($"[RISK_REWARD_BELOW_THRESHOLD_LONG] {rr}");
-                    rangeBreakDetected = false;
-                    CurrentTrade.Virtual = false;
-                    return;
-                }
-
-                EnterLong(0, CurrentTrade.PositionSize, LONG_TRADE);
-                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType} at {Close[0]}, stop {CurrentTrade.StopLoss}");
-
-                SetStopLoss(LONG_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, false);
-                SetProfitTarget(LONG_TRADE, CalculationMode.Price, CurrentTrade.TakeProfit);
-
-                return;
-            }
-
-            if (CurrentTrade.Bias == TradeBias.Short)
-            {
-                var rr = CalculateRiskReward(CurrentTrade.StopLoss - Close[0], Close[0] - CurrentTrade.TakeProfit);
-                if (rr < 0.5)
-                {
-                    PrintDebug($"[RISK_REWARD_BELOW_THRESHOLD_SHORT] {rr}");
-                    rangeBreakDetected = false;
-                    CurrentTrade.Virtual = false;
-                    return;
-                }
-
-                EnterShort(0, CurrentTrade.PositionSize, SHORT_TRADE);
-                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType} at {Close[0]}, stop {CurrentTrade.StopLoss}");
-
-                SetStopLoss(SHORT_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, false);
-                SetProfitTarget(SHORT_TRADE, CalculationMode.Price, CurrentTrade.TakeProfit);
-
-                return;
-            }
             //}
             //catch (Exception ex) { Print($"Error in OnBarUpdate: {ex}"); }
-        }
-
-        private int CalculatePositionSizeWithEdge(double stopDistance, int risk)
-        {
-            var positionSize = CalculatePositionSize(stopDistance, risk);
-
-            // TODO
-
-            return positionSize;
         }
 
         protected override void OnConnectionStatusUpdate(ConnectionStatusEventArgs e)

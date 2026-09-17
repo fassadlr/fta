@@ -9,7 +9,7 @@ using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 {
-    public class AlgoPO3_Asia_v7_4 : AlgoPO3Base
+    public class Alpha_Asia_MNQ_v8 : AlgoPO3Base
     {
         [NinjaScriptProperty]
         [Display(Name = "Risk", Order = 20, GroupName = "Parameters")]
@@ -23,10 +23,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         [Display(Name = "Session End Hour", Order = 22, GroupName = "Parameters")]
         public int SessionEndHour { get; set; }
 
-        private bool rangeBreakDetected = false;
-
         private DailyAtr dailyAtr;
         private double atrCurrent;
+
+        /*
+        The bands are currently configured as an improvement in Pnl, sharpe and drawdown from the 1st January 2026 to 17th Sept 2026 
+        */
 
         internal override List<(double Min, double Max)> LongBuckets
         {
@@ -34,9 +36,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 return
                 [
-                    (0, 500),
+                    (0, 250),
+                    (300, 350),
+                    (400, 500),
                     (600, 700),
-                    (800, 1100)
+                    (900, 1000),
                 ];
             }
         }
@@ -58,10 +62,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 return
                 [
-                    (0, 250),
-                    (350, 1100),
+                    (0, 200),
+                    (350, 500),
+                    (700, 1100),
                     (1200, 1500),
-                    (1800, 5000)
+                    (1600, 1700),
+                    (1800, 5000),
                 ];
             }
         }
@@ -81,7 +87,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Asia Alpha v7.8";
+                Name = "Alpha Asia MNQ v8.0";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -90,15 +96,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 PO3 = 81;
                 Risk = 200; //$170
 
-                LongEdgeMultiplier = 1.35;
-                ShortEdgeMultiplier = 1.35;
+                LongEdgeMultiplier = 1.5;
+                ShortEdgeMultiplier = 1.5;
                 StopGrace = 10;
 
                 DailyMaxLoss = -600; // $300
                 DailyMaxProfit = 800; // $800
 
-                // Tokyo Time
-                SessionEndHour = 12;
+                CVDEMADistanceFilteringEnabled = true;
+
+                ImportFile = string.Empty;
+
+                SessionEndHour = 12; // Tokyo Time
 
                 PrintTo = PrintTo.OutputTab1;
             }
@@ -127,11 +136,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 VWAP = OrderFlowVWAP(VWAPResolution.Standard, Bars.TradingHours, VWAPStandardDeviations.One, 1, 2, 3);
 
-                OnDataLoadedBase("Asia_Alpha");
+                OnDataLoadedBase("Alpha_Asia");
             }
             else if (State == State.Terminated)
             {
-                OnTerminatedBase("Asia_Alpha");
+                OnTerminatedBase("Alpha_Asia");
             }
         }
 
@@ -243,12 +252,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             atrCurrent = dailyAtr.Atr;
 
-            if (TokyoTime().TimeOfDay < new TimeSpan(9, 0, 0))
-                return;
-
-            if (TokyoTime().TimeOfDay == new TimeSpan(9, 0, 0))
-                PrintInfo($"[SESSION_START]");
-
             // Create the initial dealing range, this will only happen once per session.
             if (CurrentRange == null)
             {
@@ -277,6 +280,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             CurrentRange.UpdateCoverage(Close[0]);
+
+            if (TokyoTime().TimeOfDay < new TimeSpan(9, 0, 0))
+                return;
+
+            if (TokyoTime().TimeOfDay == new TimeSpan(9, 0, 0))
+                PrintInfo($"[SESSION_START]");
 
             /* ----- WE ARE IN A POSITION  ----- */
             if (Position.MarketPosition != MarketPosition.Flat)
@@ -738,10 +747,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
         private void ApplyEdgeToPosition()
         {
-            if (atrCurrent >= 10 && atrCurrent < 15 || atrCurrent >= 20 && atrCurrent < 25)
+            if (CurrentTrade.Bias == TradeBias.Long &&
+                ((atrCurrent >= 10 && atrCurrent < 15) || (atrCurrent >= 30 && atrCurrent < 35)))
             {
                 CurrentTrade.PositionSize = (int)(CurrentTrade.PositionSize * LongEdgeMultiplier);
-                PrintDebug($"[POSITION_ADJUSTED_EDGE] new position {CurrentTrade.PositionSize} atr {atrCurrent}");
+                PrintDebug($"[POSITION_ADJUSTED_EDGE] {CurrentTrade.Bias} new position {CurrentTrade.PositionSize} atr {atrCurrent}");
+            }
+
+            if (CurrentTrade.Bias == TradeBias.Short &&
+                ((atrCurrent >= 20 && atrCurrent < 25) || (atrCurrent >= 40 && atrCurrent < 45)))
+            {
+                CurrentTrade.PositionSize = (int)(CurrentTrade.PositionSize * ShortEdgeMultiplier);
+                PrintDebug($"[POSITION_ADJUSTED_EDGE] {CurrentTrade.Bias} new position {CurrentTrade.PositionSize} atr {atrCurrent}");
             }
         }
 

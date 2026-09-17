@@ -8,7 +8,7 @@ using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 {
-    public class AlgoPO3_CVD_Asia_v1 : AlgoPO3Base
+    public class CVD_Asia_MGC_v1 : AlgoPO3Base
     {
         [NinjaScriptProperty]
         [Display(Name = "Risk", Order = 20, GroupName = "Parameters")]
@@ -18,18 +18,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         [Display(Name = "Session End Hour", Order = 21, GroupName = "Parameters")]
         public int SessionEndHour { get; set; }
 
-        private bool rangeBreakDetected = false;
-
         internal override List<(double Min, double Max)> LongBuckets
         {
             get
             {
                 return
                 [
-                    (100, 500),
+                    (0, 50),
+                    (100, 400),
+                    (450, 500),
                     (600, 800),
-                    (900, 1000),
-                    (1100, 1200),
                 ];
             }
         }
@@ -40,9 +38,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 return
                 [
-                    (200, 300),
-                    (400, 500),
-                    (700, 800),
+                    (100, 200),
+                    (300, 400),
                 ];
             }
         }
@@ -53,11 +50,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 return
                 [
-                    (100, 200),
-                    (250, 300),
-                    (350, 600),
-                    (800, 1000),
-                    (1200, 1600),
+                    (0, 50),
+                    (150, 250),
+                    (300, 500),
+                    (800, 900),
                 ];
             }
         }
@@ -68,7 +64,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 return
                 [
-                    (400, 600),
+                    (0, 50),
                 ];
             }
         }
@@ -77,22 +73,24 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "CVD Asia v1.11 (MNQ)";
+                Name = "CVD Asia MGC v1.12";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
                 ConnectionLossHandling = ConnectionLossHandling.KeepRunning;
 
-                PO3 = 81;
-                Risk = 250;
+                PO3 = 27;
+                Risk = 225; // $170 for $1500 DD
 
-                DailyMaxLoss = -500;
-                DailyMaxProfit = 1100;
+                DailyMaxLoss = -400; // -300 for $1500 DD
+                DailyMaxProfit = 1000; // 700 for $1500 DD
 
-                LongEdgeMultiplier = 1.2;
-                ShortEdgeMultiplier = 1.2;
+                LongEdgeMultiplier = 1.25;
+                ShortEdgeMultiplier = 1.25;
 
                 CVDEMADistanceFilteringEnabled = true;
+
+                ImportFile = string.Empty;
 
                 // Tokyo Time
                 SessionEndHour = 11;
@@ -119,11 +117,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
             else if (State == State.DataLoaded)
             {
-                OnDataLoadedBase("Asia_CVD");
+                OnDataLoadedBase("CVD_Asia");
             }
             else if (State == State.Terminated)
             {
-                OnTerminatedBase("Asia_CVD");
+                OnTerminatedBase("CVD_Asia");
             }
         }
 
@@ -381,45 +379,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             /* ----- PLACE THE TRADE ----- */
+            PlaceCvdTrade(Risk);
 
-            CurrentTrade.PositionSize = CalculatePositionSizeWithEdge(Math.Abs(Close[0] - CurrentTrade.StopLoss), Risk);
-
-            var rr = CalculateRiskReward(Math.Abs(Close[0] - CurrentTrade.StopLoss), Math.Abs(CurrentTrade.TakeProfit - Close[0]));
-            if (rr < 0.5)
-            {
-                PrintDebug($"[RISK_REWARD_BELOW_THRESHOLD] {CurrentTrade.Bias} {rr}");
-                rangeBreakDetected = false;
-                CurrentTrade.Virtual = false;
-                return;
-            }
-
-            if (CurrentTrade.Virtual)
-            {
-                PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} triggered at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
-                return;
-            }
-
-            if (CurrentTrade.Bias == TradeBias.Long)
-            {
-                EnterLong(0, CurrentTrade.PositionSize, LONG_TRADE);
-                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType}, stop {CurrentTrade.StopLoss}");
-
-                SetStopLoss(LONG_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, false);
-                SetProfitTarget(LONG_TRADE, CalculationMode.Price, CurrentTrade.TakeProfit);
-
-                return;
-            }
-
-            if (CurrentTrade.Bias == TradeBias.Short)
-            {
-                EnterShort(0, CurrentTrade.PositionSize, SHORT_TRADE);
-                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType}, stop {CurrentTrade.StopLoss}");
-
-                SetStopLoss(SHORT_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, false);
-                SetProfitTarget(SHORT_TRADE, CalculationMode.Price, CurrentTrade.TakeProfit);
-
-                return;
-            }
             //}
             //catch (Exception ex)
             //{

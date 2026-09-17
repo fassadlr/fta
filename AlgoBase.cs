@@ -42,11 +42,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         public bool ExportTickAndCVDFlag { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Daily Max Loss", Order = 7, GroupName = "Parameters")]
+        [Display(Name = "Import File", Order = 7, GroupName = "Parameters")]
+        public string ImportFile { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Daily Max Loss", Order = 8, GroupName = "Parameters")]
         public double DailyMaxLoss { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Daily Max Profit", Order = 8, GroupName = "Parameters")]
+        [Display(Name = "Daily Max Profit", Order = 9, GroupName = "Parameters")]
         public double DailyMaxProfit { get; set; }
 
         internal double LastFractalHigh = 0;
@@ -129,9 +133,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             {
                 TickDataSeriesExport = [];
 
-                ImportCVDData("EMA", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_{Instrument.FullName}_CVDEma_{DateTime.Now:yyyyMMdd}.csv");
-                ImportCVDData("DeltaClose", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_{Instrument.FullName}_CVDDeltaClose_{DateTime.Now:yyyyMMdd}.csv");
-                ImportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_{Instrument.FullName}_Ticks_Data_{DateTime.Now:yyyyMMdd}.bin");
+                if (!string.IsNullOrEmpty(ImportFile))
+                {
+                    ImportCVDData("EMA", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_{Instrument.FullName}_CVDEma_{ImportFile}.csv");
+                    ImportCVDData("DeltaClose", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_{Instrument.FullName}_CVD_{ImportFile}.csv");
+                    ImportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_{Instrument.FullName}_Ticks_{ImportFile}.bin");
+                }
+                else
+                {
+                    ImportCVDData("EMA", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_{Instrument.FullName}_CVDEma_{DateTime.Now:yyyyMMdd}.csv");
+                    ImportCVDData("DeltaClose", $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_{Instrument.FullName}_CVD_{DateTime.Now:yyyyMMdd}.csv");
+                    ImportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\Data\{algoName}_{Instrument.FullName}_Ticks_{DateTime.Now:yyyyMMdd}.bin");
+                }
             }
 
             if (ExportTickAndCVDFlag)
@@ -152,10 +165,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
             if (ExportTickAndCVDFlag)
             {
-                ExportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_{Instrument.FullName}_Ticks_Data_{DateTime.Now:yyyyMMdd}.bin");
+                ExportTickData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_{Instrument.FullName}_Ticks_{DateTime.Now:yyyyMMdd}.bin");
                 //ExportOHLCVData($@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_MNQ_1m_OHLC_Data_{DateTime.Now:yyyyMMdd}.csv");
                 ExportCVD(CvdEmaExport, $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_{Instrument.FullName}_CVDEma_{DateTime.Now:yyyyMMdd}.csv");
-                ExportCVD(CvdDeltaCloseExport, $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_{Instrument.FullName}_CVDDeltaClose_{DateTime.Now:yyyyMMdd}.csv");
+                ExportCVD(CvdDeltaCloseExport, $@"C:\Users\fassa\Documents\GitHub\fassadlr\ftalabs\research\data\{algoName}_{Instrument.FullName}_CVD_{DateTime.Now:yyyyMMdd}.csv");
             }
         }
 
@@ -313,7 +326,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         #endregion
 
-
         #region Base Pnl
 
         internal double BasePnlUpdates()
@@ -342,7 +354,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 $"{CurrentTrade.CVD}," +
                 $"{CurrentTrade.CVD_EMA}," +
                 $"{CurrentTrade.CVD_EMA_Alignment}," +
-                $"{CurrentTrade.CVD_TradeType}";
+                $"{CurrentTrade.CVD_TradeType}," +
+                $"{CurrentTrade.VWAPDistance}," +
+                $"{CurrentTrade.ATR}";
 
             TradeCSVs.Add(tradeCSV);
             PrintTrade(tradeCSV);

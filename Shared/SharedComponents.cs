@@ -301,6 +301,53 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.Shared
             }
         }
 
+        public void DetectFractalFiveBarWithPlatos(int timeFrame)
+        {
+            // Need at least 5 bars
+            if (owner.CurrentBar < 4)
+                return;
+
+            // --- FRACTAL HIGH LOGIC ---
+            double h0 = owner.High[0];
+            double h1 = owner.High[1];
+            double h2 = owner.High[2];
+            double h3 = owner.High[3];
+            double h4 = owner.High[4];
+
+            // Middle bar must be >= all other bars (allows equal highs / plateaus)
+            bool isPeakShape = h2 >= h0 && h2 >= h1 && h2 >= h3 && h2 >= h4;
+
+            // At least one other bar must be strictly lower
+            // Prevents five completely flat equal highs
+            bool hasStrictEdge = h2 > h0 || h2 > h1 || h2 > h3 || h2 > h4;
+
+            if (isPeakShape && hasStrictEdge)
+            {
+                Fractals[(timeFrame, FractalType.HighFiveBar)] = (h2, owner.Time[2]);
+                //owner.PrintDebug($"[FRACTAL_{timeFrame}M_HIGH_5] {h2} time {owner.Time[2]}");
+            }
+
+            // --- FRACTAL LOW LOGIC ---
+            double l0 = owner.Low[0];
+            double l1 = owner.Low[1];
+            double l2 = owner.Low[2];
+            double l3 = owner.Low[3];
+            double l4 = owner.Low[4];
+
+            // Middle bar must be <= all other bars (allows equal lows / plateaus)
+            bool isValleyShape = l2 <= l0 && l2 <= l1 && l2 <= l3 && l2 <= l4;
+
+            // At least one other bar must be strictly higher
+            // Prevents five completely flat equal lows
+            bool hasStrictEdgeLow = l2 < l0 || l2 < l1 || l2 < l3 || l2 < l4;
+
+            if (isValleyShape && hasStrictEdgeLow)
+            {
+                Fractals[(timeFrame, FractalType.LowFiveBar)] = (l2, owner.Time[2]);
+                //owner.PrintDebug($"[FRACTAL_{timeFrame}M_LOW_5] {l2} time {owner.Time[2]}");
+            }
+        }
+
         /// <summary>
         /// Is there a fractal that is not yet printed due to delayed bar processing.
         /// </summary>
