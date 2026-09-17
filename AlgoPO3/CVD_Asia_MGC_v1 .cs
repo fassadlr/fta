@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using NinjaTrader.Cbi;
 using NinjaTrader.Data;
+using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
@@ -17,6 +18,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         [NinjaScriptProperty]
         [Display(Name = "Session End Hour", Order = 21, GroupName = "Parameters")]
         public int SessionEndHour { get; set; }
+
+        private DailyAtr dailyAtr;
+        private double atrCurrent;
 
         internal override List<(double Min, double Max)> LongBuckets
         {
@@ -117,6 +121,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
             else if (State == State.DataLoaded)
             {
+                VWAP = OrderFlowVWAP(VWAPResolution.Standard, Bars.TradingHours, VWAPStandardDeviations.One, 1, 2, 3);
+
                 OnDataLoadedBase("CVD_Asia");
             }
             else if (State == State.Terminated)
@@ -206,6 +212,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (BarsInProgress != 0)
                 return;
 
+            // Process atr on the 1min
+            dailyAtr.Calculate(High[0], Low[0], Close[0]);
+
             // Process fractals on the 1min
             FractalManager.DetectFractalThreeBar(1);
             FractalManager.DetectFractalFiveBar(1);
@@ -218,6 +227,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 CvdDeltaCloseExport.Add((Time[0].ToString(), OrderFlowCVDIndicator.DeltaClose[0]));
                 CvdEmaExport.Add((Time[0].ToString(), CVDEmaIndicator[0]));
             }
+
+            atrCurrent = dailyAtr.Atr;
 
             /* 
              * ----- STRATEGY START TIME ANCHORED TO TOKYO-----
@@ -324,7 +335,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
 
             /* ----- COLLECT ANY STATISTICS ----- */
+
+            CalculateVWAPDistance();
+
             CollectStatistics();
+
+            CurrentTrade.ATR = atrCurrent;
 
             CurrentTrade.CVD_TradeType = CVD_TradeType;
 
@@ -449,6 +465,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             LastTradeCount = 0;
 
             CVD_TradeType = CVD_TradeType_Enum.Normal;
+
+            dailyAtr ??= new DailyAtr();
         }
     }
 }
