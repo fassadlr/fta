@@ -77,14 +77,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (CurrentTrade.Virtual)
             {
-                PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} triggered at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
+                PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
                 return;
             }
 
             if (CurrentTrade.Bias == TradeBias.Long)
             {
                 EnterLong(0, CurrentTrade.PositionSize, LONG_TRADE);
-                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType}, stop {CurrentTrade.StopLoss}");
+                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType}, at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
 
                 SetStopLoss(LONG_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, false);
                 SetProfitTarget(LONG_TRADE, CalculationMode.Price, CurrentTrade.TakeProfit);
@@ -95,7 +95,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (CurrentTrade.Bias == TradeBias.Short)
             {
                 EnterShort(0, CurrentTrade.PositionSize, SHORT_TRADE);
-                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType}, stop {CurrentTrade.StopLoss}");
+                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType}, at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
 
                 SetStopLoss(SHORT_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, false);
                 SetProfitTarget(SHORT_TRADE, CalculationMode.Price, CurrentTrade.TakeProfit);
@@ -118,7 +118,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             CurrentTrade = null;
         }
 
-        internal void CreateCurrentTradeCVD()
+        internal void CreateCurrentTradeCVD(int timeframe = 1, bool targetFullRange = false)
         {
             if (RangeBias == RangeBias.Bearish && TradeBias == TradeBias.Short)
             {
@@ -128,11 +128,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     Entry = Close[0] // This is set for virtual trade purposes but it is essentially a market order.
                 };
 
-                var rangePosition = CurrentRange.GetPositionInRange(RangeBias, Close[0]);
-                if (rangePosition == DealingRangePosition.Discount)
+                if (CVD_TradeType == CVD_TradeType_Enum.Normal)
                 {
-                    CurrentTrade.StopLoss = CalculateStopLossForCVDAlgos();
-                    CurrentTrade.TakeProfit = CurrentRange.Eq + Spread;
+                    CurrentTrade.StopLoss = CalculateStopLossForCVDAlgos(timeframe);
+                    CurrentTrade.TakeProfit = (targetFullRange ? CurrentRange.Low : CurrentRange.Eq) + Spread;
                 }
                 else
                 {
@@ -149,11 +148,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     Entry = Close[0] // This is set for virtual trade purposes but it is essentially a market order.
                 };
 
-                var rangePosition = CurrentRange.GetPositionInRange(RangeBias, Close[0]);
-                if (rangePosition == DealingRangePosition.Discount)
+                if (CVD_TradeType == CVD_TradeType_Enum.Normal)
                 {
-                    CurrentTrade.StopLoss = CalculateStopLossForCVDAlgos();
-                    CurrentTrade.TakeProfit = CurrentRange.Eq - Spread;
+                    CurrentTrade.StopLoss = CalculateStopLossForCVDAlgos(timeframe);
+                    CurrentTrade.TakeProfit = (targetFullRange ? CurrentRange.High : CurrentRange.Eq) - Spread;
                 }
                 else
                 {
@@ -275,7 +273,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             }
         }
 
-        internal double CalculateStopLossForCVDAlgos()
+        internal double CalculateStopLossForCVDAlgos(int timeframe)
         {
             var candidates = new List<(string, double)>();
 
@@ -288,10 +286,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         return imbalanceStart + Spread;
                     }
 
-                if (FractalManager.Fractals.TryGetValue((1, FractalType.HighThreeBar), out var threeBarFractal))
+                if (FractalManager.Fractals.TryGetValue((timeframe, FractalType.HighThreeBar), out var threeBarFractal))
                     if (threeBarFractal.Price > CurrentRange.ExtHigh) candidates.Add(("3 Bar Fractal", threeBarFractal.Price));
 
-                if (FractalManager.Fractals.TryGetValue((1, FractalType.HighFiveBar), out var fiveBarFractal))
+                if (FractalManager.Fractals.TryGetValue((timeframe, FractalType.HighFiveBar), out var fiveBarFractal))
                     if (fiveBarFractal.Price > CurrentRange.ExtHigh) candidates.Add(("5 Bar Fractal", fiveBarFractal.Price));
 
                 if (High[0] > Math.Round(CurrentRange.ExtHigh))
@@ -315,10 +313,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         return imbalanceStart - Spread;
                     }
 
-                if (FractalManager.Fractals.TryGetValue((1, FractalType.LowThreeBar), out var threeBarFractal))
+                if (FractalManager.Fractals.TryGetValue((timeframe, FractalType.LowThreeBar), out var threeBarFractal))
                     if (threeBarFractal.Price < CurrentRange.ExtLow) candidates.Add(("3 Bar Fractal", threeBarFractal.Price));
 
-                if (FractalManager.Fractals.TryGetValue((1, FractalType.LowFiveBar), out var fiveBarFractal))
+                if (FractalManager.Fractals.TryGetValue((timeframe, FractalType.LowFiveBar), out var fiveBarFractal))
                     if (fiveBarFractal.Price < CurrentRange.ExtLow) candidates.Add(("5 Bar Fractal", fiveBarFractal.Price));
 
                 if (Low[0] < Math.Round(CurrentRange.ExtLow))

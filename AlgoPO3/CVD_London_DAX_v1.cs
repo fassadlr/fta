@@ -9,7 +9,7 @@ using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 {
-    public class CVD_DAX_London_v1 : AlgoPO3Base
+    public class CVD_London_DAX_v1 : AlgoPO3Base
     {
         [NinjaScriptProperty]
         [Display(Name = "Risk", Order = 20, GroupName = "Parameters")]
@@ -31,19 +31,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 return
                 [
-                    (0, 4),
-                    (8, 12),
-                    (14, 16),
-                    (26, 28),
-                    (30, 32),
-                    (38, 40),
-                    (42, 46),
-                    (54, 58),
-                    (60, 62),
-                    (64, 66),
-                    (72, 76),
-                    (105, 110),
-                    (120, 125),
                 ];
             }
         }
@@ -64,23 +51,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 return
                 [
-                    (0, 6),
-                    (8, 10),
-                    (16, 18),
-                    (22, 24),
-                    (26, 32),
-                    (38, 40),
-                    (46, 52),
-                    (54, 56),
-                    (58, 60),
-                    (62, 64),
-                    (70, 74),
-                    (76, 80),
-                    (85, 90),
-                    (95, 105),
-                    (115, 125),
-                    (135, 140),
-                    (150, 500),
                 ];
             }
         }
@@ -117,6 +87,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 ImportFile = string.Empty;
 
+                CVDEMADistanceFilteringEnabled = true;
+
                 // London Time
                 SessionStartHour = 8;
                 SessionEndHour = 10;
@@ -145,11 +117,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             {
                 VWAP = OrderFlowVWAP(VWAPResolution.Standard, Bars.TradingHours, VWAPStandardDeviations.One, 1, 2, 3);
 
-                OnDataLoadedBase("London_CVD");
+                OnDataLoadedBase("CVD_London");
             }
             else if (State == State.Terminated)
             {
-                OnTerminatedBase("London_CVD");
+                OnTerminatedBase("CVD_London");
             }
         }
 
@@ -237,8 +209,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
 
             // Process fractals on the 1min
-            FractalManager.DetectFractalThreeBarWithPlatos(1);
-            FractalManager.DetectFractalFiveBarWithPlatos(1);
+            FractalManager.DetectFractalThreeBarWithPlatos(5);
+            FractalManager.DetectFractalFiveBarWithPlatos(5);
 
             if (!ImportTickAndCvdEnabled && OrderFlowCVDIndicator.CurrentBar >= 0)
                 CVDSeries[0] = OrderFlowCVDIndicator.DeltaClose[0];
@@ -344,13 +316,17 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
             }
 
+            /*
+             * DAX does not have any continuation trades.
+             * 
             if (CVD_TradeType == CVD_TradeType_Enum.Continuation && CurrentRange.GetPositionInRange(RangeBias, Close[0]) == DealingRangePosition.Discount)
             {
                 PrintDebug($"[TRADE_STATE_FAIL] skipping trade, not in premium.");
                 return;
             }
+            */
 
-            CreateCurrentTradeCVD();
+            CreateCurrentTradeCVD(5, true);
 
             CollectStatistics();
 
@@ -437,9 +413,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (Position.MarketPosition != MarketPosition.Flat)
                 return;
 
-            var tradePnl = BasePnlUpdates();
+            BasePnlUpdates();
 
+            /*
+             * DAX does not have any continuation trades, so we don't need to update the CVD trade type based on the PnL.
+             * 
             UpdateCVDTradeType(tradePnl > 0);
+            */
         }
 
         private void PerformCleanupBeforeSessionStart()
