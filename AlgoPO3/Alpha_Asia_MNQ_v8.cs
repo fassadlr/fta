@@ -94,14 +94,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 ConnectionLossHandling = ConnectionLossHandling.KeepRunning;
 
                 PO3 = 81;
-                Risk = 200; //$170
+                Risk = 175; //$150
 
                 LongEdgeMultiplier = 1.5;
                 ShortEdgeMultiplier = 1.5;
                 StopGrace = 10;
 
-                DailyMaxLoss = -600; // $300
-                DailyMaxProfit = 800; // $800
+                DailyMaxLoss = -400; // $300
+                DailyMaxProfit = 700; // $600
 
                 CVDEMADistanceFilteringEnabled = true;
 
