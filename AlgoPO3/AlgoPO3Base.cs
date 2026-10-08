@@ -26,8 +26,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         public bool CVDEMADistanceFilteringEnabled { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Spread", Order = 15, GroupName = "Parameters")]
-        public int Spread { get; set; }
+        [Display(Name = "EQ TP Adjust", Order = 15, GroupName = "Parameters")]
+        public int EqAdjust { get; set; }
 
         internal int[] BlockEndHoursParsed;
         internal int[] EdgeHoursParsed;
@@ -131,12 +131,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (CVD_TradeType == CVD_TradeType_Enum.Normal)
                 {
                     CurrentTrade.StopLoss = CalculateStopLossForCVDAlgos(timeframe);
-                    CurrentTrade.TakeProfit = (targetFullRange ? CurrentRange.Low : CurrentRange.Eq) + Spread;
+                    CurrentTrade.TakeProfit = (targetFullRange ? CurrentRange.Low : CurrentRange.Eq + EqAdjust);
                 }
                 else
                 {
-                    CurrentTrade.StopLoss = CurrentRange.High + Spread;
-                    CurrentTrade.TakeProfit = CurrentRange.Low + Spread;
+                    CurrentTrade.StopLoss = CurrentRange.High;
+                    CurrentTrade.TakeProfit = CurrentRange.Low;
                 }
             }
 
@@ -151,12 +151,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 if (CVD_TradeType == CVD_TradeType_Enum.Normal)
                 {
                     CurrentTrade.StopLoss = CalculateStopLossForCVDAlgos(timeframe);
-                    CurrentTrade.TakeProfit = (targetFullRange ? CurrentRange.High : CurrentRange.Eq) - Spread;
+                    CurrentTrade.TakeProfit = (targetFullRange ? CurrentRange.High : CurrentRange.Eq - EqAdjust);
                 }
                 else
                 {
-                    CurrentTrade.StopLoss = CurrentRange.Low - Spread;
-                    CurrentTrade.TakeProfit = CurrentRange.High - Spread;
+                    CurrentTrade.StopLoss = CurrentRange.Low;
+                    CurrentTrade.TakeProfit = CurrentRange.High;
                 }
             }
         }
@@ -283,7 +283,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     if (imbalanceStart > CurrentRange.ExtHigh)
                     {
                         PrintDebug($"[STOP_LOSS_IMB] {imbalanceStart} {CurrentRange.ExtHigh}");
-                        return imbalanceStart + Spread;
+                        return imbalanceStart;
                     }
 
                 if (FractalManager.Fractals.TryGetValue((timeframe, FractalType.HighThreeBar), out var threeBarFractal))
@@ -299,7 +299,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 // which one is the closest to the ext high 
                 if (candidates.Any())
-                    return candidates.Min(c => c.Item2) + Spread;
+                    return candidates.Min(c => c.Item2);
 
                 //return CurrentRange.ExtLow;
             }
@@ -310,7 +310,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     if (imbalanceStart < CurrentRange.ExtLow)
                     {
                         PrintDebug($"[STOP_LOSS_IMB] {imbalanceStart} {CurrentRange.ExtLow}");
-                        return imbalanceStart - Spread;
+                        return imbalanceStart;
                     }
 
                 if (FractalManager.Fractals.TryGetValue((timeframe, FractalType.LowThreeBar), out var threeBarFractal))
@@ -324,7 +324,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 // which one is the closest to the ext low
                 if (candidates.Any())
-                    return candidates.Max(x => x.Item2) - Spread;
+                    return candidates.Max(x => x.Item2);
 
                 //return CurrentRange.ExtLow;
             }

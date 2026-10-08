@@ -111,7 +111,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             TradingHalted = true;
 
             if (ExportStrategyLogsEnabled)
-                ExportStrategyLogs(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "StrategyLogs", $@"{Account.Name}_{DateTime.Now:yyyyMMdd}.csv"));
+                ExportStrategyLogs(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "StrategyLogs", $@"{Account.Name}_{Instrument.FullName}_{DateTime.Now:yyyyMMdd}.csv"));
         }
 
         #endregion

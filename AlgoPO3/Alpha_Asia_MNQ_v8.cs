@@ -87,7 +87,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Alpha Asia MNQ v8.0";
+                Name = "Alpha Asia MNQ v8.1";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -99,6 +99,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 LongEdgeMultiplier = 1.5;
                 ShortEdgeMultiplier = 1.5;
                 StopGrace = 10;
+                EqAdjust = 0;
 
                 DailyMaxLoss = -400; // $300
                 DailyMaxProfit = 700; // $600

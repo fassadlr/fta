@@ -76,7 +76,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "CVD Asia MNQ v1.12";
+                Name = "CVD Asia MNQ v1.13";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -92,6 +92,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 ShortEdgeMultiplier = 1.2;
 
                 CVDEMADistanceFilteringEnabled = true;
+
+                EqAdjust = 5;
 
                 ImportFile = string.Empty;
 

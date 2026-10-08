@@ -77,7 +77,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 PO3 = 81;
                 Risk = 200;
-                Spread = 3;
+                //Spread = 3; Removed
 
                 DailyMaxLoss = -400;
                 DailyMaxProfit = 1000;
