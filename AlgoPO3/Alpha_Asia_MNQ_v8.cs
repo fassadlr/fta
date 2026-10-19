@@ -87,7 +87,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Alpha Asia MNQ v8.1";
+                Name = "Alpha Asia MNQ v8.2";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -697,19 +697,41 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 return;
             }
 
-            // Exit completed
-            if (execution.Order.OrderState == OrderState.Filled && Position.MarketPosition == MarketPosition.Flat)
-            {
-                var tradePnl = BasePnlUpdates();
+            // Ignore anything that isn't a filled execution
+            if (execution.Order.OrderState != OrderState.Filled)
+                return;
 
+            // Wait until the entire position is closed
+            if (Position.MarketPosition != MarketPosition.Flat)
+                return;
+
+            double tradePnl = 0d;
+
+            try
+            {
+                tradePnl = BasePnlUpdates(time, execution.Order.Name.ToLowerInvariant() == "stop loss");
+            }
+            catch (Exception ex)
+            {
+                Print("Base PnL Updates Error");
+                Print(ex);
+            }
+
+            try
+            {
                 if (tradePnl >= 0)
                     ProcessSharedBorderRange(false);
                 else
                     ProcessSharedBorderRange(true);
-
-                rangeBreakDetected = false;
-                CurrentTrade.PendingOrder = null;
             }
+            catch (Exception ex)
+            {
+                Print("Shared Border Range Processing Error");
+                Print(ex);
+            }
+
+            rangeBreakDetected = false;
+            CurrentTrade.PendingOrder = null;
         }
 
         private void PerformCleanupBeforeSessionStart()

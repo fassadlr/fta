@@ -430,7 +430,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (Position.MarketPosition != MarketPosition.Flat)
                 return;
 
-            var tradePnl = BasePnlUpdates();
+            var tradePnl = BasePnlUpdates(time, execution.Order.Name.ToLowerInvariant() == "stop loss");
 
             UpdateCVDTradeType(tradePnl > 0);
         }

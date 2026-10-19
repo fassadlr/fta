@@ -83,22 +83,22 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (CurrentTrade.Bias == TradeBias.Long)
             {
-                EnterLong(0, CurrentTrade.PositionSize, LONG_TRADE);
-                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType}, at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
-
                 SetStopLoss(LONG_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, false);
                 SetProfitTarget(LONG_TRADE, CalculationMode.Price, CurrentTrade.TakeProfit);
+
+                EnterLong(0, CurrentTrade.PositionSize, LONG_TRADE);
+                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType}, at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
 
                 return;
             }
 
             if (CurrentTrade.Bias == TradeBias.Short)
             {
-                EnterShort(0, CurrentTrade.PositionSize, SHORT_TRADE);
-                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType}, at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
-
                 SetStopLoss(SHORT_TRADE, CalculationMode.Price, CurrentTrade.StopLoss, false);
                 SetProfitTarget(SHORT_TRADE, CalculationMode.Price, CurrentTrade.TakeProfit);
+
+                EnterShort(0, CurrentTrade.PositionSize, SHORT_TRADE);
+                PrintDebug($"[PLACE_TRADE_MARKET] {CurrentTrade.Bias} {CurrentTrade.CVD_TradeType}, at {CurrentTrade.Entry}, SL {CurrentTrade.StopLoss}, TP {CurrentTrade.TakeProfit}");
 
                 return;
             }
@@ -125,7 +125,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 CurrentTrade = new TradeDetails()
                 {
                     Bias = TradeBias.Short,
-                    Entry = Close[0] // This is set for virtual trade purposes but it is essentially a market order.
+                    Entry = Close[0], // This is set for virtual trade purposes but it is essentially a market order.
+                    EntryTime = Time[0] // Market order, so entry time is now.
                 };
 
                 if (CVD_TradeType == CVD_TradeType_Enum.Normal)
@@ -145,7 +146,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 CurrentTrade = new TradeDetails()
                 {
                     Bias = TradeBias.Long,
-                    Entry = Close[0] // This is set for virtual trade purposes but it is essentially a market order.
+                    Entry = Close[0], // This is set for virtual trade purposes but it is essentially a market order.
+                    EntryTime = Time[0] // Market order, so entry time is now.
                 };
 
                 if (CVD_TradeType == CVD_TradeType_Enum.Normal)

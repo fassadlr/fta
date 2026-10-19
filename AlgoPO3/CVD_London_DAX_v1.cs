@@ -413,7 +413,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (Position.MarketPosition != MarketPosition.Flat)
                 return;
 
-            BasePnlUpdates();
+            BasePnlUpdates(time, execution.Order.Name.ToLowerInvariant() == "stop loss");
 
             /*
              * DAX does not have any continuation trades, so we don't need to update the CVD trade type based on the PnL.

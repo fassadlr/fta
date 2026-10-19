@@ -328,24 +328,22 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         #region Base Pnl
 
-        internal double BasePnlUpdates()
+        internal double BasePnlUpdates(DateTime tradeExitTime, bool isLoss)
         {
-            var trade = SystemPerformance.AllTrades[SystemPerformance.AllTrades.Count - 1];
-
             double tradePnl;
 
-            if (trade.ProfitCurrency >= 0)
-                tradePnl = Math.Abs(CurrentTrade.TakeProfit - CurrentTrade.Entry) * CurrentTrade.PositionSize * Instrument.MasterInstrument.PointValue;
-            else
+            if (isLoss)
                 tradePnl = -Math.Abs(CurrentTrade.Entry - CurrentTrade.StopLoss) * CurrentTrade.PositionSize * Instrument.MasterInstrument.PointValue;
+            else
+                tradePnl = Math.Abs(CurrentTrade.TakeProfit - CurrentTrade.Entry) * CurrentTrade.PositionSize * Instrument.MasterInstrument.PointValue;
 
             tradePnl = Math.Round(tradePnl);
 
             var winLoss = tradePnl >= 0 ? "Win" : "Loss";
 
             var tradeCSV =
-                $"{trade.Entry.Time}," +
-                $"{trade.Exit.Time}," +
+                $"{CurrentTrade.EntryTime}," +
+                $"{tradeExitTime}," +
                 $"{CurrentTrade.Bias}," +
                 $"{CurrentTrade.OrderType}," +
                 $"{winLoss}," +
@@ -684,6 +682,33 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             tradeDetails.PendingOrder = limitOrder;
 
             CurrentTrade = tradeDetails;
+        }
+
+        internal bool ImbalanceFormed(TradeBias tradeBias, int minTicks = 1)
+        {
+            if (tradeBias == TradeBias.Long)
+            {
+                if (Low[0] > High[2] &&         // IMB
+                    Low[0] - High[2] >= minTicks       // IMB gap distance
+                   )
+                {
+                    PrintDebug($"[BULLISH_IMB_FORMED] {tradeBias}: {High[2]} {Low[0]}");
+                    return true;
+                }
+            }
+
+            if (tradeBias == TradeBias.Short)
+            {
+                if (High[0] < Low[2] &&         // IMB
+                    Low[2] - High[0] >= minTicks       // IMB gap distance
+                   )
+                {
+                    PrintDebug($"[BEARISH_IMB_FORMED] {tradeBias}: {High[0]} {Low[2]}");
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         internal bool ImbalanceFormed(TradeBias tradeBias, out double imbalanceStart)
