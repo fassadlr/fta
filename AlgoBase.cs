@@ -53,6 +53,10 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         [Display(Name = "Daily Max Profit", Order = 9, GroupName = "Parameters")]
         public double DailyMaxProfit { get; set; }
 
+        [NinjaScriptProperty]
+        [Display(Name = "Daily Max Consecutive Wins", Order = 10, GroupName = "Parameters")]
+        public double DailyMaxConsecutiveWins { get; set; }
+
         internal double LastFractalHigh = 0;
         internal DateTime LastFractalHighTime;
 

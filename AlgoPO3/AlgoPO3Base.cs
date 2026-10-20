@@ -193,7 +193,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             if (isWin)
             {
                 if (CVD_TradeType == CVD_TradeType_Enum.Continuation)
+                {
                     CVD_TradeType = CVD_TradeType_Enum.Normal;
+
+                    // We need to wait for a new break before looking for another entry.
+                    rangeBreakDetected = false;
+                }
                 else
                     CVD_TradeType = CVD_TradeType_Enum.Continuation;
             }
@@ -248,13 +253,17 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 UpdateCVDTradeType(tickPrice <= CurrentTrade.TakeProfit);
 
+                var pnl = 0.0;
+
                 if (tickPrice <= CurrentTrade.TakeProfit)
-                    DayPnLVirtual += (CurrentTrade.Entry - CurrentTrade.TakeProfit) * contractTickValue;
+                    pnl = (CurrentTrade.Entry - CurrentTrade.TakeProfit) * contractTickValue;
 
                 if (tickPrice >= CurrentTrade.StopLoss)
-                    DayPnLVirtual -= (CurrentTrade.StopLoss - CurrentTrade.Entry) * contractTickValue;
+                    pnl = -((CurrentTrade.StopLoss - CurrentTrade.Entry) * contractTickValue);
 
-                PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} closed at {tickPrice} Virtual Day Pnl {Math.Round(DayPnLVirtual)}");
+                DayPnLVirtual += pnl;
+
+                PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} closed at {tickPrice} Trade Pnl {Math.Round(pnl)} Virtual Day Pnl {Math.Round(DayPnLVirtual)}");
             }
 
             if (CurrentTrade.Bias == TradeBias.Long &&
@@ -265,13 +274,17 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 UpdateCVDTradeType(tickPrice >= CurrentTrade.TakeProfit);
 
+                var pnl = 0.0;
+
                 if (tickPrice >= CurrentTrade.TakeProfit)
-                    DayPnLVirtual += (CurrentTrade.TakeProfit - CurrentTrade.Entry) * contractTickValue;
+                    pnl = (CurrentTrade.TakeProfit - CurrentTrade.Entry) * contractTickValue;
 
                 if (tickPrice <= CurrentTrade.StopLoss)
-                    DayPnLVirtual -= (CurrentTrade.Entry - CurrentTrade.StopLoss) * contractTickValue;
+                    pnl = -((CurrentTrade.StopLoss - CurrentTrade.Entry) * contractTickValue);
 
-                PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} closed at {tickPrice} Virtual Day Pnl {Math.Round(DayPnLVirtual)}");
+                DayPnLVirtual += pnl;
+
+                PrintInfo($"[VIRTUAL_POSITION] {CurrentTrade.Bias} closed at {tickPrice} Trade Pnl {Math.Round(pnl)} Virtual Day Pnl {Math.Round(DayPnLVirtual)}");
             }
         }
 

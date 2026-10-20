@@ -77,7 +77,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "CVD Asia MGC v1.14";
+                Name = "CVD Asia MGC v1.15";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -260,6 +260,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     PreviousRange = CurrentRange;
 
                     CurrentRange = found;
+
+                    // always reset the CVD trade type when a new range is detected.
+                    CVD_TradeType = CVD_TradeType_Enum.Normal;
 
                     rangeBreakDetected = true;
 

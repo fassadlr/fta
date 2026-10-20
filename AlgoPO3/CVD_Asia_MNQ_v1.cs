@@ -76,14 +76,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "CVD Asia MNQ v1.14";
+                Name = "CVD Asia MNQ v1.15";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
                 ConnectionLossHandling = ConnectionLossHandling.KeepRunning;
 
                 PO3 = 81;
-                Risk = 250;
+                Risk = 200;
 
                 DailyMaxLoss = -500;
                 DailyMaxProfit = 1100;
@@ -92,6 +92,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 ShortEdgeMultiplier = 1.2;
 
                 CVDEMADistanceFilteringEnabled = true;
+
+                DailyMaxConsecutiveWins = 2;
 
                 EqAdjust = 5;
 
@@ -253,6 +255,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                     CurrentRange = found;
 
+                    // always reset the CVD trade type when a new range is detected.
+                    CVD_TradeType = CVD_TradeType_Enum.Normal;
+
                     rangeBreakDetected = true;
 
                     PrintDebug($"[RANGE_BREAK_DETECTED] {CurrentRange}");
@@ -304,14 +309,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
             if (CVD_TradeType == CVD_TradeType_Enum.Normal && CurrentRange.GetPositionInRange(RangeBias, Close[0]) == DealingRangePosition.Premium)
             {
-                PrintDebug($"[TRADE_STATE_FAIL] skipping trade, not in discount.");
-                rangeBreakDetected = false;
+                PrintDebug($"[TRADE_STATE_FAIL] range bias {RangeBias} skipping trade, not in discount.");
                 return;
             }
 
             if (CVD_TradeType == CVD_TradeType_Enum.Continuation && CurrentRange.GetPositionInRange(RangeBias, Close[0]) == DealingRangePosition.Discount)
             {
-                PrintDebug($"[TRADE_STATE_FAIL] skipping trade, not in premium.");
+                PrintDebug($"[TRADE_STATE_FAIL] range bias {RangeBias} skipping trade, not in premium.");
                 return;
             }
 
