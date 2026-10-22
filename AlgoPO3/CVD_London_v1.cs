@@ -9,7 +9,7 @@ using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 {
-    public class AlgoPO3_CVD_London_v1 : AlgoPO3Base
+    public class CVD_London_v1 : AlgoPO3Base
     {
         [NinjaScriptProperty]
         [Display(Name = "Risk", Order = 20, GroupName = "Parameters")]
@@ -70,7 +70,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "London CVD v1.3";
+                Name = "CVD London v1.3";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
@@ -84,6 +84,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 LongEdgeMultiplier = 1;
                 ShortEdgeMultiplier = 1;
+
+                CVDEMADistanceFilteringEnabled = true;
 
                 // London Time
                 SessionStartHour = 8;
@@ -338,16 +340,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 if (CVDEMADistanceFilteringEnabled)
                 {
-                    var CVD_EMA_DistanceCheck =
-                        (CurrentTrade.CVD_EMA_Distance >= 50 && CurrentTrade.CVD_EMA_Distance < 150) ||
-                        (CurrentTrade.CVD_EMA_Distance >= 200 && CurrentTrade.CVD_EMA_Distance < 500) ||
-                        (CurrentTrade.CVD_EMA_Distance >= 600 && CurrentTrade.CVD_EMA_Distance < 900);
-
-                    if (!CVD_EMA_DistanceCheck)
+                    if (!IsInBucket(CurrentTrade.CVD_EMA_Distance, LongBuckets))
                     {
                         PrintDebug($"[CVD_DISTANCE_FAIL_LONG] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
-                        CurrentTrade.Entry = Close[0];
-
                         CurrentTrade.Virtual = true;
                         CurrentTrade.VirtualOpen = true;
 
@@ -355,7 +350,6 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                         {
                             CurrentTrade.VirtualTickIndex = FindTickIndex(Time[0].Ticks);
                         }
-
                     }
                 }
             }
@@ -368,20 +362,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                     return;
                 }
 
-
                 if (CVDEMADistanceFilteringEnabled)
                 {
-                    var CVD_EMA_DistanceCheck =
-                    (CurrentTrade.CVD_EMA_Distance >= 0 && CurrentTrade.CVD_EMA_Distance < 100) ||
-                    (CurrentTrade.CVD_EMA_Distance >= 150 && CurrentTrade.CVD_EMA_Distance < 300) ||
-                    (CurrentTrade.CVD_EMA_Distance >= 500 && CurrentTrade.CVD_EMA_Distance < 600) ||
-                    (CurrentTrade.CVD_EMA_Distance >= 700 && CurrentTrade.CVD_EMA_Distance < 800);
-
-                    if (!CVD_EMA_DistanceCheck)
+                    if (!IsInBucket(CurrentTrade.CVD_EMA_Distance, ShortBuckets))
                     {
                         PrintDebug($"[CVD_DISTANCE_FAIL_SHORT] EMA DISTANCE {CurrentTrade.CVD_EMA_Distance}");
-                        CurrentTrade.Entry = Close[0];
-
                         CurrentTrade.Virtual = true;
                         CurrentTrade.VirtualOpen = true;
 

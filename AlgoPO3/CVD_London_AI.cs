@@ -157,7 +157,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
                 TradeStartHHMM = 800;
                 TradeEndHHMM = 955;
                 ChartTimeZoneId = "";
-                SkipOpenCandles = 1;
+                SkipOpenCandles = 0;
 
                 ImportFile = string.Empty;
             }
