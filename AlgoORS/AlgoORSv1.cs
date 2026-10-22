@@ -95,6 +95,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoORS
                 SessionStartTime = 144500;
                 SessionEndTime = 160000;
                 StopGrace = 10;
+
+                ImportFile = string.Empty;
             }
             else if (State == State.Configure)
             {
