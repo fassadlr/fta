@@ -1,58 +1,94 @@
 #region Using declarations
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using NinjaTrader.Cbi;
+using NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3;
+using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
+
 #endregion
 
 // PO3 81 London Open strategy - MNQ 1 minute
 namespace NinjaTrader.NinjaScript.Strategies.FTA
 {
-    public class PO3_81_LondonOpen : Strategy
+    public class PO3_81_LondonOpen : AlgoPO3Base
     {
-        #region DealingRange
-        private class DealingRange
-        {
-            public double Low, ExtLow, FV1, FV2, BR1, BR2, MB1, MB2, Eq, MB3, MB4, BR3, BR4, FV3, FV4, High, ExtHigh;
-            public double OBCE1, ExtensionLowCE, FV2Entry, MBCE1, MBCE2, FV3Entry, OBCE2, ExtensionHighCE, ExtensionRange;
-            public int MinCovered, MaxCovered;
+        #region Properties
 
-            public DealingRange(int po3, double price)
-            {
-                Low = Math.Floor(price / po3) * po3;
-                ExtLow = Low - (po3 * 0.111);
-                FV1 = Low + (po3 * 0.11);
-                FV2 = Low + (po3 * 0.17);
-                BR1 = Low + (po3 * 0.29);
-                BR2 = Low + (po3 * 0.41);
-                MB1 = Low + (po3 * 0.41);
-                MB2 = Low + (po3 * 0.47);
-                Eq = Low + (po3 * 0.50);
-                MB3 = Low + (po3 * 0.53);
-                MB4 = Low + (po3 * 0.59);
-                BR3 = Low + (po3 * 0.59);
-                BR4 = Low + (po3 * 0.71);
-                FV3 = Low + (po3 * 0.83);
-                FV4 = Low + (po3 * 0.89);
-                High = Low + po3;
-                ExtHigh = High + (po3 * 0.111);
+        [NinjaScriptProperty]
+        [Range(1, double.MaxValue)]
+        [Display(Name = "Risk per trade ($)", GroupName = "Risk", Order = 0)]
+        public double RiskPerTrade { get; set; }
 
-                OBCE1 = Low + ((FV1 - Low) / 2);
-                ExtensionLowCE = ExtLow + ((Low - ExtLow) / 2);
-                FV2Entry = Math.Round(FV2 / 0.05) * 0.05;
-                MBCE1 = MB1 + ((MB2 - MB1) / 2);
-                MBCE2 = MB3 + ((MB4 - MB3) / 2);
-                FV3Entry = Math.Round(FV3 / 0.05) * 0.05;
-                OBCE2 = FV4 + ((High - FV4) / 2);
-                ExtensionHighCE = ExtHigh - ((ExtHigh - High) / 2);
+        [NinjaScriptProperty]
+        [Range(1, int.MaxValue)]
+        [Display(Name = "Max contracts", GroupName = "Risk", Order = 1)]
+        public int MaxContracts { get; set; }
 
-                ExtensionRange = Math.Round(Low - ExtLow);
-                MinCovered = 0;
-                MaxCovered = 0;
-            }
-        }
+        [NinjaScriptProperty]
+        [Range(0, double.MaxValue)]
+        [Display(Name = "Min RR (all trades)", GroupName = "Risk", Order = 2)]
+        public double MinRR { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 20)]
+        [Display(Name = "Max trades per day", GroupName = "Risk", Order = 3)]
+        public int MaxTradesPerDay { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 2359)]
+        [Display(Name = "Reference time UK (HHMM)", GroupName = "Time (UK)", Order = 0)]
+        public int TrackStartHHMM { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 2359)]
+        [Display(Name = "Trade start UK (HHMM)", GroupName = "Time (UK)", Order = 1)]
+        public int TradeStartHHMM { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 2359)]
+        [Display(Name = "Last entry cut-off UK (HHMM)", GroupName = "Time (UK)", Order = 2)]
+        public int TradeEndHHMM { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Chart time zone ID (blank = PC local)", GroupName = "Time (UK)", Order = 3)]
+        public string ChartTimeZoneId { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0.0, 100.0)]
+        [Display(Name = "Re-entry confirmation points", GroupName = "Parameters", Order = 0)]
+        public double ReentryConfirmPoints { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 10)]
+        [Display(Name = "Fractal strength", GroupName = "Parameters", Order = 1)]
+        public int FractalStrength { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(10, 5000)]
+        [Display(Name = "Fractal lookback (bars)", GroupName = "Parameters", Order = 2)]
+        public int FractalLookback { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Allow equal highs/lows as fractal", GroupName = "Parameters", Order = 3)]
+        public bool AllowEqualFractals { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0.0, 100.0)]
+        [Display(Name = "Stop buffer", GroupName = "Parameters", Order = 3)]
+        public double StopBufferPoints { get; set; }
+
+        internal override List<(double Min, double Max)> LongBuckets => throw new NotImplementedException();
+
+        internal override List<(double Min, double Max)> LongEdgeBuckets => throw new NotImplementedException();
+
+        internal override List<(double Min, double Max)> ShortBuckets => throw new NotImplementedException();
+
+        internal override List<(double Min, double Max)> ShortEdgeBuckets => throw new NotImplementedException();
         #endregion
 
         #region State
+
         // Setup phases
         private const int PhaseWaitingForRangeBreak = 0;   // waiting for price to enter a new range
         private const int PhaseInsideArmedRange = 1;        // price is inside the armed range, waiting for it to leave
@@ -95,22 +131,29 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 TimeInForce = TimeInForce.Gtc;
                 BarsRequiredToTrade = 20;
 
-                Po3Size = 81;
-                RiskPerTrade = 200;
+                PO3 = 81;
+
+                RiskPerTrade = 250;
                 MaxContracts = 50;
                 MinRR = 0.5;
-                EqOffsetPoints = 1;
-                FractalStrength = 2;
+                EqAdjust = 0;
+                FractalStrength = 1;
                 FractalLookback = 100;
                 StopBufferPoints = 3;
-                MaxTradesPerDay = 5;
+                MaxTradesPerDay = 2;
                 ReentryConfirmPoints = 1;
-                EnableDebug = true;
+                DebugLogEnabled = true;
                 AllowEqualFractals = false;
                 TrackStartHHMM = 700;
                 TradeStartHHMM = 800;
                 TradeEndHHMM = 955;
                 ChartTimeZoneId = "";
+
+                ImportFile = string.Empty;
+            }
+            else if (State == State.Configure)
+            {
+                Events = NewsEvents.Events();
             }
             else if (State == State.DataLoaded)
             {
@@ -126,7 +169,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         private static TimeSpan HhmmToTimeSpan(int hhmm) { return new TimeSpan(hhmm / 100, hhmm % 100, 0); }
 
-        private int GetRangeIndex(double price) { return (int)Math.Floor(price / Po3Size); }
+        private int GetRangeIndex(double price) { return (int)Math.Floor(price / PO3); }
 
         protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
         {
@@ -137,21 +180,28 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         private void Log(string message)
         {
-            if (EnableDebug) Print(ToUkTime(Time[0]).ToString("yyyy-MM-dd HH:mm") + " UK | " + message);
+            if (DebugLogEnabled)
+                Print(ToUkTime(Time[0]).ToString("yyyy-MM-dd HH:mm") + " UK | " + message);
         }
 
         protected override void OnBarUpdate()
         {
             RunStrategyLogic();
 
-            if (!EnableDebug || !referenceRangeSet || CurrentBar < BarsRequiredToTrade) return;
+            if (!DebugLogEnabled || !referenceRangeSet || CurrentBar < BarsRequiredToTrade)
+                return;
+
             TimeSpan barTimeOfDay = ToUkTime(Time[0]).TimeOfDay;
-            if (barTimeOfDay < HhmmToTimeSpan(TrackStartHHMM) || barTimeOfDay > HhmmToTimeSpan(TradeEndHHMM)) return;
+
+            if (barTimeOfDay < HhmmToTimeSpan(TrackStartHHMM) || barTimeOfDay > HhmmToTimeSpan(TradeEndHHMM))
+                return;
 
             int loggedRangeIndex = GetRangeIndex(Close[0]);
-            string stateText = "range " + (loggedRangeIndex * Po3Size) + " | ref " + (referenceRangeIndex * Po3Size) + " | phase " + setupPhase +
-                               " | armed " + (setupPhase == PhaseWaitingForRangeBreak ? "-" : (armedRangeIndex * Po3Size).ToString()) + " dir " + armedDirection +
+
+            string stateText = "range " + (loggedRangeIndex * PO3) + " | ref " + (referenceRangeIndex * PO3) + " | phase " + setupPhase +
+                               " | armed " + (setupPhase == PhaseWaitingForRangeBreak ? "-" : (armedRangeIndex * PO3).ToString()) + " dir " + armedDirection +
                                " | lastDir " + lastRangeChangeDirection + " | pos " + Position.MarketPosition + " | trades " + tradesTakenToday;
+
             if (stateText != lastLoggedState)
             {
                 Log("close " + Close[0] + " | " + stateText);
@@ -182,6 +232,20 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 wasInPositionLastBar = false;
                 lastExitWasTarget = false;
                 lastLoggedState = "";
+                TradingHalted = false;   // halt is per day: reset at the start of each new session
+            }
+
+            if (TradingHalted)
+                return;
+
+            // Skip all day events (easter etc).
+            var eventForToday = GetNewsEventForToday();
+            if (eventForToday != null &&
+                eventForToday.EventTime.Date == Time[0].Date &&
+                eventForToday.AllDay && Position.MarketPosition == MarketPosition.Flat)
+            {
+                HaltTrading($"[TRADING_HALTED] Trading skipped for day due to all day event {eventForToday.EventTime}");
+                return;
             }
 
             TimeSpan ukTimeOfDay = ukTime.TimeOfDay;
@@ -228,7 +292,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                     // Target hit: that leg is spent. Same range cannot be re-armed - wait for a NEW range break from here.
                     referenceRangeIndex = currentRangeIndex;
                     setupPhase = PhaseWaitingForRangeBreak;
-                    Log("Target hit - leg invalid, waiting for new range break from " + (currentRangeIndex * Po3Size));
+                    Log("Target hit - leg invalid, waiting for new range break from " + (currentRangeIndex * PO3));
                 }
                 else if (lastRangeChangeDirection != 0)
                 {
@@ -260,21 +324,21 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 {
                     // Scenario 1: new range entered since 07:00
                     int openDirection = currentRangeIndex > referenceRangeIndex ? 1 : -1;
-                    DealingRange openRange = new DealingRange(Po3Size, currentRangeIndex * Po3Size + Po3Size / 2.0);
-                    double openLegTargetPrice = openDirection > 0 ? openRange.Eq - EqOffsetPoints : openRange.Eq + EqOffsetPoints;
+                    DealingRange openRange = new DealingRange(PO3, currentRangeIndex * PO3 + PO3 / 2.0);
+                    double openLegTargetPrice = openDirection > 0 ? openRange.Eq - EqAdjust : openRange.Eq + EqAdjust;
                     bool openLegTargetAlreadyReached = openDirection > 0 ? highSinceRangeEntry >= openLegTargetPrice : lowSinceRangeEntry <= openLegTargetPrice;
 
                     if (openLegTargetAlreadyReached)
                     {
                         // The 07:00-08:00 leg already ran to its target level: no trade, wait for a new range break
-                        Log("London open: leg already reached target level " + openLegTargetPrice.ToString("F2") + " - no trade, waiting for new range break from " + (currentRangeIndex * Po3Size));
+                        Log("London open: leg already reached target level " + openLegTargetPrice.ToString("F2") + " - no trade, waiting for new range break from " + (currentRangeIndex * PO3));
                         referenceRangeIndex = currentRangeIndex;
                         setupPhase = PhaseWaitingForRangeBreak;
                     }
                     else if (!TryEnter(openDirection, currentRangeIndex))
                     {
                         // Rejected (RR too low / no valid stop) but target not reached: leg still valid for a leave and re-entry
-                        Log("London open: entry rejected, target not reached - range " + (currentRangeIndex * Po3Size) + " armed, waiting for leave and re-entry");
+                        Log("London open: entry rejected, target not reached - range " + (currentRangeIndex * PO3) + " armed, waiting for leave and re-entry");
                         armedRangeIndex = currentRangeIndex;
                         armedDirection = openDirection;
                         setupPhase = PhaseInsideArmedRange;
@@ -301,14 +365,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             else if (setupPhase == PhaseInsideArmedRange)
             {
                 // Entered the armed range and ran straight to the target level without a re-entry: leg is invalid
-                DealingRange armedRange = new DealingRange(Po3Size, armedRangeIndex * Po3Size + Po3Size / 2.0);
-                double armedLegTargetPrice = armedDirection > 0 ? armedRange.Eq - EqOffsetPoints : armedRange.Eq + EqOffsetPoints;
+                DealingRange armedRange = new DealingRange(PO3, armedRangeIndex * PO3 + PO3 / 2.0);
+                double armedLegTargetPrice = armedDirection > 0 ? armedRange.Eq - EqAdjust : armedRange.Eq + EqAdjust;
                 bool armedLegTargetReached = armedDirection > 0 ? High[0] >= armedLegTargetPrice : Low[0] <= armedLegTargetPrice;
                 if (armedLegTargetReached && (currentRangeIndex - armedRangeIndex) * armedDirection <= 0)
                 {
                     referenceRangeIndex = currentRangeIndex;
                     setupPhase = PhaseWaitingForRangeBreak;
-                    Log("Price reached target level " + armedLegTargetPrice.ToString("F2") + " before re-entry - leg invalid, waiting for new range break from " + (currentRangeIndex * Po3Size));
+                    Log("Price reached target level " + armedLegTargetPrice.ToString("F2") + " before re-entry - leg invalid, waiting for new range break from " + (currentRangeIndex * PO3));
                     return;
                 }
 
@@ -321,8 +385,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 if (currentRangeIndex == armedRangeIndex)
                 {
                     // Re-entry must close at least ReentryConfirmPoints inside the range
-                    double armedRangeLow = armedRangeIndex * Po3Size;
-                    double armedRangeHigh = armedRangeLow + Po3Size;
+                    double armedRangeLow = armedRangeIndex * PO3;
+                    double armedRangeHigh = armedRangeLow + PO3;
                     double closeDepthInsideRange = armedDirection > 0 ? Close[0] - armedRangeLow : armedRangeHigh - Close[0];
                     if (closeDepthInsideRange < ReentryConfirmPoints)
                     {
@@ -354,25 +418,29 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         private bool TryEnter(int direction, int rangeIndex)
         {
-            DealingRange dealingRange = new DealingRange(Po3Size, rangeIndex * Po3Size + Po3Size / 2.0);
+            DealingRange dealingRange = new DealingRange(PO3, rangeIndex * PO3 + PO3 / 2.0);
             double entryPrice = Close[0];
             double stopPrice, targetPrice, rewardPoints, riskPoints;
+            int stopFractalBarsAgo;
+            string stopFractalText;
 
             if (direction > 0)
             {
-                double fractalLowPrice = FindFractalLow(dealingRange.ExtLow);
+                double fractalLowPrice = FindFractalLow(dealingRange.ExtLow, out stopFractalBarsAgo);
                 if (double.IsNaN(fractalLowPrice)) { Log("No entry: no fractal low below ExtLow " + dealingRange.ExtLow.ToString("F2") + " in lookback"); return false; }
+                stopFractalText = fractalLowPrice.ToString("F2") + " from " + ToUkTime(Time[stopFractalBarsAgo]).ToString("HH:mm") + " UK (" + stopFractalBarsAgo + " bars ago, ExtLow " + dealingRange.ExtLow.ToString("F2") + ")";
                 stopPrice = fractalLowPrice - StopBufferPoints;
-                targetPrice = dealingRange.Eq - EqOffsetPoints;
+                targetPrice = dealingRange.Eq - EqAdjust;
                 rewardPoints = targetPrice - entryPrice;
                 riskPoints = entryPrice - stopPrice;
             }
             else
             {
-                double fractalHighPrice = FindFractalHigh(dealingRange.ExtHigh);
+                double fractalHighPrice = FindFractalHigh(dealingRange.ExtHigh, out stopFractalBarsAgo);
                 if (double.IsNaN(fractalHighPrice)) { Log("No entry: no fractal high above ExtHigh " + dealingRange.ExtHigh.ToString("F2") + " in lookback"); return false; }
+                stopFractalText = fractalHighPrice.ToString("F2") + " from " + ToUkTime(Time[stopFractalBarsAgo]).ToString("HH:mm") + " UK (" + stopFractalBarsAgo + " bars ago, ExtHigh " + dealingRange.ExtHigh.ToString("F2") + ")";
                 stopPrice = fractalHighPrice + StopBufferPoints;
-                targetPrice = dealingRange.Eq + EqOffsetPoints;
+                targetPrice = dealingRange.Eq + EqAdjust;
                 rewardPoints = entryPrice - targetPrice;
                 riskPoints = stopPrice - entryPrice;
             }
@@ -413,131 +481,86 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             }
 
             tradesTakenToday++;
-            Log((direction > 0 ? "ENTER LONG " : "ENTER SHORT ") + "qty " + contracts + " entry~" + entryPrice + " stop " + stopPrice + " tp " + targetPrice + " RR " + (rewardPoints / riskPoints).ToString("F2"));
+            Log((direction > 0 ? "ENTER LONG " : "ENTER SHORT ") + "qty " + contracts + " entry~" + entryPrice + " stop " + stopPrice + " tp " + targetPrice + " RR " + (rewardPoints / riskPoints).ToString("F2") + " | stop fractal " + stopFractalText);
             return true;
         }
 
-        // Most recent confirmed fractal low that sits below 'belowPrice'
-        private double FindFractalLow(double belowPrice)
+        // Most recent strict fractal low below 'belowPrice' (stop for longs).
+        // Equal-low pivots (a low that ties a neighbour) cannot be the stop themselves, but they act as a floor:
+        // a strict fractal older than one is only valid if its low is LOWER than that equal-low pivot.
+        private double FindFractalLow(double belowPrice, out int fractalBarsAgo)
         {
+            fractalBarsAgo = -1;
+            double equalPivotFloor = double.MaxValue;   // lowest equal-low pivot seen so far (more recent bars)
             int maxBarsAgo = Math.Min(FractalLookback, CurrentBar - FractalStrength);
             for (int barsAgo = FractalStrength; barsAgo <= maxBarsAgo; barsAgo++)
             {
-                bool isFractal = true;
+                double candidateLow = Low[barsAgo];
+                bool isStrictFractal = true;
+                bool isEqualPivot = true;   // lows are >= neighbours' lows being allowed to tie
                 for (int neighbourOffset = 1; neighbourOffset <= FractalStrength; neighbourOffset++)
                 {
-                    double candidateLow = Low[barsAgo];
-                    double lowerNeighbourBefore = Low[barsAgo + neighbourOffset];   // older bar
-                    double lowerNeighbourAfter = Low[barsAgo - neighbourOffset];    // newer bar
-                    bool failsFractal = AllowEqualFractals
-                        ? (candidateLow > lowerNeighbourAfter || candidateLow > lowerNeighbourBefore)
-                        : (candidateLow >= lowerNeighbourAfter || candidateLow >= lowerNeighbourBefore);
-                    if (failsFractal) { isFractal = false; break; }
+                    double olderLow = Low[barsAgo + neighbourOffset];
+                    double newerLow = Low[barsAgo - neighbourOffset];
+                    if (candidateLow >= newerLow || candidateLow >= olderLow) isStrictFractal = false;
+                    if (candidateLow > newerLow || candidateLow > olderLow) isEqualPivot = false;
                 }
-                if (isFractal && Low[barsAgo] < belowPrice) return Low[barsAgo];
+
+                if (AllowEqualFractals)
+                {
+                    if (isEqualPivot && candidateLow < belowPrice) { fractalBarsAgo = barsAgo; return candidateLow; }
+                    continue;
+                }
+
+                if (isStrictFractal)
+                {
+                    if (candidateLow < belowPrice && candidateLow < equalPivotFloor) { fractalBarsAgo = barsAgo; return candidateLow; }
+                }
+                else if (isEqualPivot)
+                {
+                    equalPivotFloor = Math.Min(equalPivotFloor, candidateLow);
+                }
             }
             return double.NaN;
         }
 
-        // Most recent confirmed fractal high that sits above 'abovePrice'
-        private double FindFractalHigh(double abovePrice)
+        // Most recent strict fractal high above 'abovePrice' (stop for shorts).
+        // Equal-high pivots (a high that ties a neighbour) cannot be the stop themselves, but they act as a floor:
+        // a strict fractal older than one is only valid if its high is HIGHER than that equal-high pivot.
+        private double FindFractalHigh(double abovePrice, out int fractalBarsAgo)
         {
+            fractalBarsAgo = -1;
+            double equalPivotCeiling = double.MinValue;   // highest equal-high pivot seen so far (more recent bars)
             int maxBarsAgo = Math.Min(FractalLookback, CurrentBar - FractalStrength);
             for (int barsAgo = FractalStrength; barsAgo <= maxBarsAgo; barsAgo++)
             {
-                bool isFractal = true;
+                double candidateHigh = High[barsAgo];
+                bool isStrictFractal = true;
+                bool isEqualPivot = true;
                 for (int neighbourOffset = 1; neighbourOffset <= FractalStrength; neighbourOffset++)
                 {
-                    double candidateHigh = High[barsAgo];
-                    double higherNeighbourBefore = High[barsAgo + neighbourOffset]; // older bar
-                    double higherNeighbourAfter = High[barsAgo - neighbourOffset];  // newer bar
-                    bool failsFractal = AllowEqualFractals
-                        ? (candidateHigh < higherNeighbourAfter || candidateHigh < higherNeighbourBefore)
-                        : (candidateHigh <= higherNeighbourAfter || candidateHigh <= higherNeighbourBefore);
-                    if (failsFractal) { isFractal = false; break; }
+                    double olderHigh = High[barsAgo + neighbourOffset];
+                    double newerHigh = High[barsAgo - neighbourOffset];
+                    if (candidateHigh <= newerHigh || candidateHigh <= olderHigh) isStrictFractal = false;
+                    if (candidateHigh < newerHigh || candidateHigh < olderHigh) isEqualPivot = false;
                 }
-                if (isFractal && High[barsAgo] > abovePrice) return High[barsAgo];
+
+                if (AllowEqualFractals)
+                {
+                    if (isEqualPivot && candidateHigh > abovePrice) { fractalBarsAgo = barsAgo; return candidateHigh; }
+                    continue;
+                }
+
+                if (isStrictFractal)
+                {
+                    if (candidateHigh > abovePrice && candidateHigh > equalPivotCeiling) { fractalBarsAgo = barsAgo; return candidateHigh; }
+                }
+                else if (isEqualPivot)
+                {
+                    equalPivotCeiling = Math.Max(equalPivotCeiling, candidateHigh);
+                }
             }
             return double.NaN;
         }
-
-        #region Properties
-        [NinjaScriptProperty]
-        [Range(0.0, 100.0)]
-        [Display(Name = "Re-entry confirmation (points inside range)", GroupName = "Range", Order = 1)]
-        public double ReentryConfirmPoints { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Debug logging (Output window)", GroupName = "Debug", Order = 0)]
-        public bool EnableDebug { get; set; }
-
-        [NinjaScriptProperty]
-        [Range(1, int.MaxValue)]
-        [Display(Name = "PO3 range size (points)", GroupName = "Range", Order = 0)]
-        public int Po3Size { get; set; }
-
-        [NinjaScriptProperty]
-        [Range(1, double.MaxValue)]
-        [Display(Name = "Risk per trade ($)", GroupName = "Risk", Order = 0)]
-        public double RiskPerTrade { get; set; }
-
-        [NinjaScriptProperty]
-        [Range(1, int.MaxValue)]
-        [Display(Name = "Max contracts", GroupName = "Risk", Order = 1)]
-        public int MaxContracts { get; set; }
-
-        [NinjaScriptProperty]
-        [Range(0, double.MaxValue)]
-        [Display(Name = "Min RR (all trades)", GroupName = "Risk", Order = 2)]
-        public double MinRR { get; set; }
-
-        [NinjaScriptProperty]
-        [Range(0, double.MaxValue)]
-        [Display(Name = "EQ target offset (points)", GroupName = "Exits", Order = 0)]
-        public double EqOffsetPoints { get; set; }
-
-        [NinjaScriptProperty]
-        [Range(1, 10)]
-        [Display(Name = "Fractal strength (bars each side)", GroupName = "Exits", Order = 1)]
-        public int FractalStrength { get; set; }
-
-        [NinjaScriptProperty]
-        [Range(10, 5000)]
-        [Display(Name = "Fractal lookback (bars)", GroupName = "Exits", Order = 2)]
-        public int FractalLookback { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Allow equal highs/lows as fractal", GroupName = "Exits", Order = 4)]
-        public bool AllowEqualFractals { get; set; }
-
-        [NinjaScriptProperty]
-        [Range(0.0, 100.0)]
-        [Display(Name = "Stop buffer (points)", GroupName = "Exits", Order = 3)]
-        public double StopBufferPoints { get; set; }
-
-        [NinjaScriptProperty]
-        [Range(1, 20)]
-        [Display(Name = "Max trades per day", GroupName = "Risk", Order = 3)]
-        public int MaxTradesPerDay { get; set; }
-
-        [NinjaScriptProperty]
-        [Range(0, 2359)]
-        [Display(Name = "Reference time UK (HHMM)", GroupName = "Time (UK)", Order = 0)]
-        public int TrackStartHHMM { get; set; }
-
-        [NinjaScriptProperty]
-        [Range(0, 2359)]
-        [Display(Name = "Trade start UK (HHMM)", GroupName = "Time (UK)", Order = 1)]
-        public int TradeStartHHMM { get; set; }
-
-        [NinjaScriptProperty]
-        [Range(0, 2359)]
-        [Display(Name = "Last entry cut-off UK (HHMM)", GroupName = "Time (UK)", Order = 2)]
-        public int TradeEndHHMM { get; set; }
-
-        [NinjaScriptProperty]
-        [Display(Name = "Chart time zone ID (blank = PC local)", GroupName = "Time (UK)", Order = 3)]
-        public string ChartTimeZoneId { get; set; }
-        #endregion
     }
 }

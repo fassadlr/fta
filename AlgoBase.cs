@@ -14,47 +14,47 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
     public abstract class AlgoBase : Strategy
     {
         [NinjaScriptProperty]
-        [Display(Name = "Is Live", Order = 0, GroupName = "Parameters")]
+        [Display(Name = "Is Live", Order = 0, GroupName = "Base")]
         public bool IsLive { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Display Debug Logs", Order = 1, GroupName = "Parameters")]
+        [Display(Name = "Display Debug Logs", Order = 1, GroupName = "Base")]
         public bool DebugLogEnabled { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Display Trade Logs", Order = 2, GroupName = "Parameters")]
+        [Display(Name = "Display Trade Logs", Order = 2, GroupName = "Base")]
         public bool TradeLogEnabled { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Export Trades CSV", Order = 3, GroupName = "Parameters")]
+        [Display(Name = "Export Trades CSV", Order = 3, GroupName = "Base")]
         public bool ExportTradesCSVEnabled { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Export Strategy Logs", Order = 4, GroupName = "Parameters")]
+        [Display(Name = "Export Strategy Logs", Order = 4, GroupName = "Base")]
         public bool ExportStrategyLogsEnabled { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Import Tick and CVD", Order = 5, GroupName = "Parameters")]
+        [Display(Name = "Import Tick and CVD", Order = 5, GroupName = "Base")]
         public bool ImportTickAndCvdEnabled { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Export Tick and CVD", Order = 6, GroupName = "Parameters")]
+        [Display(Name = "Export Tick and CVD", Order = 6, GroupName = "Base")]
         public bool ExportTickAndCVDFlag { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Import File", Order = 7, GroupName = "Parameters")]
+        [Display(Name = "Import File", Order = 7, GroupName = "Base")]
         public string ImportFile { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Daily Max Loss", Order = 8, GroupName = "Parameters")]
+        [Display(Name = "Daily Max Loss", Order = 8, GroupName = "Base")]
         public double DailyMaxLoss { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Daily Max Profit", Order = 9, GroupName = "Parameters")]
+        [Display(Name = "Daily Max Profit", Order = 9, GroupName = "Base")]
         public double DailyMaxProfit { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Daily Max Consecutive Wins", Order = 10, GroupName = "Parameters")]
+        [Display(Name = "Daily Max Consecutive Wins", Order = 10, GroupName = "Base")]
         public double DailyMaxConsecutiveWins { get; set; }
 
         internal double LastFractalHigh = 0;

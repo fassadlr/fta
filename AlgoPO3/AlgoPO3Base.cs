@@ -10,7 +10,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
     public abstract class AlgoPO3Base : AlgoBase
     {
         [NinjaScriptProperty]
-        [Display(Name = "PO3", Description = "PO3", Order = 10, GroupName = "Parameters")]
+        [Display(Name = "PO3", Description = "PO3", Order = 10, GroupName = "Base")]
         public int PO3 { get; set; }
 
         [NinjaScriptProperty]
