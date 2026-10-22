@@ -53,16 +53,32 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         #endregion
 
         #region State
-        private TimeZoneInfo srcTz, ukTz;
-        private int dayKey = -1;
-        private bool refSet, openEvaluated;
-        private int refIdx;
-        private int phase;          // 0 = waiting for first new range, 1 = inside armed range, 2 = left armed range (waiting re-entry)
-        private int armedIdx, armedDir;
-        private int tradesToday;
-        private int prevIdx, lastDir;   // continuous range tracking: previous range index and direction of last range change
-        private bool wasInPos;
-        private bool lastExitWasTP;
+        // Setup phases
+        private const int PhaseWaitingForRangeBreak = 0;   // waiting for price to enter a new range
+        private const int PhaseInsideArmedRange = 1;        // price is inside the armed range, waiting for it to leave
+        private const int PhaseWaitingForReentry = 2;       // price left the armed range, waiting for a confirmed re-entry
+
+        private TimeZoneInfo chartTimeZone, ukTimeZone;
+
+        private int lastProcessedDayKey = -1;
+        private bool referenceRangeSet;
+        private bool londonOpenEvaluated;
+        private int tradesTakenToday;
+
+        private int referenceRangeIndex;                    // range we are "moving from" (07:00 range, or reset after a spent leg)
+        private int setupPhase;
+        private int armedRangeIndex;
+        private int armedDirection;                         // 1 = bullish (long), -1 = bearish (short), 0 = none
+
+        private int previousRangeIndex;                     // continuous range tracking
+        private int lastRangeChangeDirection;               // direction of the most recent range change
+        private double highSinceRangeEntry;                 // high since price last entered the current range
+        private double lowSinceRangeEntry;                  // low since price last entered the current range
+
+        private bool wasInPositionLastBar;
+        private bool lastExitWasTarget;
+
+        private string lastLoggedState = "";
         #endregion
 
         protected override void OnStateChange()
@@ -80,14 +96,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 BarsRequiredToTrade = 20;
 
                 Po3Size = 81;
-                RiskPerTrade = 100;
+                RiskPerTrade = 200;
                 MaxContracts = 50;
                 MinRR = 0.5;
-                EqOffsetPoints = 3;
+                EqOffsetPoints = 1;
                 FractalStrength = 2;
-                FractalLookback = 500;
-                StopBufferPoints = 0;
+                FractalLookback = 100;
+                StopBufferPoints = 3;
                 MaxTradesPerDay = 5;
+                ReentryConfirmPoints = 1;
                 EnableDebug = true;
                 AllowEqualFractals = false;
                 TrackStartHHMM = 700;
@@ -97,262 +114,327 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             }
             else if (State == State.DataLoaded)
             {
-                ukTz = TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time"); // UK incl. BST
-                srcTz = string.IsNullOrEmpty(ChartTimeZoneId) ? TimeZoneInfo.Local : TimeZoneInfo.FindSystemTimeZoneById(ChartTimeZoneId);
+                ukTimeZone = TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time"); // UK incl. BST
+                chartTimeZone = string.IsNullOrEmpty(ChartTimeZoneId) ? TimeZoneInfo.Local : TimeZoneInfo.FindSystemTimeZoneById(ChartTimeZoneId);
             }
         }
 
-        private DateTime ToUk(DateTime t)
+        private DateTime ToUkTime(DateTime chartTime)
         {
-            return TimeZoneInfo.ConvertTime(DateTime.SpecifyKind(t, DateTimeKind.Unspecified), srcTz, ukTz);
+            return TimeZoneInfo.ConvertTime(DateTime.SpecifyKind(chartTime, DateTimeKind.Unspecified), chartTimeZone, ukTimeZone);
         }
 
-        private static TimeSpan Hhmm(int v) { return new TimeSpan(v / 100, v % 100, 0); }
-        private int RangeIdx(double price) { return (int)Math.Floor(price / Po3Size); }
+        private static TimeSpan HhmmToTimeSpan(int hhmm) { return new TimeSpan(hhmm / 100, hhmm % 100, 0); }
+
+        private int GetRangeIndex(double price) { return (int)Math.Floor(price / Po3Size); }
 
         protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
         {
             if (execution.Order == null || execution.Order.OrderState != OrderState.Filled) return;
-            if (execution.Order.Name == "Profit target") lastExitWasTP = true;
-            else if (execution.Order.Name == "Stop loss") lastExitWasTP = false;
+            if (execution.Order.Name == "Profit target") lastExitWasTarget = true;
+            else if (execution.Order.Name == "Stop loss") lastExitWasTarget = false;
         }
 
-        private string lastLog = "";
-
-        private void Log(string msg)
+        private void Log(string message)
         {
-            if (EnableDebug) Print(ToUk(Time[0]).ToString("yyyy-MM-dd HH:mm") + " UK | " + msg);
+            if (EnableDebug) Print(ToUkTime(Time[0]).ToString("yyyy-MM-dd HH:mm") + " UK | " + message);
         }
 
         protected override void OnBarUpdate()
         {
-            Process();
+            RunStrategyLogic();
 
-            if (!EnableDebug || !refSet || CurrentBar < BarsRequiredToTrade) return;
-            TimeSpan tt = ToUk(Time[0]).TimeOfDay;
-            if (tt < Hhmm(TrackStartHHMM) || tt > Hhmm(TradeEndHHMM)) return;
+            if (!EnableDebug || !referenceRangeSet || CurrentBar < BarsRequiredToTrade) return;
+            TimeSpan barTimeOfDay = ToUkTime(Time[0]).TimeOfDay;
+            if (barTimeOfDay < HhmmToTimeSpan(TrackStartHHMM) || barTimeOfDay > HhmmToTimeSpan(TradeEndHHMM)) return;
 
-            int ix = RangeIdx(Close[0]);
-            string state = "range " + (ix * Po3Size) + " | ref " + (refIdx * Po3Size) + " | phase " + phase +
-                           " | armed " + (phase == 0 ? "-" : (armedIdx * Po3Size).ToString()) + " dir " + armedDir +
-                           " | lastDir " + lastDir + " | pos " + Position.MarketPosition + " | trades " + tradesToday;
-            if (state != lastLog)
+            int loggedRangeIndex = GetRangeIndex(Close[0]);
+            string stateText = "range " + (loggedRangeIndex * Po3Size) + " | ref " + (referenceRangeIndex * Po3Size) + " | phase " + setupPhase +
+                               " | armed " + (setupPhase == PhaseWaitingForRangeBreak ? "-" : (armedRangeIndex * Po3Size).ToString()) + " dir " + armedDirection +
+                               " | lastDir " + lastRangeChangeDirection + " | pos " + Position.MarketPosition + " | trades " + tradesTakenToday;
+            if (stateText != lastLoggedState)
             {
-                Log("close " + Close[0] + " | " + state);
-                lastLog = state;
+                Log("close " + Close[0] + " | " + stateText);
+                lastLoggedState = stateText;
             }
         }
 
-        private void Process()
+        private void RunStrategyLogic()
         {
             if (CurrentBar < BarsRequiredToTrade) return;
 
-            DateTime uk = ToUk(Time[0]);
-            int dk = uk.Year * 10000 + uk.Month * 100 + uk.Day;
-            if (dk != dayKey)
+            DateTime ukTime = ToUkTime(Time[0]);
+            int todayDayKey = ukTime.Year * 10000 + ukTime.Month * 100 + ukTime.Day;
+
+            // New UK day: clear everything from the previous day
+            if (todayDayKey != lastProcessedDayKey)
             {
-                dayKey = dk;
-                refSet = false; openEvaluated = false;
-                phase = 0; armedIdx = 0; armedDir = 0;
-                tradesToday = 0;
-                refIdx = 0; prevIdx = 0; lastDir = 0; wasInPos = false; lastExitWasTP = false; lastLog = "";
+                lastProcessedDayKey = todayDayKey;
+                referenceRangeSet = false;
+                londonOpenEvaluated = false;
+                setupPhase = PhaseWaitingForRangeBreak;
+                armedRangeIndex = 0;
+                armedDirection = 0;
+                tradesTakenToday = 0;
+                referenceRangeIndex = 0;
+                previousRangeIndex = 0;
+                lastRangeChangeDirection = 0;
+                wasInPositionLastBar = false;
+                lastExitWasTarget = false;
+                lastLoggedState = "";
             }
 
-            TimeSpan t = uk.TimeOfDay;
+            TimeSpan ukTimeOfDay = ukTime.TimeOfDay;
 
-            // No new trades from the end time onwards. Open trades are left to hit their stop or target.
-            if (t >= Hhmm(TradeEndHHMM)) return;
+            // No new trades from the cut-off time onwards. Open trades are left to hit their stop or target.
+            if (ukTimeOfDay >= HhmmToTimeSpan(TradeEndHHMM)) return;
 
-            // Reference range at 07:00 UK - this is the first range, where we are moving from
-            if (!refSet && t >= Hhmm(TrackStartHHMM))
+            // Reference range at 07:00 UK - the first range, where we are moving from
+            if (!referenceRangeSet && ukTimeOfDay >= HhmmToTimeSpan(TrackStartHHMM))
             {
-                refIdx = RangeIdx(Open[0]);
-                prevIdx = refIdx;
-                lastDir = 0;
-                refSet = true;
+                referenceRangeIndex = GetRangeIndex(Open[0]);
+                previousRangeIndex = referenceRangeIndex;
+                lastRangeChangeDirection = 0;
+                highSinceRangeEntry = High[0];
+                lowSinceRangeEntry = Low[0];
+                referenceRangeSet = true;
             }
-            if (!refSet) return;
+            if (!referenceRangeSet) return;
 
             // Track every range change from 07:00 onwards (multiple ranges, always know where we came from)
-            int idx = RangeIdx(Close[0]);
-            if (idx != prevIdx)
+            int currentRangeIndex = GetRangeIndex(Close[0]);
+            if (currentRangeIndex != previousRangeIndex)
             {
-                lastDir = idx > prevIdx ? 1 : -1;
-                prevIdx = idx;
+                lastRangeChangeDirection = currentRangeIndex > previousRangeIndex ? 1 : -1;
+                previousRangeIndex = currentRangeIndex;
+                highSinceRangeEntry = High[0];
+                lowSinceRangeEntry = Low[0];
+            }
+            else
+            {
+                highSinceRangeEntry = Math.Max(highSinceRangeEntry, High[0]);
+                lowSinceRangeEntry = Math.Min(lowSinceRangeEntry, Low[0]);
             }
 
-            if (t < Hhmm(TradeStartHHMM)) return;
+            if (ukTimeOfDay < HhmmToTimeSpan(TradeStartHHMM)) return;
 
-            bool inPos = Position.MarketPosition != MarketPosition.Flat;
+            bool isInPosition = Position.MarketPosition != MarketPosition.Flat;
 
-            // Trade just closed (stop or target): arm the CURRENT range using the direction we entered it from.
-            // e.g. long stopped out below the range -> we are in the lower range having come down, so it is armed
-            // bearish and needs: go back into the old range, then re-enter this one -> short.
-            if (wasInPos && !inPos && openEvaluated)
+            // Trade just closed (stop or target)
+            if (wasInPositionLastBar && !isInPosition && londonOpenEvaluated)
             {
-                if (lastExitWasTP)
+                if (lastExitWasTarget)
                 {
                     // Target hit: that leg is spent. Same range cannot be re-armed - wait for a NEW range break from here.
-                    refIdx = idx; phase = 0;
-                    Log("Target hit - leg invalid, waiting for new range break from " + (idx * Po3Size));
+                    referenceRangeIndex = currentRangeIndex;
+                    setupPhase = PhaseWaitingForRangeBreak;
+                    Log("Target hit - leg invalid, waiting for new range break from " + (currentRangeIndex * Po3Size));
                 }
-                else if (lastDir != 0) { armedIdx = idx; armedDir = lastDir; phase = 1; }
-                else { refIdx = idx; phase = 0; }
-                lastExitWasTP = false;
-                wasInPos = false;
-                return;
-            }
-            wasInPos = inPos;
-
-            bool canTrade = !inPos && tradesToday < MaxTradesPerDay;
-
-            // ---- London open: evaluate once ----
-            if (!openEvaluated)
-            {
-                if (!canTrade) return;
-                openEvaluated = true;
-                if (idx != refIdx)
+                else if (lastRangeChangeDirection != 0)
                 {
-                    // Scenario 1: new range entered since 07:00
-                    int dir = idx > refIdx ? 1 : -1;
-                    if (TryEnter(dir, idx, true)) return;
-                    // RR failed (or no valid stop): no trade. Treat this range as the starting range and
-                    // wait for a break out of it (Scenario 2 flow), rather than arming it.
-                    Log("Scenario 1 rejected - using range " + (idx * Po3Size) + " as starting range");
-                    refIdx = idx; phase = 0;
+                    // Stopped out: arm the CURRENT range using the direction we entered it from
+                    armedRangeIndex = currentRangeIndex;
+                    armedDirection = lastRangeChangeDirection;
+                    setupPhase = PhaseInsideArmedRange;
                 }
                 else
                 {
-                    refIdx = idx; phase = 0;
+                    referenceRangeIndex = currentRangeIndex;
+                    setupPhase = PhaseWaitingForRangeBreak;
+                }
+                lastExitWasTarget = false;
+                wasInPositionLastBar = false;
+                return;
+            }
+            wasInPositionLastBar = isInPosition;
+
+            bool canTakeNewTrade = !isInPosition && tradesTakenToday < MaxTradesPerDay;
+
+            // ---- London open: evaluate once ----
+            if (!londonOpenEvaluated)
+            {
+                if (!canTakeNewTrade) return;
+                londonOpenEvaluated = true;
+
+                if (currentRangeIndex != referenceRangeIndex)
+                {
+                    // Scenario 1: new range entered since 07:00
+                    int openDirection = currentRangeIndex > referenceRangeIndex ? 1 : -1;
+                    DealingRange openRange = new DealingRange(Po3Size, currentRangeIndex * Po3Size + Po3Size / 2.0);
+                    double openLegTargetPrice = openDirection > 0 ? openRange.Eq - EqOffsetPoints : openRange.Eq + EqOffsetPoints;
+                    bool openLegTargetAlreadyReached = openDirection > 0 ? highSinceRangeEntry >= openLegTargetPrice : lowSinceRangeEntry <= openLegTargetPrice;
+
+                    if (openLegTargetAlreadyReached)
+                    {
+                        // The 07:00-08:00 leg already ran to its target level: no trade, wait for a new range break
+                        Log("London open: leg already reached target level " + openLegTargetPrice.ToString("F2") + " - no trade, waiting for new range break from " + (currentRangeIndex * Po3Size));
+                        referenceRangeIndex = currentRangeIndex;
+                        setupPhase = PhaseWaitingForRangeBreak;
+                    }
+                    else if (!TryEnter(openDirection, currentRangeIndex))
+                    {
+                        // Rejected (RR too low / no valid stop) but target not reached: leg still valid for a leave and re-entry
+                        Log("London open: entry rejected, target not reached - range " + (currentRangeIndex * Po3Size) + " armed, waiting for leave and re-entry");
+                        armedRangeIndex = currentRangeIndex;
+                        armedDirection = openDirection;
+                        setupPhase = PhaseInsideArmedRange;
+                    }
+                }
+                else
+                {
+                    referenceRangeIndex = currentRangeIndex;
+                    setupPhase = PhaseWaitingForRangeBreak;
                 }
                 return;
             }
 
             // ---- Scenario 2: enter -> leave -> re-enter (runs even while in a trade, so range changes are never missed) ----
-            if (phase == 0)
+            if (setupPhase == PhaseWaitingForRangeBreak)
             {
-                if (idx != refIdx)
+                if (currentRangeIndex != referenceRangeIndex)
                 {
-                    armedIdx = idx;
-                    armedDir = idx > refIdx ? 1 : -1;
-                    phase = 1;
+                    armedRangeIndex = currentRangeIndex;
+                    armedDirection = currentRangeIndex > referenceRangeIndex ? 1 : -1;
+                    setupPhase = PhaseInsideArmedRange;
                 }
             }
-            else if (phase == 1)
+            else if (setupPhase == PhaseInsideArmedRange)
             {
                 // Entered the armed range and ran straight to the target level without a re-entry: leg is invalid
-                DealingRange ar = new DealingRange(Po3Size, armedIdx * Po3Size + Po3Size / 2.0);
-                double legTp = armedDir > 0 ? ar.Eq - EqOffsetPoints : ar.Eq + EqOffsetPoints;
-                bool reached = armedDir > 0 ? High[0] >= legTp : Low[0] <= legTp;
-                if (reached && (idx - armedIdx) * armedDir <= 0)
+                DealingRange armedRange = new DealingRange(Po3Size, armedRangeIndex * Po3Size + Po3Size / 2.0);
+                double armedLegTargetPrice = armedDirection > 0 ? armedRange.Eq - EqOffsetPoints : armedRange.Eq + EqOffsetPoints;
+                bool armedLegTargetReached = armedDirection > 0 ? High[0] >= armedLegTargetPrice : Low[0] <= armedLegTargetPrice;
+                if (armedLegTargetReached && (currentRangeIndex - armedRangeIndex) * armedDirection <= 0)
                 {
-                    refIdx = idx; phase = 0;
-                    Log("Price reached target level " + legTp.ToString("F2") + " before re-entry - leg invalid, waiting for new range break from " + (idx * Po3Size));
+                    referenceRangeIndex = currentRangeIndex;
+                    setupPhase = PhaseWaitingForRangeBreak;
+                    Log("Price reached target level " + armedLegTargetPrice.ToString("F2") + " before re-entry - leg invalid, waiting for new range break from " + (currentRangeIndex * Po3Size));
                     return;
                 }
 
-                if (idx == armedIdx) return;
-                if ((idx - armedIdx) * armedDir > 0) armedIdx = idx;   // pushed on into a further range
-                else phase = 2;                                        // fell back out of armed range
+                if (currentRangeIndex == armedRangeIndex) return;
+                if ((currentRangeIndex - armedRangeIndex) * armedDirection > 0) armedRangeIndex = currentRangeIndex;   // pushed on into a further range
+                else setupPhase = PhaseWaitingForReentry;                                                               // fell back out of armed range
             }
-            else if (phase == 2)
+            else if (setupPhase == PhaseWaitingForReentry)
             {
-                if (idx == armedIdx)
+                if (currentRangeIndex == armedRangeIndex)
                 {
-                    if (!canTrade) { Log("Re-entry trigger ignored: position open or trade limit reached"); return; }                             // keep waiting until flat
-                    if (TryEnter(armedDir, armedIdx, false)) return;
-                    phase = 1; // could not take it (no stop / no reward) - keep watching
+                    // Re-entry must close at least ReentryConfirmPoints inside the range
+                    double armedRangeLow = armedRangeIndex * Po3Size;
+                    double armedRangeHigh = armedRangeLow + Po3Size;
+                    double closeDepthInsideRange = armedDirection > 0 ? Close[0] - armedRangeLow : armedRangeHigh - Close[0];
+                    if (closeDepthInsideRange < ReentryConfirmPoints)
+                    {
+                        Log("Re-entry close only " + closeDepthInsideRange.ToString("F2") + " pts inside range (need " + ReentryConfirmPoints + ") - waiting");
+                        return;
+                    }
+
+                    if (!canTakeNewTrade) { Log("Re-entry trigger ignored: position open or trade limit reached"); return; }   // keep waiting until flat
+                    if (TryEnter(armedDirection, armedRangeIndex)) return;
+                    setupPhase = PhaseInsideArmedRange;   // could not take it (no stop / RR / size) - keep watching
                 }
-                else if ((idx - armedIdx) * armedDir > 0)
+                else if ((currentRangeIndex - armedRangeIndex) * armedDirection > 0)
                 {
-                    armedIdx = idx; phase = 1;                         // moved on into a further range
+                    armedRangeIndex = currentRangeIndex;
+                    setupPhase = PhaseInsideArmedRange;   // moved on into a further range
                 }
-                else if ((idx - prevRefForOpposite()) * armedDir < 0)
+                else if ((currentRangeIndex - GetRangeIndexArmedFrom()) * armedDirection < 0)
                 {
                     // price went through to the opposite side - new range in the other direction
-                    armedIdx = idx; armedDir = -armedDir; phase = 1;
+                    armedRangeIndex = currentRangeIndex;
+                    armedDirection = -armedDirection;
+                    setupPhase = PhaseInsideArmedRange;
                 }
             }
         }
 
         // The range we armed from is one step back from the armed range
-        private int prevRefForOpposite() { return armedIdx - armedDir; }
+        private int GetRangeIndexArmedFrom() { return armedRangeIndex - armedDirection; }
 
-        private bool TryEnter(int dir, int idx, bool checkRR)
+        private bool TryEnter(int direction, int rangeIndex)
         {
-            DealingRange r = new DealingRange(Po3Size, idx * Po3Size + Po3Size / 2.0);
-            double entry = Close[0];
-            double stop, tp, reward, risk;
+            DealingRange dealingRange = new DealingRange(Po3Size, rangeIndex * Po3Size + Po3Size / 2.0);
+            double entryPrice = Close[0];
+            double stopPrice, targetPrice, rewardPoints, riskPoints;
 
-            if (dir > 0)
+            if (direction > 0)
             {
-                double fl = FindFractalLow(r.ExtLow);
-                if (double.IsNaN(fl)) { Log("No entry: no fractal low below ExtLow " + r.ExtLow.ToString("F2") + " in lookback"); return false; }
-                stop = fl - StopBufferPoints;
-                tp = r.Eq - EqOffsetPoints;
-                reward = tp - entry;
-                risk = entry - stop;
+                double fractalLowPrice = FindFractalLow(dealingRange.ExtLow);
+                if (double.IsNaN(fractalLowPrice)) { Log("No entry: no fractal low below ExtLow " + dealingRange.ExtLow.ToString("F2") + " in lookback"); return false; }
+                stopPrice = fractalLowPrice - StopBufferPoints;
+                targetPrice = dealingRange.Eq - EqOffsetPoints;
+                rewardPoints = targetPrice - entryPrice;
+                riskPoints = entryPrice - stopPrice;
             }
             else
             {
-                double fh = FindFractalHigh(r.ExtHigh);
-                if (double.IsNaN(fh)) { Log("No entry: no fractal high above ExtHigh " + r.ExtHigh.ToString("F2") + " in lookback"); return false; }
-                stop = fh + StopBufferPoints;
-                tp = r.Eq + EqOffsetPoints;
-                reward = entry - tp;
-                risk = stop - entry;
+                double fractalHighPrice = FindFractalHigh(dealingRange.ExtHigh);
+                if (double.IsNaN(fractalHighPrice)) { Log("No entry: no fractal high above ExtHigh " + dealingRange.ExtHigh.ToString("F2") + " in lookback"); return false; }
+                stopPrice = fractalHighPrice + StopBufferPoints;
+                targetPrice = dealingRange.Eq + EqOffsetPoints;
+                rewardPoints = entryPrice - targetPrice;
+                riskPoints = stopPrice - entryPrice;
             }
 
-            if (reward <= 0 || risk <= 0)
+            if (rewardPoints <= 0 || riskPoints <= 0)
             {
-                Log("No entry: reward " + reward.ToString("F2") + " risk " + risk.ToString("F2") + " (stop " + stop.ToString("F2") + ", tp " + tp.ToString("F2") + ")");
+                Log("No entry: reward " + rewardPoints.ToString("F2") + " risk " + riskPoints.ToString("F2") + " (stop " + stopPrice.ToString("F2") + ", tp " + targetPrice.ToString("F2") + ")");
                 return false;
             }
-            if (checkRR && reward / risk < MinRR)
+            if (rewardPoints / riskPoints < MinRR)
             {
-                Log("No entry: RR " + (reward / risk).ToString("F2") + " < " + MinRR + " (stop " + stop.ToString("F2") + ", tp " + tp.ToString("F2") + ")");
-                return false;
-            }
-
-            int qty = (int)Math.Floor(RiskPerTrade / (risk * Instrument.MasterInstrument.PointValue));
-            qty = Math.Min(qty, MaxContracts);
-            if (qty < 1)
-            {
-                Log("No entry: stop distance " + risk.ToString("F2") + " pts (stop " + stop.ToString("F2") + ") too wide for risk of " + RiskPerTrade + " -> qty 0");
+                Log("No entry: RR " + (rewardPoints / riskPoints).ToString("F2") + " < " + MinRR + " (stop " + stopPrice.ToString("F2") + ", tp " + targetPrice.ToString("F2") + ")");
                 return false;
             }
 
-            stop = Instrument.MasterInstrument.RoundToTickSize(stop);
-            tp = Instrument.MasterInstrument.RoundToTickSize(tp);
-
-            if (dir > 0)
+            int contracts = (int)Math.Floor(RiskPerTrade / (riskPoints * Instrument.MasterInstrument.PointValue));
+            contracts = Math.Min(contracts, MaxContracts);
+            if (contracts < 1)
             {
-                SetStopLoss("Long", CalculationMode.Price, stop, false);
-                SetProfitTarget("Long", CalculationMode.Price, tp);
-                EnterLong(qty, "Long");
+                Log("No entry: stop distance " + riskPoints.ToString("F2") + " pts (stop " + stopPrice.ToString("F2") + ") too wide for risk of " + RiskPerTrade + " -> 0 contracts");
+                return false;
+            }
+
+            stopPrice = Instrument.MasterInstrument.RoundToTickSize(stopPrice);
+            targetPrice = Instrument.MasterInstrument.RoundToTickSize(targetPrice);
+
+            if (direction > 0)
+            {
+                SetStopLoss("Long", CalculationMode.Price, stopPrice, false);
+                SetProfitTarget("Long", CalculationMode.Price, targetPrice);
+                EnterLong(contracts, "Long");
             }
             else
             {
-                SetStopLoss("Short", CalculationMode.Price, stop, false);
-                SetProfitTarget("Short", CalculationMode.Price, tp);
-                EnterShort(qty, "Short");
+                SetStopLoss("Short", CalculationMode.Price, stopPrice, false);
+                SetProfitTarget("Short", CalculationMode.Price, targetPrice);
+                EnterShort(contracts, "Short");
             }
 
-            tradesToday++;
-            Log((dir > 0 ? "ENTER LONG " : "ENTER SHORT ") + "qty " + qty + " entry~" + entry + " stop " + stop + " tp " + tp + " RR " + (reward / risk).ToString("F2"));
+            tradesTakenToday++;
+            Log((direction > 0 ? "ENTER LONG " : "ENTER SHORT ") + "qty " + contracts + " entry~" + entryPrice + " stop " + stopPrice + " tp " + targetPrice + " RR " + (rewardPoints / riskPoints).ToString("F2"));
             return true;
         }
 
         // Most recent confirmed fractal low that sits below 'belowPrice'
         private double FindFractalLow(double belowPrice)
         {
-            int maxK = Math.Min(FractalLookback, CurrentBar - FractalStrength);
-            for (int k = FractalStrength; k <= maxK; k++)
+            int maxBarsAgo = Math.Min(FractalLookback, CurrentBar - FractalStrength);
+            for (int barsAgo = FractalStrength; barsAgo <= maxBarsAgo; barsAgo++)
             {
-                bool ok = true;
-                for (int j = 1; j <= FractalStrength; j++)
-                    if (AllowEqualFractals ? (Low[k] > Low[k - j] || Low[k] > Low[k + j]) : (Low[k] >= Low[k - j] || Low[k] >= Low[k + j])) { ok = false; break; }
-                if (ok && Low[k] < belowPrice) return Low[k];
+                bool isFractal = true;
+                for (int neighbourOffset = 1; neighbourOffset <= FractalStrength; neighbourOffset++)
+                {
+                    double candidateLow = Low[barsAgo];
+                    double lowerNeighbourBefore = Low[barsAgo + neighbourOffset];   // older bar
+                    double lowerNeighbourAfter = Low[barsAgo - neighbourOffset];    // newer bar
+                    bool failsFractal = AllowEqualFractals
+                        ? (candidateLow > lowerNeighbourAfter || candidateLow > lowerNeighbourBefore)
+                        : (candidateLow >= lowerNeighbourAfter || candidateLow >= lowerNeighbourBefore);
+                    if (failsFractal) { isFractal = false; break; }
+                }
+                if (isFractal && Low[barsAgo] < belowPrice) return Low[barsAgo];
             }
             return double.NaN;
         }
@@ -360,18 +442,31 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         // Most recent confirmed fractal high that sits above 'abovePrice'
         private double FindFractalHigh(double abovePrice)
         {
-            int maxK = Math.Min(FractalLookback, CurrentBar - FractalStrength);
-            for (int k = FractalStrength; k <= maxK; k++)
+            int maxBarsAgo = Math.Min(FractalLookback, CurrentBar - FractalStrength);
+            for (int barsAgo = FractalStrength; barsAgo <= maxBarsAgo; barsAgo++)
             {
-                bool ok = true;
-                for (int j = 1; j <= FractalStrength; j++)
-                    if (AllowEqualFractals ? (High[k] < High[k - j] || High[k] < High[k + j]) : (High[k] <= High[k - j] || High[k] <= High[k + j])) { ok = false; break; }
-                if (ok && High[k] > abovePrice) return High[k];
+                bool isFractal = true;
+                for (int neighbourOffset = 1; neighbourOffset <= FractalStrength; neighbourOffset++)
+                {
+                    double candidateHigh = High[barsAgo];
+                    double higherNeighbourBefore = High[barsAgo + neighbourOffset]; // older bar
+                    double higherNeighbourAfter = High[barsAgo - neighbourOffset];  // newer bar
+                    bool failsFractal = AllowEqualFractals
+                        ? (candidateHigh < higherNeighbourAfter || candidateHigh < higherNeighbourBefore)
+                        : (candidateHigh <= higherNeighbourAfter || candidateHigh <= higherNeighbourBefore);
+                    if (failsFractal) { isFractal = false; break; }
+                }
+                if (isFractal && High[barsAgo] > abovePrice) return High[barsAgo];
             }
             return double.NaN;
         }
 
         #region Properties
+        [NinjaScriptProperty]
+        [Range(0.0, 100.0)]
+        [Display(Name = "Re-entry confirmation (points inside range)", GroupName = "Range", Order = 1)]
+        public double ReentryConfirmPoints { get; set; }
+
         [NinjaScriptProperty]
         [Display(Name = "Debug logging (Output window)", GroupName = "Debug", Order = 0)]
         public bool EnableDebug { get; set; }
@@ -393,7 +488,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         [NinjaScriptProperty]
         [Range(0, double.MaxValue)]
-        [Display(Name = "Min RR (scenario 1)", GroupName = "Risk", Order = 2)]
+        [Display(Name = "Min RR (all trades)", GroupName = "Risk", Order = 2)]
         public double MinRR { get; set; }
 
         [NinjaScriptProperty]
