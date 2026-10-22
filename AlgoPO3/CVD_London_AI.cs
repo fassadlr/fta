@@ -3,13 +3,13 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using NinjaTrader.Cbi;
-using NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3;
+using NinjaTrader.Data;
 using NinjaTrader.NinjaScript.Strategies.FTA.Shared;
 
 #endregion
 
 // PO3 81 London Open strategy - MNQ 1 minute
-namespace NinjaTrader.NinjaScript.Strategies.FTA
+namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 {
     public class PO3_81_LondonOpen : AlgoPO3Base
     {
@@ -49,6 +49,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         [Range(0, 2359)]
         [Display(Name = "Last entry cut-off UK (HHMM)", GroupName = "Time (UK)", Order = 2)]
         public int TradeEndHHMM { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 30)]
+        [Display(Name = "Skip first candles after trade start", GroupName = "Time (UK)", Order = 4)]
+        public int SkipOpenCandles { get; set; }
 
         [NinjaScriptProperty]
         [Display(Name = "Chart time zone ID (blank = PC local)", GroupName = "Time (UK)", Order = 3)]
@@ -95,6 +100,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         private const int PhaseWaitingForReentry = 2;       // price left the armed range, waiting for a confirmed re-entry
 
         private TimeZoneInfo chartTimeZone, ukTimeZone;
+        private int barMinutes = 1;                         // minutes per bar (1 on the 1-minute chart)
 
         private int lastProcessedDayKey = -1;
         private bool referenceRangeSet;
@@ -110,6 +116,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         private int lastRangeChangeDirection;               // direction of the most recent range change
         private double highSinceRangeEntry;                 // high since price last entered the current range
         private double lowSinceRangeEntry;                  // low since price last entered the current range
+
+        private int preOpenRangeIndex;                      // range price was in at the close of the last candle before the London open
+        private bool preOpenSnapshotTaken;
 
         private bool wasInPositionLastBar;
         private bool lastExitWasTarget;
@@ -133,14 +142,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
                 PO3 = 81;
 
-                RiskPerTrade = 250;
+                RiskPerTrade = 200;
                 MaxContracts = 50;
                 MinRR = 0.5;
                 EqAdjust = 0;
                 FractalStrength = 1;
                 FractalLookback = 100;
                 StopBufferPoints = 3;
-                MaxTradesPerDay = 2;
+                MaxTradesPerDay = 3;
                 ReentryConfirmPoints = 1;
                 DebugLogEnabled = true;
                 AllowEqualFractals = false;
@@ -148,6 +157,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 TradeStartHHMM = 800;
                 TradeEndHHMM = 955;
                 ChartTimeZoneId = "";
+                SkipOpenCandles = 1;
 
                 ImportFile = string.Empty;
             }
@@ -159,6 +169,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             {
                 ukTimeZone = TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time"); // UK incl. BST
                 chartTimeZone = string.IsNullOrEmpty(ChartTimeZoneId) ? TimeZoneInfo.Local : TimeZoneInfo.FindSystemTimeZoneById(ChartTimeZoneId);
+                barMinutes = BarsPeriod.BarsPeriodType == BarsPeriodType.Minute ? Math.Max(1, BarsPeriod.Value) : 1;
             }
         }
 
@@ -231,6 +242,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 lastRangeChangeDirection = 0;
                 wasInPositionLastBar = false;
                 lastExitWasTarget = false;
+                preOpenRangeIndex = 0;
+                preOpenSnapshotTaken = false;
                 lastLoggedState = "";
                 TradingHalted = false;   // halt is per day: reset at the start of each new session
             }
@@ -280,7 +293,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 lowSinceRangeEntry = Math.Min(lowSinceRangeEntry, Low[0]);
             }
 
-            if (ukTimeOfDay < HhmmToTimeSpan(TradeStartHHMM)) return;
+            // Remember which range price was in just before the London open (close of the last pre-open candle)
+            if (!preOpenSnapshotTaken && ukTimeOfDay >= HhmmToTimeSpan(TradeStartHHMM))
+            {
+                preOpenRangeIndex = currentRangeIndex;
+                preOpenSnapshotTaken = true;
+            }
+
+            // Bar times are bar CLOSE times, and an order sent on a bar close fills on the next bar's open.
+            // Skipping N candles means no decision is made until the first N candles of the session have fully closed,
+            // so nothing can be entered at the open itself. Range tracking above still includes those candles.
+            TimeSpan firstDecisionTime = HhmmToTimeSpan(TradeStartHHMM) + TimeSpan.FromMinutes(SkipOpenCandles * barMinutes);
+            if (ukTimeOfDay < firstDecisionTime) return;
 
             bool isInPosition = Position.MarketPosition != MarketPosition.Flat;
 
@@ -320,7 +344,30 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 if (!canTakeNewTrade) return;
                 londonOpenEvaluated = true;
 
-                if (currentRangeIndex != referenceRangeIndex)
+                if (currentRangeIndex != preOpenRangeIndex)
+                {
+                    // The skipped open candle(s) moved price into a different range: that is the arming event.
+                    // No immediate entry - the range must be left and re-entered first.
+                    int openCandleDirection = currentRangeIndex > preOpenRangeIndex ? 1 : -1;
+                    DealingRange enteredRange = new DealingRange(PO3, currentRangeIndex * PO3 + PO3 / 2.0);
+                    double enteredLegTargetPrice = openCandleDirection > 0 ? enteredRange.Eq - EqAdjust : enteredRange.Eq + EqAdjust;
+                    bool enteredLegTargetReached = openCandleDirection > 0 ? highSinceRangeEntry >= enteredLegTargetPrice : lowSinceRangeEntry <= enteredLegTargetPrice;
+
+                    if (enteredLegTargetReached)
+                    {
+                        Log("London open: open candle entered range " + (currentRangeIndex * PO3) + " and already reached target level " + enteredLegTargetPrice.ToString("F2") + " - waiting for new range break");
+                        referenceRangeIndex = currentRangeIndex;
+                        setupPhase = PhaseWaitingForRangeBreak;
+                    }
+                    else
+                    {
+                        Log("London open: open candle entered range " + (currentRangeIndex * PO3) + " (" + (openCandleDirection > 0 ? "bullish" : "bearish") + ") - armed, waiting for leave and re-entry");
+                        armedRangeIndex = currentRangeIndex;
+                        armedDirection = openCandleDirection;
+                        setupPhase = PhaseInsideArmedRange;
+                    }
+                }
+                else if (currentRangeIndex != referenceRangeIndex)
                 {
                     // Scenario 1: new range entered since 07:00
                     int openDirection = currentRangeIndex > referenceRangeIndex ? 1 : -1;
