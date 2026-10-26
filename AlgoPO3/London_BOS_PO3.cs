@@ -20,20 +20,26 @@ using NinjaTrader.NinjaScript.DrawingTools;
 //
 //  1. Fractals: 3-candle swing high/low (1 candle each side).
 //     Tracked from 07:00 UK each day; the previous day's fractals are cleared at 07:00.
-//  2. BOS: a 5m candle CLOSES beyond the most recent unbroken fractal, and that close sits in a
-//     different PO3 dealing range than where the leg started, i.e. the stop fractal
-//     (Low = floor(price / po3) * po3). The broken fractal itself may be inside the new range.
-//     Each fractal can only trigger once; if a setup is skipped we wait for the next BOS.
+//  2. BOS: a 5m candle CLOSES beyond any fractal that has not yet been closed through
+//     (not just the most recent one). Each fractal can only trigger once; if several break on
+//     the same candle, the most recent of them is the broken fractal.
+//     NEW RANGE rule (Low = floor(price / po3) * po3): the stop fractal is in the old range, the
+//     BOS close is at least 1 tick into a new range, and it is the first BOS in that direction into
+//     that range since the stop fractal formed. If not, the BOS is ignored but the fractal is used up.
 //  3. Entry: LIMIT order at the broken fractal price (retest of the break).
 //  4. Stop: StopBufferTicks (default 3) beyond the most recent opposite fractal. If an earlier fractal sits just
 //     beyond it (within StopPivotTolerance x PO3) and is still unbroken - i.e. it is the true
 //     origin of the leg that made this BOS - that swing is used instead. All other checks
 //     then use the new stop.
 //  5. Target: 1R from the limit price, capped at EQ of the new dealing range (never more than 1R).
-//  6. Skip if RR < MinRR (0.9).
-//  7. Skip if the leg INTO the stop fractal contains a fair value gap.
+//  6. Skip if RR < MinRR (0.9). EQ scenario (optional): if the target is capped at EQ and RR is
+//     between AdjustFloorRR (0.5) and MinRR, move the limit toward the stop until RR = MinRR.
+//  7. Skip if the stop leg (stop fractal -> BOS candle) has an FVG in the trade direction
+//     (bearish FVG for a short, bullish FVG for a long).
+//     Only UNTOUCHED FVGs count: if any later candle has traded into the gap, it is ignored.
 //  Session: 08:00-10:00 UK time (handles GMT/BST automatically). New setups only inside it.
-//  Pending limit is cancelled if price hits the target before fill, or the session ends.
+//  Pending limit is cancelled if price reaches the TP zone before fill - the target or the EQ block
+//  edge (0.47 for longs, 0.53 for shorts), whichever comes first - or the session ends.
 //  (If the BOS candle itself already traded to the target, the setup is skipped.)
 //  Filled positions are never closed on time: they run to stop or target.
 //  Max 1 trade per UK day: once an entry fills, no new setups that day.
@@ -53,30 +59,33 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Mirrors the DealingRange grid (only the levels this strategy uses).
         private class DealingRange
         {
-            public double Low, Eq, High;
+            public double Low, MB2, Eq, MB3, High;
             public DealingRange(int po3, double price)
             {
                 Low  = Math.Floor(price / po3) * po3;
+                MB2  = Low + (po3 * 0.47);
                 Eq   = Low + (po3 * 0.50);
+                MB3  = Low + (po3 * 0.53);
                 High = Low + po3;
             }
         }
 
         private List<Swing> swings;
-        private Swing lastHigh;
-        private Swing lastLow;
-        private bool lastHighBroken;
-        private bool lastLowBroken;
+        private Swing lastHigh;          // most recent fractal high (stop source for shorts)
+        private Swing lastLow;           // most recent fractal low  (stop source for longs)
+        private List<Swing> openHighs;   // fractal highs not yet closed above
+        private List<Swing> openLows;    // fractal lows  not yet closed below
+        private List<int> bullBosBars;   // every long BOS today (traded or not)
+        private List<int> bearBosBars;   // every short BOS today (traded or not)
 
         // Pending limit tracking
         private Order entryOrder;
         private bool pendingLong;
-        private double pendingTarget;
+        private double pendingCancelLevel;   // price that counts as "TP hit" before fill
         private int pendingSinceBar;
 
         private const string LongSignal  = "PO3 Long";
         private const string ShortSignal = "PO3 Short";
-        private const int LegLookbackFallback = 100;
         private const int FractalStrength = 1;   // 3-candle fractal: 1 candle each side
         private const double TargetR = 1.0;
 
@@ -125,10 +134,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 MinRR               = 0.9;
                 RiskDollars         = 500;
                 StopBufferTicks     = 3;
+                AdjustEntryForRR    = true;
+                AdjustFloorRR       = 0.5;
 
                 // FVG filter
-                CheckLegIntoStop    = true;
-                CheckLegStopToBreak = false;
                 MinFvgTicks         = 1;
 
                 // Filters
@@ -144,8 +153,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 swings = new List<Swing>();
                 lastHigh = null;
                 lastLow = null;
-                lastHighBroken = false;
-                lastLowBroken = false;
+                openHighs = new List<Swing>();
+                openLows = new List<Swing>();
+                bullBosBars = new List<int>();
+                bearBosBars = new List<int>();
                 entryOrder = null;
                 trackingDate = DateTime.MinValue;
                 trackingStartBar = 0;
@@ -164,20 +175,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             DetectFractal();
 
-            // A fractal is consumed by the first close beyond it, whether we trade it or not.
-            bool longBos = false;
-            bool shortBos = false;
-
-            if (lastHigh != null && !lastHighBroken && Close[0] > lastHigh.Price)
-            {
-                lastHighBroken = true;
-                longBos = true;
-            }
-            if (lastLow != null && !lastLowBroken && Close[0] < lastLow.Price)
-            {
-                lastLowBroken = true;
-                shortBos = true;
-            }
+            // BOS = first close beyond ANY fractal that has not been closed through yet.
+            // Every fractal closed through is consumed, whether we trade it or not.
+            // If several break at once, the most recent one is the broken fractal (limit price).
+            Swing brokenHigh = ConsumeBroken(openHighs, true);
+            Swing brokenLow  = ConsumeBroken(openLows, false);
+            bool longBos  = brokenHigh != null;
+            bool shortBos = brokenLow != null;
+            if (longBos)  bullBosBars.Add(CurrentBar);
+            if (shortBos) bearBosBars.Add(CurrentBar);
 
             // Manage a working limit order before looking for new setups.
             if (entryOrder != null)
@@ -200,16 +206,63 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             if (longBos && AllowLong)
-                TryLong();
+                TryLong(brokenHigh);
             else if (shortBos && AllowShort)
-                TryShort();
+                TryShort(brokenLow);
+        }
+
+        // Removes every open fractal the current close has gone through; returns the most recent one.
+        private Swing ConsumeBroken(List<Swing> open, bool highs)
+        {
+            Swing mostRecent = null;
+            for (int i = open.Count - 1; i >= 0; i--)
+            {
+                Swing f = open[i];
+                bool broken = highs ? Close[0] > f.Price : Close[0] < f.Price;
+                if (!broken)
+                    continue;
+                if (mostRecent == null || f.Bar > mostRecent.Bar)
+                    mostRecent = f;
+                open.RemoveAt(i);
+            }
+            return mostRecent;
+        }
+
+        // "Into a new range" (all must hold):
+        //  1. the stop fractal (where the leg started) is in the OLD range,
+        //  2. the BOS close is at least 1 tick into a NEW range (higher for a long, lower for a short),
+        //  3. this is the FIRST BOS in this direction into that range since the stop fractal formed.
+        // Returns null if OK, otherwise the reason it failed.
+        private string NewRangeFailure(bool isLong, Swing origin)
+        {
+            double closeLow  = RangeLowFor(Close[0], isLong);
+            double originLow = RangeLowFor(origin.Price, isLong);
+
+            if (isLong ? closeLow <= originLow : closeLow >= originLow)
+                return string.Format("not into new range (stop {0} range {1}, close range {2})", origin.Price, originLow, closeLow);
+
+            foreach (int b in isLong ? bullBosBars : bearBosBars)
+            {
+                if (b > origin.Bar && b < CurrentBar && RangeLowFor(Bars.GetClose(b), isLong) == closeLow)
+                    return string.Format("not first BOS into range {0} (earlier BOS on candle opening {1})", closeLow, OpenTime(b));
+            }
+            return null;
+        }
+
+        // Range a close belongs to for the range-change check. A close EXACTLY on a boundary has not
+        // entered the next range - it must be at least 1 tick past it:
+        //  long:  a range is (Low, High]  -> a close on the boundary stays in the range below
+        //  short: a range is [Low, High)  -> a close on the boundary stays in the range above
+        private double RangeLowFor(double price, bool isLong)
+        {
+            double k = isLong ? Math.Ceiling(price / Po3 - 1e-9) - 1 : Math.Floor(price / Po3 + 1e-9);
+            return k * Po3;
         }
 
         #region Setup logic
 
-        private void TryLong()
+        private void TryLong(Swing broken)
         {
-            Swing broken = lastHigh;
             Swing stopSwing = lastLow;
             if (broken == null || stopSwing == null)
                 return;
@@ -225,19 +278,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            // "Into a new range" = the leg started (stop fractal) in a lower dealing range than the BOS close.
-            DealingRange originRange = new DealingRange(Po3, stopSwing.Price);
-            DealingRange newRange    = new DealingRange(Po3, Close[0]);
-
-            if (RequireNewRange && newRange.Low <= originRange.Low)
+            DealingRange newRange = new DealingRange(Po3, Close[0]);
+            string rangeFail = RequireNewRange ? NewRangeFailure(true, stopSwing) : null;
+            if (rangeFail != null)
             {
-                Skip(string.Format("BOS not into new range (origin {0} = close {1})", originRange.Low, newRange.Low), true);
+                Skip(rangeFail, true);
                 return;
             }
 
-            if (FvgOnStopLeg(stopSwing))
+            FvgHit fvg = FvgOnStopLeg(stopSwing, true);
+            if (fvg != null)
             {
-                Skip("FVG on stop leg", true);
+                ReportFvgSkip(fvg, true);
                 return;
             }
 
@@ -245,15 +297,33 @@ namespace NinjaTrader.NinjaScript.Strategies
             double target  = Instrument.MasterInstrument.RoundToTickSize(Math.Min(targetR, newRange.Eq));
             double rr      = (target - entry) / risk;
 
+            // Scenario: target capped at EQ and RR short of MinRR (but >= floor) ->
+            // move the limit DOWN toward the stop until EQ is MinRR away. Stop and target unchanged.
+            if (rr < MinRR && AdjustEntryForRR && target < targetR && rr >= AdjustFloorRR)
+            {
+                double raw      = (target + MinRR * stop) / (1 + MinRR);
+                double newEntry = Instrument.MasterInstrument.RoundToTickSize(Math.Floor(raw / TickSize + 1e-9) * TickSize);
+                if (newEntry > stop && newEntry < entry)
+                {
+                    Log(string.Format("LONG  limit moved {0} -> {1} (RR {2:0.00} -> {3:0.00} to EQ)",
+                        entry, newEntry, rr, (target - newEntry) / (newEntry - stop)));
+                    entry    = newEntry;
+                    risk     = entry - stop;
+                    rr       = (target - entry) / risk;
+                }
+            }
+
             if (rr < MinRR)
             {
                 Skip(string.Format("RR {0:0.00} < {1:0.00}", rr, MinRR), true);
                 return;
             }
 
-            if (High[0] >= target)
+            // "TP hit" = the target, or the 0.47 edge of the EQ block if price gets there first.
+            double cancelLevel = Instrument.MasterInstrument.RoundToTickSize(Math.Min(target, newRange.MB2));
+            if (High[0] >= cancelLevel)
             {
-                Skip("target already hit on BOS candle", true);
+                Skip(string.Format("TP zone ({0}) already hit on BOS candle", cancelLevel), true);
                 return;
             }
 
@@ -269,22 +339,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             entryOrder = EnterLongLimit(0, true, qty, entry, LongSignal);
 
             pendingLong = true;
-            pendingTarget = target;
+            pendingCancelLevel = cancelLevel;
             pendingSinceBar = CurrentBar;
 
             if (ShowDrawings)
             {
-                Draw.Text(this, "po3L" + CurrentBar, string.Format("L {3} @ {0} | {1:0.00}R{2}", entry, rr, target >= targetR ? "" : " (EQ)", qty),
-                    0, Low[0] - 6 * TickSize, Brushes.LimeGreen);
                 Draw.Line(this, "po3Lent" + CurrentBar, false, CurrentBar - broken.Bar, entry, 0, entry, Brushes.LimeGreen, DashStyleHelper.Dash, 1);
                 DrawStop(true, stopSwing, stop);
             }
             Log(string.Format("LONG  {5} @ limit {0} stop {1} target {2} (EQ {3}) RR {4:0.00} risk ${6:0}", entry, stop, target, newRange.Eq, rr, qty, qty * risk * Instrument.MasterInstrument.PointValue));
         }
 
-        private void TryShort()
+        private void TryShort(Swing broken)
         {
-            Swing broken = lastLow;
             Swing stopSwing = lastHigh;
             if (broken == null || stopSwing == null)
                 return;
@@ -300,19 +367,18 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            // "Into a new range" = the leg started (stop fractal) in a higher dealing range than the BOS close.
-            DealingRange originRange = new DealingRange(Po3, stopSwing.Price);
-            DealingRange newRange    = new DealingRange(Po3, Close[0]);
-
-            if (RequireNewRange && newRange.Low >= originRange.Low)
+            DealingRange newRange = new DealingRange(Po3, Close[0]);
+            string rangeFail = RequireNewRange ? NewRangeFailure(false, stopSwing) : null;
+            if (rangeFail != null)
             {
-                Skip(string.Format("BOS not into new range (origin {0} = close {1})", originRange.Low, newRange.Low), false);
+                Skip(rangeFail, false);
                 return;
             }
 
-            if (FvgOnStopLeg(stopSwing))
+            FvgHit fvg = FvgOnStopLeg(stopSwing, false);
+            if (fvg != null)
             {
-                Skip("FVG on stop leg", false);
+                ReportFvgSkip(fvg, false);
                 return;
             }
 
@@ -320,15 +386,33 @@ namespace NinjaTrader.NinjaScript.Strategies
             double target  = Instrument.MasterInstrument.RoundToTickSize(Math.Max(targetR, newRange.Eq));
             double rr      = (entry - target) / risk;
 
+            // Scenario: target capped at EQ and RR short of MinRR (but >= floor) ->
+            // move the limit UP toward the stop until EQ is MinRR away. Stop and target unchanged.
+            if (rr < MinRR && AdjustEntryForRR && target > targetR && rr >= AdjustFloorRR)
+            {
+                double raw      = (target + MinRR * stop) / (1 + MinRR);
+                double newEntry = Instrument.MasterInstrument.RoundToTickSize(Math.Ceiling(raw / TickSize - 1e-9) * TickSize);
+                if (newEntry < stop && newEntry > entry)
+                {
+                    Log(string.Format("SHORT limit moved {0} -> {1} (RR {2:0.00} -> {3:0.00} to EQ)",
+                        entry, newEntry, rr, (newEntry - target) / (stop - newEntry)));
+                    entry    = newEntry;
+                    risk     = stop - entry;
+                    rr       = (entry - target) / risk;
+                }
+            }
+
             if (rr < MinRR)
             {
                 Skip(string.Format("RR {0:0.00} < {1:0.00}", rr, MinRR), false);
                 return;
             }
 
-            if (Low[0] <= target)
+            // "TP hit" = the target, or the 0.53 edge of the EQ block if price gets there first.
+            double cancelLevel = Instrument.MasterInstrument.RoundToTickSize(Math.Max(target, newRange.MB3));
+            if (Low[0] <= cancelLevel)
             {
-                Skip("target already hit on BOS candle", false);
+                Skip(string.Format("TP zone ({0}) already hit on BOS candle", cancelLevel), false);
                 return;
             }
 
@@ -344,30 +428,29 @@ namespace NinjaTrader.NinjaScript.Strategies
             entryOrder = EnterShortLimit(0, true, qty, entry, ShortSignal);
 
             pendingLong = false;
-            pendingTarget = target;
+            pendingCancelLevel = cancelLevel;
             pendingSinceBar = CurrentBar;
 
             if (ShowDrawings)
             {
-                Draw.Text(this, "po3S" + CurrentBar, string.Format("S {3} @ {0} | {1:0.00}R{2}", entry, rr, target <= targetR ? "" : " (EQ)", qty),
-                    0, High[0] + 6 * TickSize, Brushes.OrangeRed);
                 Draw.Line(this, "po3Sent" + CurrentBar, false, CurrentBar - broken.Bar, entry, 0, entry, Brushes.OrangeRed, DashStyleHelper.Dash, 1);
                 DrawStop(false, stopSwing, stop);
             }
             Log(string.Format("SHORT {5} @ limit {0} stop {1} target {2} (EQ {3}) RR {4:0.00} risk ${6:0}", entry, stop, target, newRange.Eq, rr, qty, qty * risk * Instrument.MasterInstrument.PointValue));
         }
 
-        // Fixed rules: cancel if price hits the target before fill, or the 08:00-10:00 UK session ends.
+        // Fixed rules: cancel if price reaches the TP zone before fill (target, or the EQ block edge:
+        // 0.47 for longs, 0.53 for shorts, whichever comes first), or the 08:00-10:00 UK session ends.
         private void ManagePendingLimit()
         {
             string reason = null;
 
             if (CurrentBar > pendingSinceBar)
             {
-                if (pendingLong && High[0] >= pendingTarget)
-                    reason = "target reached before fill";
-                else if (!pendingLong && Low[0] <= pendingTarget)
-                    reason = "target reached before fill";
+                if (pendingLong && High[0] >= pendingCancelLevel)
+                    reason = string.Format("TP zone {0} reached before fill", pendingCancelLevel);
+                else if (!pendingLong && Low[0] <= pendingCancelLevel)
+                    reason = string.Format("TP zone {0} reached before fill", pendingCancelLevel);
             }
 
             if (reason == null && !InSession())
@@ -520,8 +603,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 swings.Clear();
                 lastHigh = null;
                 lastLow = null;
-                lastHighBroken = false;
-                lastLowBroken = false;
+                openHighs.Clear();
+                openLows.Clear();
+                bullBosBars.Clear();
+                bearBosBars.Clear();
             }
 
             double ph = Bars.GetHigh(pivot);
@@ -542,7 +627,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Swing s = new Swing { Price = ph, Bar = pivot, IsHigh = true };
                 swings.Add(s);
                 lastHigh = s;
-                lastHighBroken = false;
+                openHighs.Add(s);
                 if (ShowDrawings)
                     Draw.TriangleDown(this, "fh" + pivot, false, n, ph + 2 * TickSize, Brushes.IndianRed);
             }
@@ -551,7 +636,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Swing s = new Swing { Price = pl, Bar = pivot, IsHigh = false };
                 swings.Add(s);
                 lastLow = s;
-                lastLowBroken = false;
+                openLows.Add(s);
                 if (ShowDrawings)
                     Draw.TriangleUp(this, "fl" + pivot, false, n, pl - 2 * TickSize, Brushes.SteelBlue);
             }
@@ -564,66 +649,95 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         #region FVG
 
-        private bool FvgOnStopLeg(Swing stopSwing)
+        private class FvgHit
         {
-            if (CheckLegIntoStop)
-            {
-                int legStart = LegStart(stopSwing);
-                if (legStart >= 0 && HasFvg(legStart, stopSwing.Bar))
-                    return true;
-            }
-            if (CheckLegStopToBreak && HasFvg(stopSwing.Bar, CurrentBar))
-                return true;
-            return false;
+            public int Bar;         // third candle of the FVG (absolute index)
+            public bool Bull;
+            public double Top, Bottom;
+            public int LegFrom, LegTo;
+            public double LegFromPrice, LegToPrice;
         }
 
-        // Origin of the leg that ran INTO the stop fractal:
-        // the extreme opposite price between the previous same-side fractal and the stop fractal.
-        private int LegStart(Swing s)
+        // The stop leg = from the stop fractal to the BOS candle (the move in the trade direction).
+        // Only gaps in the trade direction count: bearish FVGs for a short, bullish FVGs for a long.
+        // Returns the first such FVG, or null if the leg is clean.
+        private FvgHit FvgOnStopLeg(Swing stopSwing, bool isLong)
         {
-            int prevSame = -1;
-            for (int i = swings.Count - 1; i >= 0; i--)
+            FvgHit hit = FindFvg(stopSwing.Bar, CurrentBar, isLong);
+            if (hit != null)
             {
-                if (swings[i].IsHigh == s.IsHigh && swings[i].Bar < s.Bar)
-                {
-                    prevSame = swings[i].Bar;
-                    break;
-                }
+                hit.LegFrom = stopSwing.Bar;
+                hit.LegFromPrice = stopSwing.Price;
+                hit.LegTo = CurrentBar;
+                hit.LegToPrice = Close[0];
             }
-
-            // No earlier same-side fractal today: look back no further than 07:00 UK.
-            int from = prevSame >= 0 ? prevSame : Math.Max(trackingStartBar, s.Bar - LegLookbackFallback);
-            int best = -1;
-            double bestVal = s.IsHigh ? double.MaxValue : double.MinValue;
-
-            for (int b = from; b < s.Bar; b++)
-            {
-                if (s.IsHigh)
-                {
-                    double lo = Bars.GetLow(b);
-                    if (lo < bestVal) { bestVal = lo; best = b; }
-                }
-                else
-                {
-                    double hi = Bars.GetHigh(b);
-                    if (hi > bestVal) { bestVal = hi; best = b; }
-                }
-            }
-            return best;
+            return hit;
         }
 
-        // Any 3-candle FVG (bullish or bearish) fully inside [fromBar, toBar].
-        private bool HasFvg(int fromBar, int toBar)
+        // Log the FVG and leg, and mark them on the chart: grey dotted line = leg checked,
+        // orange box = the gap that caused the skip.
+        private void ReportFvgSkip(FvgHit h, bool isLong)
+        {
+            Log(string.Format("{0} BOS skipped: FVG on stop leg. Leg {1} ({2}) -> {3} ({4}). {5} FVG {6} - {7} ({8} pts) on candles opening {9}-{10}",
+                isLong ? "LONG" : "SHORT",
+                h.LegFromPrice, OpenTime(h.LegFrom), h.LegToPrice, OpenTime(h.LegTo),
+                h.Bull ? "Bullish" : "Bearish", h.Bottom, h.Top, h.Top - h.Bottom,
+                OpenTime(h.Bar - 2), OpenTime(h.Bar)));
+
+            if (!ShowDrawings)
+                return;
+
+            Draw.Line(this, "po3FvgLeg" + CurrentBar, false, CurrentBar - h.LegFrom, h.LegFromPrice,
+                CurrentBar - h.LegTo, h.LegToPrice, Brushes.Gray, DashStyleHelper.Dot, 2);
+            Draw.Rectangle(this, "po3Fvg" + CurrentBar, false, CurrentBar - (h.Bar - 2), h.Top,
+                CurrentBar - h.Bar, h.Bottom, Brushes.Orange, Brushes.Orange, 40);
+        }
+
+        // First UNTOUCHED 3-candle FVG in the given direction fully inside [fromBar, toBar], or null.
+        // An FVG only counts if no candle after it (up to and including the BOS candle) has traded
+        // back into it, even by a tick. Touched FVGs are logged and ignored.
+        private FvgHit FindFvg(int fromBar, int toBar, bool bullish)
         {
             double minGap = Math.Max(MinFvgTicks, 1) * TickSize - TickSize * 0.001;
             for (int i = fromBar + 2; i <= toBar; i++)
             {
-                double bullGap = Bars.GetLow(i) - Bars.GetHigh(i - 2);
-                double bearGap = Bars.GetLow(i - 2) - Bars.GetHigh(i);
-                if (bullGap >= minGap || bearGap >= minGap)
-                    return true;
+                FvgHit hit = null;
+                if (bullish)
+                {
+                    double gap = Bars.GetLow(i) - Bars.GetHigh(i - 2);
+                    if (gap >= minGap)
+                        hit = new FvgHit { Bar = i, Bull = true, Bottom = Bars.GetHigh(i - 2), Top = Bars.GetLow(i) };
+                }
+                else
+                {
+                    double gap = Bars.GetLow(i - 2) - Bars.GetHigh(i);
+                    if (gap >= minGap)
+                        hit = new FvgHit { Bar = i, Bull = false, Bottom = Bars.GetHigh(i), Top = Bars.GetLow(i - 2) };
+                }
+                if (hit == null)
+                    continue;
+
+                int touchBar = FirstTouch(hit);
+                if (touchBar < 0)
+                    return hit;
+
+                Log(string.Format("  {0} FVG {1} - {2} (candles opening {3}-{4}) touched at {5} - ignored",
+                    hit.Bull ? "Bullish" : "Bearish", hit.Bottom, hit.Top,
+                    OpenTime(hit.Bar - 2), OpenTime(hit.Bar), OpenTime(touchBar)));
             }
-            return false;
+            return null;
+        }
+
+        // First candle after the FVG that trades into it: for a bearish FVG a high reaching its
+        // bottom edge, for a bullish FVG a low reaching its top edge. -1 if never touched.
+        private int FirstTouch(FvgHit h)
+        {
+            for (int b = h.Bar + 1; b <= CurrentBar; b++)
+            {
+                if (h.Bull ? Bars.GetLow(b) <= h.Top : Bars.GetHigh(b) >= h.Bottom)
+                    return b;
+            }
+            return -1;
         }
 
         #endregion
@@ -708,12 +822,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int StopBufferTicks { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Skip if FVG on leg INTO stop fractal", Order = 1, GroupName = "4. FVG filter")]
-        public bool CheckLegIntoStop { get; set; }
+        [Display(Name = "EQ scenario: move limit to reach Min RR", Order = 5, GroupName = "2. Risk")]
+        public bool AdjustEntryForRR { get; set; }
 
         [NinjaScriptProperty]
-        [Display(Name = "Skip if FVG on leg stop fractal -> BOS", Order = 2, GroupName = "4. FVG filter")]
-        public bool CheckLegStopToBreak { get; set; }
+        [Range(0, 20)]
+        [Display(Name = "EQ scenario: only if original RR >=", Order = 6, GroupName = "2. Risk")]
+        public double AdjustFloorRR { get; set; }
 
         [NinjaScriptProperty]
         [Range(1, 1000)]
