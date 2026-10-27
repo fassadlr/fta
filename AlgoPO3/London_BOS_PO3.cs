@@ -25,7 +25,7 @@ using NinjaTrader.NinjaScript.DrawingTools;
 //     the same candle, the most recent of them is the broken fractal.
 //     NEW RANGE rule (Low = floor(price / po3) * po3): the stop fractal is in the old range, the
 //     BOS close is at least 1 tick into a new range, and it is the first BOS in that direction into
-//     that range since the stop fractal formed. If not, the BOS is ignored but the fractal is used up.
+//     that range since the stop fractal formed (or since price last closed back in the old range). If not, the BOS is ignored but the fractal is used up.
 //  3. Entry: LIMIT order at the broken fractal price (retest of the break).
 //  4. Stop: StopBufferTicks (default 3) beyond the most recent opposite fractal. If an earlier fractal sits just
 //     beyond it (within StopPivotTolerance x PO3) and is still unbroken - i.e. it is the true
@@ -34,9 +34,13 @@ using NinjaTrader.NinjaScript.DrawingTools;
 //  5. Target: 1R from the limit price, capped at EQ of the new dealing range (never more than 1R).
 //  6. Skip if RR < MinRR (0.9). EQ scenario (optional): if the target is capped at EQ and RR is
 //     between AdjustFloorRR (0.5) and MinRR, move the limit toward the stop until RR = MinRR.
+//     1R scenario (optional): if the target is a plain 1R (not capped by EQ), move the limit
+//     EntryOffsetPoints (0.5) toward price (up for longs, down for shorts), keeping stop and target,
+//     as long as RR stays >= MinRR.
 //  7. Skip if the stop leg (stop fractal -> BOS candle) has an FVG in the trade direction
 //     (bearish FVG for a short, bullish FVG for a long).
 //     Only UNTOUCHED FVGs count: if any later candle has traded into the gap, it is ignored.
+//     A gap completed by the BOS candle itself never counts.
 //  Session: 08:00-10:00 UK time (handles GMT/BST automatically). New setups only inside it.
 //  Pending limit is cancelled if price reaches the TP zone before fill - the target or the EQ block
 //  edge (0.47 for longs, 0.53 for shorts), whichever comes first - or the session ends.
@@ -136,6 +140,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 StopBufferTicks     = 3;
                 AdjustEntryForRR    = true;
                 AdjustFloorRR       = 0.5;
+                OffsetEntryOn1R     = true;
+                EntryOffsetPoints   = 0.5;
 
                 // FVG filter
                 MinFvgTicks         = 1;
@@ -231,7 +237,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         // "Into a new range" (all must hold):
         //  1. the stop fractal (where the leg started) is in the OLD range,
         //  2. the BOS close is at least 1 tick into a NEW range (higher for a long, lower for a short),
-        //  3. this is the FIRST BOS in this direction into that range since the stop fractal formed.
+        //  3. this is the FIRST BOS in this direction into that range since the stop fractal formed,
+        //     ignoring earlier BOSs that price has since closed back through into the old range.
         // Returns null if OK, otherwise the reason it failed.
         private string NewRangeFailure(bool isLong, Swing origin)
         {
@@ -241,10 +248,24 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (isLong ? closeLow <= originLow : closeLow >= originLow)
                 return string.Format("not into new range (stop {0} range {1}, close range {2})", origin.Price, originLow, closeLow);
 
+            // An earlier BOS into this range only blocks us if price has stayed in the new range since.
+            // If any candle after it closed back in the old range (below for a long, above for a short),
+            // that BOS is superseded and this one counts as a fresh break into the range.
+            int resetBar = origin.Bar;
+            for (int c = CurrentBar - 1; c > origin.Bar; c--)
+            {
+                double cLow = RangeLowFor(Bars.GetClose(c), isLong);
+                if (isLong ? cLow < closeLow : cLow > closeLow)
+                {
+                    resetBar = c;
+                    break;
+                }
+            }
+
             foreach (int b in isLong ? bullBosBars : bearBosBars)
             {
-                if (b > origin.Bar && b < CurrentBar && RangeLowFor(Bars.GetClose(b), isLong) == closeLow)
-                    return string.Format("not first BOS into range {0} (earlier BOS on candle opening {1})", closeLow, OpenTime(b));
+                if (b > resetBar && b < CurrentBar && RangeLowFor(Bars.GetClose(b), isLong) == closeLow)
+                    return string.Format("not first BOS into range {0} (earlier BOS on candle opening {1}, price has not closed back in the old range since)", closeLow, OpenTime(b));
             }
             return null;
         }
@@ -311,6 +332,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                     risk     = entry - stop;
                     rr       = (target - entry) / risk;
                 }
+            }
+
+            // Scenario: target is a plain 1R (below EQ) -> raise the limit by EntryOffsetPoints so a
+            // near-miss retest still fills. Stop and target stay put; only applied if RR stays >= MinRR.
+            if (rr >= MinRR && OffsetEntryOn1R && EntryOffsetPoints > 0 && targetR < newRange.Eq)
+            {
+                double newEntry = Instrument.MasterInstrument.RoundToTickSize(entry + EntryOffsetPoints);
+                double newRR    = (target - newEntry) / (newEntry - stop);
+                if (newRR >= MinRR && newEntry < target)
+                {
+                    Log(string.Format("LONG  limit offset {0} -> {1} (RR {2:0.00} -> {3:0.00})", entry, newEntry, rr, newRR));
+                    entry = newEntry;
+                    risk  = entry - stop;
+                    rr    = newRR;
+                }
+                else
+                    Log(string.Format("LONG  limit offset skipped: RR would be {0:0.00} < {1:0.00}", newRR, MinRR));
             }
 
             if (rr < MinRR)
@@ -400,6 +438,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                     risk     = stop - entry;
                     rr       = (entry - target) / risk;
                 }
+            }
+
+            // Scenario: target is a plain 1R (above EQ) -> lower the limit by EntryOffsetPoints so a
+            // near-miss retest still fills. Stop and target stay put; only applied if RR stays >= MinRR.
+            if (rr >= MinRR && OffsetEntryOn1R && EntryOffsetPoints > 0 && targetR > newRange.Eq)
+            {
+                double newEntry = Instrument.MasterInstrument.RoundToTickSize(entry - EntryOffsetPoints);
+                double newRR    = (newEntry - target) / (stop - newEntry);
+                if (newRR >= MinRR && newEntry > target)
+                {
+                    Log(string.Format("SHORT limit offset {0} -> {1} (RR {2:0.00} -> {3:0.00})", entry, newEntry, rr, newRR));
+                    entry = newEntry;
+                    risk  = stop - entry;
+                    rr    = newRR;
+                }
+                else
+                    Log(string.Format("SHORT limit offset skipped: RR would be {0:0.00} < {1:0.00}", newRR, MinRR));
             }
 
             if (rr < MinRR)
@@ -663,7 +718,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Returns the first such FVG, or null if the leg is clean.
         private FvgHit FvgOnStopLeg(Swing stopSwing, bool isLong)
         {
-            FvgHit hit = FindFvg(stopSwing.Bar, CurrentBar, isLong);
+            // The BOS candle never completes an FVG (it is not a fully formed gap), so the last
+            // 3-candle pattern checked ends on the candle BEFORE the BOS. The BOS candle can still
+            // touch (and so invalidate) an earlier FVG.
+            FvgHit hit = FindFvg(stopSwing.Bar, CurrentBar - 1, isLong);
             if (hit != null)
             {
                 hit.LegFrom = stopSwing.Bar;
@@ -829,6 +887,15 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(0, 20)]
         [Display(Name = "EQ scenario: only if original RR >=", Order = 6, GroupName = "2. Risk")]
         public double AdjustFloorRR { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "1R scenario: offset limit toward price", Order = 7, GroupName = "2. Risk")]
+        public bool OffsetEntryOn1R { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 1000)]
+        [Display(Name = "1R scenario: entry offset (points)", Order = 8, GroupName = "2. Risk")]
+        public double EntryOffsetPoints { get; set; }
 
         [NinjaScriptProperty]
         [Range(1, 1000)]
