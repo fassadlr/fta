@@ -16,7 +16,7 @@ using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.DrawingTools;
 #endregion
 
-// PO3 Range BOS strategy (run on a 5-minute chart)
+// PO3_London_BOS strategy (run on a 5-minute chart)
 //
 //  1. Fractals: 3-candle swing high/low (1 candle each side).
 //     Tracked from 07:00 UK each day; the previous day's fractals are cleared at 07:00.
@@ -27,7 +27,9 @@ using NinjaTrader.NinjaScript.DrawingTools;
 //     BOS close is at least 1 tick into a new range, and it is the first BOS in that direction into
 //     that range since the stop fractal formed (or since price last closed back in the old range). If not, the BOS is ignored but the fractal is used up.
 //  3. Entry: LIMIT order at the broken fractal price (retest of the break).
-//  4. Stop: StopBufferTicks (default 3) beyond the most recent opposite fractal. If an earlier fractal sits just
+//  4. Stop: StopBufferTicks (default 3) beyond the most recent opposite fractal.
+//     Skipped if the stop lands in the new range's extension band (long: -0.111 Ext to 0 Low,
+//     short: 1 High to 1.111 Ext). If an earlier fractal sits just
 //     beyond it (within StopPivotTolerance x PO3) and is still unbroken - i.e. it is the true
 //     origin of the leg that made this BOS - that swing is used instead. All other checks
 //     then use the new stop.
@@ -42,16 +44,21 @@ using NinjaTrader.NinjaScript.DrawingTools;
 //     Only UNTOUCHED FVGs count: if any later candle has traded into the gap, it is ignored.
 //     A gap completed by the BOS candle itself never counts.
 //  Session: 08:00-10:00 UK time (handles GMT/BST automatically). New setups only inside it.
-//  Pending limit is cancelled if price reaches the TP zone before fill - the target or the EQ block
-//  edge (0.47 for longs, 0.53 for shorts), whichever comes first - or the session ends.
-//  (If the BOS candle itself already traded to the target, the setup is skipped.)
+//  Late-range scenario (optional): if a BOS candle breaks a fractal but its close is still in the
+//  stop's range, wait LateRangeCandles (1) candle(s). If one closes into the new range, run the normal
+//  checks then, with the limit at the original broken fractal.
+//  07:55 scenario (optional): a BOS on the candle opening 07:55 also counts; its limit goes in
+//  at the 08:00 open. All the usual rules still apply.
+//  Pending limit is cancelled if price reaches the EQ block before fill (0.47 of the new range for
+//  longs, 0.53 for shorts) - a 1R target being traded through does not cancel - or the session ends.
+//  (If the BOS candle itself already reached the EQ block, the setup is skipped.)
 //  Filled positions are never closed on time: they run to stop or target.
 //  Max 1 trade per UK day: once an entry fills, no new setups that day.
 //  (A limit cancelled unfilled does not count.)
 
-namespace NinjaTrader.NinjaScript.Strategies
+namespace NinjaTrader.NinjaScript.Strategies.FTA
 {
-    public class PO3RangeBOS : Strategy
+    public class PO3_London_BOS : Strategy
     {
         private class Swing
         {
@@ -63,7 +70,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         // Mirrors the DealingRange grid (only the levels this strategy uses).
         private class DealingRange
         {
-            public double Low, MB2, Eq, MB3, High;
+            public double ExtLow, Low, MB2, Eq, MB3, High, ExtHigh;
             public DealingRange(int po3, double price)
             {
                 Low  = Math.Floor(price / po3) * po3;
@@ -71,6 +78,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Eq   = Low + (po3 * 0.50);
                 MB3  = Low + (po3 * 0.53);
                 High = Low + po3;
+                ExtLow  = Low - (po3 * 0.111);
+                ExtHigh = High + (po3 * 0.111);
             }
         }
 
@@ -81,6 +90,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         private List<Swing> openLows;    // fractal lows  not yet closed below
         private List<int> bullBosBars;   // every long BOS today (traded or not)
         private List<int> bearBosBars;   // every short BOS today (traded or not)
+
+        // Late-range scenario: a BOS that broke a fractal but hasn't closed into the new range yet
+        private Swing waitingBroken;
+        private bool waitingLong;
+        private int waitingBosBar = -1;
 
         // Pending limit tracking
         private Order entryOrder;
@@ -110,7 +124,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (State == State.SetDefaults)
             {
-                Name                                = "PO3RangeBOS";
+                Name                                = "PO3_London_BOS";
                 Description                         = "5m BOS into a new PO3 dealing range. Limit at broken fractal, stop a few ticks past last fractal, target 1R or range EQ, min RR 0.9, skip if FVG on stop leg.";
                 Calculate                           = Calculate.OnBarClose;
                 EntriesPerDirection                 = 1;
@@ -141,6 +155,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 AdjustEntryForRR    = true;
                 AdjustFloorRR       = 0.5;
                 OffsetEntryOn1R     = true;
+                AllowPreOpenBos     = true;
+                SkipStopInExtension = true;
+                LateRangeCandles    = 1;
                 EntryOffsetPoints   = 0.5;
 
                 // FVG filter
@@ -191,6 +208,22 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (longBos)  bullBosBars.Add(CurrentBar);
             if (shortBos) bearBosBars.Add(CurrentBar);
 
+            // Late-range scenario: pick up a BOS that is waiting for a close into the new range.
+            // It is dropped if it has expired or if a fresh BOS printed on this candle.
+            Swing lateBroken = null;
+            bool lateLong = false;
+            int lateBosBar = -1;
+            if (waitingBroken != null)
+            {
+                if (CurrentBar - waitingBosBar <= LateRangeCandles && !longBos && !shortBos)
+                {
+                    lateBroken = waitingBroken;
+                    lateLong = waitingLong;
+                    lateBosBar = waitingBosBar;
+                }
+                waitingBroken = null;
+            }
+
             // Manage a working limit order before looking for new setups.
             if (entryOrder != null)
             {
@@ -202,7 +235,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             if (Position.MarketPosition != MarketPosition.Flat)
                 return;
-            if (!InSession())
+            if (!CanStartSetup())
                 return;
             if (tradedDate == ToUk(Time[0]).Date)
             {
@@ -212,9 +245,27 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             if (longBos && AllowLong)
-                TryLong(brokenHigh);
+                TryLong(brokenHigh, CurrentBar);
             else if (shortBos && AllowShort)
-                TryShort(brokenLow);
+                TryShort(brokenLow, CurrentBar);
+            else if (lateBroken != null && lateLong && AllowLong)
+                TryLong(lateBroken, lateBosBar);
+            else if (lateBroken != null && !lateLong && AllowShort)
+                TryShort(lateBroken, lateBosBar);
+        }
+
+        // Late-range scenario: if the BOS only failed because its close is still in the stop's range,
+        // wait up to LateRangeCandles candles for a close into the new range. Returns true if waiting.
+        private bool WaitForLateRange(bool isLong, Swing broken, int bosBar)
+        {
+            if (LateRangeCandles <= 0 || CurrentBar - bosBar >= LateRangeCandles)
+                return false;
+            waitingBroken = broken;
+            waitingLong = isLong;
+            waitingBosBar = bosBar;
+            Log(string.Format("{0} BOS of {1} not into new range yet - waiting {2} candle(s) for a close into it",
+                isLong ? "LONG" : "SHORT", broken.Price, LateRangeCandles - (CurrentBar - bosBar)));
+            return true;
         }
 
         // Removes every open fractal the current close has gone through; returns the most recent one.
@@ -240,13 +291,17 @@ namespace NinjaTrader.NinjaScript.Strategies
         //  3. this is the FIRST BOS in this direction into that range since the stop fractal formed,
         //     ignoring earlier BOSs that price has since closed back through into the old range.
         // Returns null if OK, otherwise the reason it failed.
-        private string NewRangeFailure(bool isLong, Swing origin)
+        private string NewRangeFailure(bool isLong, Swing origin, out bool stillInStopRange)
         {
+            stillInStopRange = false;
             double closeLow  = RangeLowFor(Close[0], isLong);
             double originLow = RangeLowFor(origin.Price, isLong);
 
             if (isLong ? closeLow <= originLow : closeLow >= originLow)
+            {
+                stillInStopRange = true;
                 return string.Format("not into new range (stop {0} range {1}, close range {2})", origin.Price, originLow, closeLow);
+            }
 
             // An earlier BOS into this range only blocks us if price has stayed in the new range since.
             // If any candle after it closed back in the old range (below for a long, above for a short),
@@ -282,7 +337,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         #region Setup logic
 
-        private void TryLong(Swing broken)
+        // bosBar = the candle that broke the fractal (CurrentBar, or earlier for a late-range confirmation).
+        private void TryLong(Swing broken, int bosBar)
         {
             Swing stopSwing = lastLow;
             if (broken == null || stopSwing == null)
@@ -300,10 +356,24 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             DealingRange newRange = new DealingRange(Po3, Close[0]);
-            string rangeFail = RequireNewRange ? NewRangeFailure(true, stopSwing) : null;
+            bool stillInStopRange = false;
+            string rangeFail = RequireNewRange ? NewRangeFailure(true, stopSwing, out stillInStopRange) : null;
             if (rangeFail != null)
             {
+                if (stillInStopRange && WaitForLateRange(true, broken, bosBar))
+                    return;
                 Skip(rangeFail, true);
+                return;
+            }
+            if (bosBar != CurrentBar)
+                Log(string.Format("LONG  BOS of {0} (candle opening {1}) confirmed: closed into new range on candle opening {2}",
+                    broken.Price, OpenTime(bosBar), OpenTime(CurrentBar)));
+
+            // Skip if the stop sits in the extension band below the new range (between -0.111 Ext and 0 Low).
+            if (SkipStopInExtension && stop >= newRange.ExtLow - 1e-9 && stop <= newRange.Low + 1e-9)
+            {
+                Skip(string.Format("stop {0} in range extension ({1} - {2})", stop,
+                    Instrument.MasterInstrument.RoundToTickSize(newRange.ExtLow), newRange.Low), true);
                 return;
             }
 
@@ -357,11 +427,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            // "TP hit" = the target, or the 0.47 edge of the EQ block if price gets there first.
-            double cancelLevel = Instrument.MasterInstrument.RoundToTickSize(Math.Min(target, newRange.MB2));
+            // "TP hit" only means price reached the EQ block (0.47 for a long) - that completes the leg.
+            // A plain 1R target being traded through before fill does NOT cancel/skip.
+            double cancelLevel = Instrument.MasterInstrument.RoundToTickSize(newRange.MB2);
             if (High[0] >= cancelLevel)
             {
-                Skip(string.Format("TP zone ({0}) already hit on BOS candle", cancelLevel), true);
+                Skip(string.Format("EQ block ({0}) already hit on BOS candle", cancelLevel), true);
                 return;
             }
 
@@ -388,7 +459,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             Log(string.Format("LONG  {5} @ limit {0} stop {1} target {2} (EQ {3}) RR {4:0.00} risk ${6:0}", entry, stop, target, newRange.Eq, rr, qty, qty * risk * Instrument.MasterInstrument.PointValue));
         }
 
-        private void TryShort(Swing broken)
+        private void TryShort(Swing broken, int bosBar)
         {
             Swing stopSwing = lastHigh;
             if (broken == null || stopSwing == null)
@@ -406,10 +477,24 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             DealingRange newRange = new DealingRange(Po3, Close[0]);
-            string rangeFail = RequireNewRange ? NewRangeFailure(false, stopSwing) : null;
+            bool stillInStopRange = false;
+            string rangeFail = RequireNewRange ? NewRangeFailure(false, stopSwing, out stillInStopRange) : null;
             if (rangeFail != null)
             {
+                if (stillInStopRange && WaitForLateRange(false, broken, bosBar))
+                    return;
                 Skip(rangeFail, false);
+                return;
+            }
+            if (bosBar != CurrentBar)
+                Log(string.Format("SHORT BOS of {0} (candle opening {1}) confirmed: closed into new range on candle opening {2}",
+                    broken.Price, OpenTime(bosBar), OpenTime(CurrentBar)));
+
+            // Skip if the stop sits in the extension band above the new range (between 1 High and 1.111 Ext).
+            if (SkipStopInExtension && stop >= newRange.High - 1e-9 && stop <= newRange.ExtHigh + 1e-9)
+            {
+                Skip(string.Format("stop {0} in range extension ({1} - {2})", stop, newRange.High,
+                    Instrument.MasterInstrument.RoundToTickSize(newRange.ExtHigh)), false);
                 return;
             }
 
@@ -463,11 +548,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            // "TP hit" = the target, or the 0.53 edge of the EQ block if price gets there first.
-            double cancelLevel = Instrument.MasterInstrument.RoundToTickSize(Math.Max(target, newRange.MB3));
+            // "TP hit" only means price reached the EQ block (0.53 for a short) - that completes the leg.
+            // A plain 1R target being traded through before fill does NOT cancel/skip.
+            double cancelLevel = Instrument.MasterInstrument.RoundToTickSize(newRange.MB3);
             if (Low[0] <= cancelLevel)
             {
-                Skip(string.Format("TP zone ({0}) already hit on BOS candle", cancelLevel), false);
+                Skip(string.Format("EQ block ({0}) already hit on BOS candle", cancelLevel), false);
                 return;
             }
 
@@ -494,8 +580,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             Log(string.Format("SHORT {5} @ limit {0} stop {1} target {2} (EQ {3}) RR {4:0.00} risk ${6:0}", entry, stop, target, newRange.Eq, rr, qty, qty * risk * Instrument.MasterInstrument.PointValue));
         }
 
-        // Fixed rules: cancel if price reaches the TP zone before fill (target, or the EQ block edge:
-        // 0.47 for longs, 0.53 for shorts, whichever comes first), or the 08:00-10:00 UK session ends.
+        // Fixed rules: cancel if price reaches the EQ block before fill (0.47 for longs, 0.53 for
+        // shorts, of the new range), or the 08:00-10:00 UK session ends.
         private void ManagePendingLimit()
         {
             string reason = null;
@@ -503,9 +589,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (CurrentBar > pendingSinceBar)
             {
                 if (pendingLong && High[0] >= pendingCancelLevel)
-                    reason = string.Format("TP zone {0} reached before fill", pendingCancelLevel);
+                    reason = string.Format("EQ block {0} reached before fill", pendingCancelLevel);
                 else if (!pendingLong && Low[0] <= pendingCancelLevel)
-                    reason = string.Format("TP zone {0} reached before fill", pendingCancelLevel);
+                    reason = string.Format("EQ block {0} reached before fill", pendingCancelLevel);
             }
 
             if (reason == null && !InSession())
@@ -662,6 +748,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 openLows.Clear();
                 bullBosBars.Clear();
                 bearBosBars.Clear();
+                waitingBroken = null;
             }
 
             double ph = Bars.GetHigh(pivot);
@@ -825,6 +912,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             return t > SessionStartUk && t < SessionEndUk;
         }
 
+        // New setups: any candle inside the session, plus (optionally) the 07:55 candle, which closes
+        // at 08:00 exactly - its limit order goes in at the 08:00 open.
+        private bool CanStartSetup()
+        {
+            if (InSession())
+                return true;
+            return AllowPreOpenBos && ToUk(Time[0]).TimeOfDay == SessionStartUk;
+        }
+
         // Earliest bar on the same UK day as 'bar' that opened at or after 07:00 UK.
         private int FirstBarAfterTrackStart(int bar)
         {
@@ -865,6 +961,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         public double StopPivotTolerance { get; set; }
 
         [NinjaScriptProperty]
+        [Display(Name = "Skip if stop is in range extension", Order = 1, GroupName = "2. Risk")]
+        public bool SkipStopInExtension { get; set; }
+
+        [NinjaScriptProperty]
         [Range(0, 20)]
         [Display(Name = "Min RR", Order = 2, GroupName = "2. Risk")]
         public double MinRR { get; set; }
@@ -901,6 +1001,15 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Range(1, 1000)]
         [Display(Name = "Min FVG size (ticks)", Order = 3, GroupName = "4. FVG filter")]
         public int MinFvgTicks { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "07:55 scenario: allow BOS on the 07:55 candle", Order = 3, GroupName = "5. Filters")]
+        public bool AllowPreOpenBos { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 10)]
+        [Display(Name = "Late-range scenario: candles to wait for close into new range (0 = off)", Order = 4, GroupName = "5. Filters")]
+        public int LateRangeCandles { get; set; }
 
         [NinjaScriptProperty]
         [Display(Name = "Allow longs", Order = 1, GroupName = "5. Filters")]
