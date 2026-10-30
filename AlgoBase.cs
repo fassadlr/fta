@@ -55,7 +55,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         [NinjaScriptProperty]
         [Display(Name = "Daily Max Consecutive Wins", Order = 10, GroupName = "Base")]
-        public double DailyMaxConsecutiveWins { get; set; }
+        public int DailyMaxConsecutiveWins { get; set; }
 
         internal double LastFractalHigh = 0;
         internal DateTime LastFractalHighTime;
@@ -387,11 +387,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 return false;
             }
 
-            //if (DailyTradeResult.Count == 2 && DailyTradeResult[0].Pnl > 0 && DailyTradeResult[1].Pnl > 0)
-            //{
-            //    HaltTrading($"[TRADING_HALTED] Max Consecutive wins reached {DayPnL}");
-            //    return false;
-            //}
+            if (DailyMaxConsecutiveWins != 0 && DailyTradeResult.Count == DailyMaxConsecutiveWins)
+            {
+                if (DailyTradeResult.Take(DailyMaxConsecutiveWins).All(t => t.Pnl > 0))
+                {
+                    HaltTrading($"[TRADING_HALTED] Max Consecutive wins reached {DayPnL}");
+                    return false;
+                }
+            }
 
             return true;
         }
