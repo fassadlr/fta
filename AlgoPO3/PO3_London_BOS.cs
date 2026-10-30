@@ -3,6 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
+using System.IO;
+using System.Text;
 using System.Linq;
 using System.Windows;
 using System.Windows.Media;
@@ -14,6 +17,7 @@ using NinjaTrader.Gui.Tools;
 using NinjaTrader.Data;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.DrawingTools;
+using NinjaTrader.NinjaScript.Indicators;
 #endregion
 
 // PO3_London_BOS strategy (run on a 5-minute chart)
@@ -47,6 +51,10 @@ using NinjaTrader.NinjaScript.DrawingTools;
 //  Late-range scenario (optional): if a BOS candle breaks a fractal but its close is still in the
 //  stop's range, wait LateRangeCandles (1) candle(s). If one closes into the new range, run the normal
 //  checks then, with the limit at the original broken fractal.
+//  No-trade calendar (optional): no new trades on dates listed in NoTradeCalendar (holidays).
+//  SMA filter (optional): longs only if the BOS close is above the SMA(SmaPeriod), shorts only if below.
+//  VWAP: anchored at the Globex open (18:00 New York), plotted and logged (not a filter).
+//  Trade log: one CSV row per filled trade, written when the strategy stops (State.Terminated).
 //  07:55 scenario (optional): a BOS on the candle opening 07:55 also counts; its limit goes in
 //  at the 08:00 open. All the usual rules still apply.
 //  Pending limit is cancelled if price reaches the EQ block before fill (0.47 of the new range for
@@ -83,7 +91,86 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             }
         }
 
+        // ---------------------------------------------------------------------------------------
+        // NO-TRADE CALENDAR - UK dates the strategy must not open new trades on.
+        // Add single days to Days, and inclusive date ranges to Ranges (start, end).
+        // ---------------------------------------------------------------------------------------
+        private static class NoTradeCalendar
+        {
+            // Single days (e.g. bank holidays)
+            private static readonly DateTime[] Days =
+            {
+                // Easter 2025
+                new DateTime(2025, 4, 18),   // Good Friday
+                new DateTime(2025, 4, 21),   // Easter Monday
+                // Easter 2026
+                new DateTime(2026, 4, 3),    // Good Friday
+                new DateTime(2026, 4, 6),    // Easter Monday
+
+                // Other England & Wales bank holidays 2025
+                new DateTime(2025, 5, 5),    // Early May bank holiday
+                new DateTime(2025, 5, 26),   // Spring bank holiday
+                new DateTime(2025, 8, 25),   // Summer bank holiday
+                // Other England & Wales bank holidays 2026
+                new DateTime(2026, 5, 4),    // Early May bank holiday
+                new DateTime(2026, 5, 25),   // Spring bank holiday
+                new DateTime(2026, 8, 31),   // Summer bank holiday
+                // (New Year's Day, Christmas Day and Boxing Day fall inside the Christmas ranges below)
+            };
+
+            // Inclusive ranges: Christmas week through New Year, trading resumes the first Monday of January
+            private static readonly DateTime[][] Ranges =
+            {
+                new[] { new DateTime(2024, 12, 23), new DateTime(2025, 1, 5) },   // resume Mon 6 Jan 2025
+                new[] { new DateTime(2025, 12, 22), new DateTime(2026, 1, 4) },   // resume Mon 5 Jan 2026
+                new[] { new DateTime(2026, 12, 21), new DateTime(2027, 1, 3) },   // resume Mon 4 Jan 2027
+            };
+
+            public static bool IsBlocked(DateTime ukDate)
+            {
+                DateTime d = ukDate.Date;
+                foreach (DateTime day in Days)
+                    if (day.Date == d)
+                        return true;
+                foreach (DateTime[] r in Ranges)
+                    if (d >= r[0].Date && d <= r[1].Date)
+                        return true;
+                return false;
+            }
+        }
+
+        private DateTime blockedLoggedDate = DateTime.MinValue;
+
+        // One row of the CSV trade log
+        private class TradeRecord
+        {
+            public bool IsLong;
+            public DateTime BosTime, SetupTime;          // candle OPEN times, UK
+            public double BrokenFractal, BosClose, LimitPrice, Stop, Target, PlannedRR;
+            public string TargetType, Notes;
+            public int Qty;
+            public double PlannedRiskDollars;
+            public double Sma, Vwap;
+            public DateTime EntryTime, ExitTime;         // execution times, UK
+            public int FilledQty, ExitQty;
+            public double EntryValue, ExitValue;         // sum(price x qty)
+            public string ExitType = "";
+            public bool Closed;
+        }
+
         private List<Swing> swings;
+        private SMA sma;
+
+        // Trade log
+        private List<TradeRecord> tradeLog;
+        private TradeRecord pendingRec;   // limit placed, not filled yet
+        private TradeRecord activeRec;    // filled, not closed yet
+
+        // VWAP anchored at the CME Globex (ETH) open, 18:00 New York time
+        private static readonly TimeSpan EthStartNy = new TimeSpan(18, 0, 0);
+        private TimeZoneInfo nyTz;
+        private DateTime vwapKey = DateTime.MinValue;
+        private double vwapPV, vwapV, vwapValue;
         private Swing lastHigh;          // most recent fractal high (stop source for shorts)
         private Swing lastLow;           // most recent fractal low  (stop source for longs)
         private List<Swing> openHighs;   // fractal highs not yet closed above
@@ -157,7 +244,18 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 OffsetEntryOn1R     = true;
                 AllowPreOpenBos     = true;
                 SkipStopInExtension = true;
+                MinStopPoints       = 0;      // 0 = off; e.g. 20 to skip very tight stops
+                MaxStopPoints       = 0;      // 0 = off
                 LateRangeCandles    = 1;
+                UseSmaFilter        = true;
+                SmaPeriod           = 48;    // 48 x 5m = 4 hours
+
+                // Trade log
+                WriteTradeLog       = true;
+                UseNoTradeCalendar  = true;
+                TradeLogFolder      = "";
+
+                AddPlot(new Stroke(Brushes.DodgerBlue, 2), PlotStyle.Line, "VWAP ETH");
                 EntryOffsetPoints   = 0.5;
 
                 // FVG filter
@@ -173,6 +271,9 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             }
             else if (State == State.DataLoaded)
             {
+                sma = SMA(Close, SmaPeriod);
+                if (UseSmaFilter && ShowDrawings)
+                    AddChartIndicator(sma);
                 swings = new List<Swing>();
                 lastHigh = null;
                 lastLow = null;
@@ -185,6 +286,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 trackingStartBar = 0;
                 tradedDate = DateTime.MinValue;
                 ukTz = TimeZoneInfo.FindSystemTimeZoneById("GMT Standard Time");
+                nyTz = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+                tradeLog = new List<TradeRecord>();
+                pendingRec = null;
+                activeRec = null;
+                vwapKey = DateTime.MinValue;
+            }
+            else if (State == State.Terminated)
+            {
+                WriteTradeLogCsv();
             }
         }
 
@@ -192,6 +302,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         {
             if (BarsInProgress != 0)
                 return;
+
+            UpdateVwap();
 
             if (CurrentBar < 2 * FractalStrength + 2)
                 return;
@@ -237,6 +349,15 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 return;
             if (!CanStartSetup())
                 return;
+            if (UseNoTradeCalendar && NoTradeCalendar.IsBlocked(ToUk(Time[0]).Date))
+            {
+                if (blockedLoggedDate != ToUk(Time[0]).Date)
+                {
+                    blockedLoggedDate = ToUk(Time[0]).Date;
+                    Log("No-trade date - skipping the day");
+                }
+                return;
+            }
             if (tradedDate == ToUk(Time[0]).Date)
             {
                 if ((longBos && AllowLong) || (shortBos && AllowShort))
@@ -369,6 +490,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 Log(string.Format("LONG  BOS of {0} (candle opening {1}) confirmed: closed into new range on candle opening {2}",
                     broken.Price, OpenTime(bosBar), OpenTime(CurrentBar)));
 
+            // SMA filter: longs only when the close is ABOVE the SMA.
+            if (UseSmaFilter && Close[0] <= sma[0])
+            {
+                Skip(string.Format("close {0} not above SMA({1}) {2:0.00}", Close[0], SmaPeriod, sma[0]), true);
+                return;
+            }
+
             // Skip if the stop sits in the extension band below the new range (between -0.111 Ext and 0 Low).
             if (SkipStopInExtension && stop >= newRange.ExtLow - 1e-9 && stop <= newRange.Low + 1e-9)
             {
@@ -436,6 +564,20 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 return;
             }
 
+            // Minimum stop distance (entry to stop, after any entry adjustment). 0 = off.
+            if (MinStopPoints > 0 && risk < MinStopPoints - 1e-9)
+            {
+                Skip(string.Format("stop distance {0} pts < minimum {1} pts", risk, MinStopPoints), true);
+                return;
+            }
+
+            // Maximum stop distance. 0 = off.
+            if (MaxStopPoints > 0 && risk > MaxStopPoints + 1e-9)
+            {
+                Skip(string.Format("stop distance {0} pts > maximum {1} pts", risk, MaxStopPoints), true);
+                return;
+            }
+
             int qty = PositionSize(risk);
             if (qty < 1)
             {
@@ -450,6 +592,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             pendingLong = true;
             pendingCancelLevel = cancelLevel;
             pendingSinceBar = CurrentBar;
+            pendingRec = NewRecord(true, broken, bosBar, entry, stop, target, target < targetR ? "EQ" : "1R",
+                rr, qty, qty * risk * Instrument.MasterInstrument.PointValue, stopSwing != lastLow);
 
             if (ShowDrawings)
             {
@@ -489,6 +633,13 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             if (bosBar != CurrentBar)
                 Log(string.Format("SHORT BOS of {0} (candle opening {1}) confirmed: closed into new range on candle opening {2}",
                     broken.Price, OpenTime(bosBar), OpenTime(CurrentBar)));
+
+            // SMA filter: shorts only when the close is BELOW the SMA.
+            if (UseSmaFilter && Close[0] >= sma[0])
+            {
+                Skip(string.Format("close {0} not below SMA({1}) {2:0.00}", Close[0], SmaPeriod, sma[0]), false);
+                return;
+            }
 
             // Skip if the stop sits in the extension band above the new range (between 1 High and 1.111 Ext).
             if (SkipStopInExtension && stop >= newRange.High - 1e-9 && stop <= newRange.ExtHigh + 1e-9)
@@ -557,6 +708,20 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 return;
             }
 
+            // Minimum stop distance (entry to stop, after any entry adjustment). 0 = off.
+            if (MinStopPoints > 0 && risk < MinStopPoints - 1e-9)
+            {
+                Skip(string.Format("stop distance {0} pts < minimum {1} pts", risk, MinStopPoints), false);
+                return;
+            }
+
+            // Maximum stop distance. 0 = off.
+            if (MaxStopPoints > 0 && risk > MaxStopPoints + 1e-9)
+            {
+                Skip(string.Format("stop distance {0} pts > maximum {1} pts", risk, MaxStopPoints), false);
+                return;
+            }
+
             int qty = PositionSize(risk);
             if (qty < 1)
             {
@@ -571,6 +736,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
             pendingLong = false;
             pendingCancelLevel = cancelLevel;
             pendingSinceBar = CurrentBar;
+            pendingRec = NewRecord(false, broken, bosBar, entry, stop, target, target > targetR ? "EQ" : "1R",
+                rr, qty, qty * risk * Instrument.MasterInstrument.PointValue, stopSwing != lastHigh);
 
             if (ShowDrawings)
             {
@@ -623,7 +790,187 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
             if (orderState == OrderState.Filled || orderState == OrderState.Cancelled || orderState == OrderState.Rejected)
                 entryOrder = null;
+
+            if ((orderState == OrderState.Cancelled || orderState == OrderState.Rejected) && filled == 0)
+                pendingRec = null;
         }
+
+        #region Trade log
+
+        private TradeRecord NewRecord(bool isLong, Swing broken, int bosBar, double entry, double stop, double target,
+            string targetType, double rr, int qty, double riskDollars, bool stopMoved)
+        {
+            double brokenPx = Instrument.MasterInstrument.RoundToTickSize(broken.Price);
+            List<string> notes = new List<string>();
+            if (bosBar != CurrentBar)                      notes.Add("late-range");
+            if (ToUk(Time[0]).TimeOfDay == SessionStartUk) notes.Add("07:55 BOS");
+            if (stopMoved)                                 notes.Add("stop moved to structural swing");
+            if (entry != brokenPx)
+                notes.Add((isLong ? entry < brokenPx : entry > brokenPx) ? "EQ scenario entry" : "1R offset entry");
+
+            return new TradeRecord
+            {
+                IsLong = isLong,
+                BosTime = BarOpenUk(bosBar),
+                SetupTime = BarOpenUk(CurrentBar),
+                BrokenFractal = broken.Price,
+                BosClose = Close[0],
+                LimitPrice = entry,
+                Stop = stop,
+                Target = target,
+                TargetType = targetType,
+                PlannedRR = rr,
+                Qty = qty,
+                PlannedRiskDollars = riskDollars,
+                Notes = string.Join("; ", notes),
+                Sma = sma[0],
+                Vwap = vwapValue
+            };
+        }
+
+        protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity,
+            MarketPosition marketPosition, string orderId, DateTime time)
+        {
+            if (execution.Order == null)
+                return;
+            string name = execution.Order.Name;
+
+            // Entry fill
+            if (name == LongSignal || name == ShortSignal)
+            {
+                if (pendingRec != null)
+                {
+                    activeRec = pendingRec;
+                    pendingRec = null;
+                    activeRec.EntryTime = ToUk(time);
+                    tradeLog.Add(activeRec);
+                }
+                if (activeRec != null)
+                {
+                    activeRec.FilledQty += quantity;
+                    activeRec.EntryValue += price * quantity;
+                }
+                return;
+            }
+
+            // Exit fill (stop, target or anything else that flattens the position)
+            if (activeRec == null)
+                return;
+            activeRec.ExitQty += quantity;
+            activeRec.ExitValue += price * quantity;
+            activeRec.ExitTime = ToUk(time);
+            activeRec.ExitType = name == "Stop loss" ? "Stop" : name == "Profit target" ? "Target" : name;
+            if (activeRec.ExitQty >= activeRec.FilledQty)
+            {
+                activeRec.Closed = true;
+                activeRec = null;
+            }
+        }
+
+        // P/L is calculated from the fills: points x point value x contracts (no commission).
+        private void WriteTradeLogCsv()
+        {
+            if (!WriteTradeLog || tradeLog == null || tradeLog.Count == 0)
+                return;
+            if (Category == Category.Optimize)
+                return;
+
+            try
+            {
+                string folder = string.IsNullOrWhiteSpace(TradeLogFolder)
+                    ? Path.Combine(NinjaTrader.Core.Globals.UserDataDir, "PO3_London_BOS logs")
+                    : TradeLogFolder;
+                Directory.CreateDirectory(folder);
+
+                string inst = Instrument != null ? Instrument.FullName : "unknown";
+                foreach (char c in Path.GetInvalidFileNameChars())
+                    inst = inst.Replace(c, '_');
+                string file = Path.Combine(folder, string.Format("PO3_London_BOS_{0}_{1:yyyyMMdd_HHmmss}.csv", inst, DateTime.Now));
+
+                CultureInfo ci = CultureInfo.InvariantCulture;
+                double pv = Instrument != null ? Instrument.MasterInstrument.PointValue : 1;
+                StringBuilder sb = new StringBuilder();
+                sb.AppendLine("Date,Direction,Limit,Stop,Target,Target type," +
+                    "SMA,Close vs SMA,Close - SMA (pts),VWAP ETH,Close vs VWAP,Close - VWAP (pts)," +
+                    "Entry time (UK),Entry price,Exit time (UK),Exit price,Exit type,Points,P/L $,Result");
+
+                foreach (TradeRecord r in tradeLog)
+                {
+                    double entryPx = r.FilledQty > 0 ? r.EntryValue / r.FilledQty : r.LimitPrice;
+                    string exitTime = "", exitPx = "", points = "", pnl = "", result = "Open";
+                    if (r.Closed && r.ExitQty > 0)
+                    {
+                        double xPx = r.ExitValue / r.ExitQty;
+                        double pts = (xPx - entryPx) * (r.IsLong ? 1 : -1);
+                        exitTime = r.ExitTime.ToString("yyyy-MM-dd HH:mm:ss", ci);
+                        exitPx   = xPx.ToString(ci);
+                        points   = pts.ToString("0.00", ci);
+                        pnl      = (pts * pv * r.FilledQty).ToString("0.00", ci);
+                        result   = pts > 0 ? "Win" : pts < 0 ? "Loss" : "Breakeven";
+                    }
+
+                    sb.AppendLine(string.Join(",", new string[]
+                    {
+                        r.SetupTime.ToString("yyyy-MM-dd", ci),
+                        r.IsLong ? "Long" : "Short",
+                        r.LimitPrice.ToString(ci),
+                        r.Stop.ToString(ci),
+                        r.Target.ToString(ci),
+                        r.TargetType,
+                        r.Sma.ToString("0.00", ci),
+                        r.BosClose > r.Sma ? "Above" : r.BosClose < r.Sma ? "Below" : "On",
+                        (r.BosClose - r.Sma).ToString("0.00", ci),
+                        r.Vwap.ToString("0.00", ci),
+                        r.BosClose > r.Vwap ? "Above" : r.BosClose < r.Vwap ? "Below" : "On",
+                        (r.BosClose - r.Vwap).ToString("0.00", ci),
+                        r.EntryTime.ToString("yyyy-MM-dd HH:mm:ss", ci),
+                        entryPx.ToString(ci),
+                        exitTime,
+                        exitPx,
+                        r.ExitType,
+                        points,
+                        pnl,
+                        result
+                    }));
+                }
+
+                File.WriteAllText(file, sb.ToString());
+                Print("PO3_London_BOS trade log written: " + file + " (" + tradeLog.Count + " trades)");
+            }
+            catch (Exception ex)
+            {
+                Print("PO3_London_BOS trade log FAILED: " + ex.Message);
+            }
+        }
+
+        #endregion
+
+        #region VWAP
+
+        // Session VWAP anchored at the CME Globex open (18:00 New York), so on a London morning it covers
+        // the whole overnight session. Typical price (H+L+C)/3 weighted by volume. Needs an ETH
+        // (24h) trading-hours template on the chart, otherwise there is no overnight data.
+        private void UpdateVwap()
+        {
+            DateTime nyOpen = TimeZoneInfo.ConvertTime(Time[0], Core.Globals.GeneralOptions.TimeZoneInfo, nyTz)
+                .AddMinutes(-BarsPeriod.Value);
+            DateTime key = nyOpen.TimeOfDay >= EthStartNy ? nyOpen.Date.AddDays(1) : nyOpen.Date;
+            if (key != vwapKey)
+            {
+                vwapKey = key;
+                vwapPV = 0;
+                vwapV = 0;
+            }
+
+            double tp = (High[0] + Low[0] + Close[0]) / 3.0;
+            double v  = Volume[0];
+            vwapPV += tp * v;
+            vwapV  += v;
+            vwapValue = vwapV > 0 ? vwapPV / vwapV : tp;
+            Values[0][0] = vwapValue;
+        }
+
+        #endregion
 
         // Red stop line from the stop swing to the BOS candle, labelled with the stop price.
         private void DrawStop(bool isLong, Swing stopSwing, double stop)
@@ -703,6 +1050,11 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                     side, tol, selected.Price, OpenTime(selected.Bar)));
 
             return best;
+        }
+
+        private DateTime BarOpenUk(int bar)
+        {
+            return ToUk(Bars.GetTime(bar)).AddMinutes(-BarsPeriod.Value);
         }
 
         // Candle OPEN time in UK time (NinjaTrader stamps bars with their close time).
@@ -980,6 +1332,16 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         public int StopBufferTicks { get; set; }
 
         [NinjaScriptProperty]
+        [Range(0, 10000)]
+        [Display(Name = "Min stop distance (pts, 0 = off)", Order = 9, GroupName = "2. Risk")]
+        public double MinStopPoints { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(0, 10000)]
+        [Display(Name = "Max stop distance (pts, 0 = off)", Order = 10, GroupName = "2. Risk")]
+        public double MaxStopPoints { get; set; }
+
+        [NinjaScriptProperty]
         [Display(Name = "EQ scenario: move limit to reach Min RR", Order = 5, GroupName = "2. Risk")]
         public bool AdjustEntryForRR { get; set; }
 
@@ -1012,12 +1374,33 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
         public int LateRangeCandles { get; set; }
 
         [NinjaScriptProperty]
+        [Display(Name = "SMA filter: longs above / shorts below", Order = 5, GroupName = "5. Filters")]
+        public bool UseSmaFilter { get; set; }
+
+        [NinjaScriptProperty]
+        [Range(1, 10000)]
+        [Display(Name = "SMA filter: period", Order = 6, GroupName = "5. Filters")]
+        public int SmaPeriod { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Skip no-trade dates (holidays)", Order = 7, GroupName = "5. Filters")]
+        public bool UseNoTradeCalendar { get; set; }
+
+        [NinjaScriptProperty]
         [Display(Name = "Allow longs", Order = 1, GroupName = "5. Filters")]
         public bool AllowLong { get; set; }
 
         [NinjaScriptProperty]
         [Display(Name = "Allow shorts", Order = 2, GroupName = "5. Filters")]
         public bool AllowShort { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Write trade log CSV", Order = 1, GroupName = "7. Trade log")]
+        public bool WriteTradeLog { get; set; }
+
+        [NinjaScriptProperty]
+        [Display(Name = "Trade log folder (blank = Documents\\NinjaTrader 8\\PO3_London_BOS logs)", Order = 2, GroupName = "7. Trade log")]
+        public string TradeLogFolder { get; set; }
 
         [Display(Name = "Show drawings", Order = 1, GroupName = "6. Visuals")]
         public bool ShowDrawings { get; set; }
