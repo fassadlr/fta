@@ -104,6 +104,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
         internal Dictionary<int, bool> DataSetValidation { get; set; }
 
+        internal List<(int TradeNumber, double Pnl)> DailyTradeResult { get; set; } = [];
+
         #region Trading Halt
 
         internal bool TradingHalted { get; set; }
@@ -343,6 +345,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
 
             tradePnl = Math.Round(tradePnl);
 
+            DailyTradeResult.Add((DailyTradeResult.Count + 1, tradePnl));
+
             var winLoss = tradePnl >= 0 ? "Win" : "Loss";
 
             var tradeCSV =
@@ -382,6 +386,12 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA
                 HaltTrading($"[TRADING_HALTED] Max Loss reached {DayPnL}");
                 return false;
             }
+
+            //if (DailyTradeResult.Count == 2 && DailyTradeResult[0].Pnl > 0 && DailyTradeResult[1].Pnl > 0)
+            //{
+            //    HaltTrading($"[TRADING_HALTED] Max Consecutive wins reached {DayPnL}");
+            //    return false;
+            //}
 
             return true;
         }

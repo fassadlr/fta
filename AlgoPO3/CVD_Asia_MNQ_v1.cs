@@ -458,6 +458,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             LastTradeCount = 0;
 
             CVD_TradeType = CVD_TradeType_Enum.Normal;
+
+            DailyTradeResult.Clear();
         }
     }
 }
