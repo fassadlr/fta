@@ -87,14 +87,14 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
         {
             if (State == State.SetDefaults)
             {
-                Name = "Alpha Asia MNQ v8.3";
+                Name = "Alpha Asia MNQ v8.4";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 IsExitOnSessionCloseStrategy = true;
                 ConnectionLossHandling = ConnectionLossHandling.KeepRunning;
 
                 PO3 = 81;
-                Risk = 175; //$150
+                Risk = 200; //$150
 
                 LongEdgeMultiplier = 1.5;
                 ShortEdgeMultiplier = 1.5;
@@ -103,6 +103,7 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
 
                 DailyMaxLoss = -400; // $300
                 DailyMaxProfit = 700; // $600
+                DailyMaxConsecutiveWins = 2;
 
                 CVDEMADistanceFilteringEnabled = true;
 
@@ -766,6 +767,8 @@ namespace NinjaTrader.NinjaScript.Strategies.FTA.AlgoPO3
             DayPnL = 0;
             DayPnLVirtual = 0;
             LastTradeCount = 0;
+
+            DailyTradeResult.Clear();
         }
 
         private void ApplyEdgeToPosition()
